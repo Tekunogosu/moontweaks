@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>moontweaks</AssemblyName>
+    <RootNamespace>MoonTweaks</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Vendored MoonSharp doc comments are incomplete and malformed in places.
+         Documentation of our own bindings is enforced by the docs script in check mode. -->
+    <NoWarn>$(NoWarn);CS1570;CS1571;CS1572;CS1573;CS1574;CS1591;CS0419</NoWarn>
+  </PropertyGroup>
+
+  <!-- Vintage Story install; override with the VINTAGE_STORY environment variable. -->
+  <PropertyGroup>
+    <VintageStoryDir Condition="'$(VINTAGE_STORY)' != ''">$(VINTAGE_STORY)</VintageStoryDir>
+    <VintageStoryDir Condition="'$(VintageStoryDir)' == ''">$(HOME)/.local/share/vintagestory</VintageStoryDir>
+  </PropertyGroup>
+
+  <!-- MoonSharp is compiled into moontweaks.dll rather than shipped beside it. -->
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);DOTNET_CORE;HASDYNAMIC</DefineConstants>
+    <MoonSharpDir>$(MSBuildThisFileDirectory)third_party/moonsharp/src/MoonSharp.Interpreter</MoonSharpDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src/**/*.cs" />
+    <Compile Include="$(MoonSharpDir)/**/*.cs" Link="third_party/MoonSharp/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="VintagestoryAPI"><HintPath>$(VintageStoryDir)/VintagestoryAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="VintagestoryLib"><HintPath>$(VintageStoryDir)/VintagestoryLib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(VintageStoryDir)/Lib/Newtonsoft.Json.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(VintageStoryDir)/Lib/0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="VSSurvivalMod"><HintPath>$(VintageStoryDir)/Mods/VSSurvivalMod.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="VSEssentials"><HintPath>$(VintageStoryDir)/Mods/VSEssentials.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>

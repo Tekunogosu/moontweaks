@@ -1,0 +1,6 @@
+bin/
+docs/
+.idea/
+obj/
+.testbed/
+*.user

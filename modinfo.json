@@ -1,0 +1,12 @@
+{
+  "type": "code",
+  "modid": "moontweaks",
+  "name": "MoonTweaks",
+  "description": "Lua scripting for Vintage Story recipes and registries.",
+  "version": "0.1.0",
+  "side": "Universal",
+  "requiredonclient": false,
+  "dependencies": {
+    "game": "1.22.0"
+  }
+}

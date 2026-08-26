@@ -1,0 +1,54 @@
+name: docs
+
+# The reference is generated from the mod's bindings, so it is rebuilt from
+# source rather than committed. A binding without documentation fails the job.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Fetch Vintage Story
+        run: |
+          mkdir -p "$HOME/vs"
+          curl -sSfL "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_${VS_VERSION}.tar.gz" \
+            | tar -xz -C "$HOME/vs"
+          echo "VINTAGE_STORY=$HOME/vs" >> "$GITHUB_ENV"
+        env:
+          VS_VERSION: 1.22.7
+
+      - run: ./scripts/sync-moonsharp.sh
+      - run: ./scripts/package.sh
+      - run: ./scripts/docs.sh --check
+      - run: ./scripts/docs.sh
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
