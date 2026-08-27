@@ -124,7 +124,16 @@ need nothing installed.
 the recipe on the line that declares it, then appends the resolved recipes to a
 mutation log. Nothing touches a registry until every script has run. A script
 that fails on line 40 therefore contributes nothing, rather than leaving the
-recipe tree half-edited — including the scripts that ran before it.
+recipe tree half-edited — including the scripts that ran before it. The log keeps
+what each change turned out to affect, which is what `/moontweaks list` reports
+and what the startup lines are written from, so the two cannot disagree.
+
+**Added recipes are renumbered.** The game identifies a new recipe by how many
+the list already holds, which collides with a surviving recipe whenever a script
+removed one first. A knapping surface resolves the recipe a player picked by that
+identifier, so a duplicate silently hands them another recipe's output — an axe
+where they chose a knife blade. `RecipeRegistry` therefore assigns an identifier
+past every one in use rather than trusting the count.
 
 Failures name the file, the line, the call, and the argument:
 
@@ -137,11 +146,14 @@ Failures name the file, the line, the call, and the argument:
 ### Layers
 
 ```
-Host       ModSystem, script discovery, editor scaffolding, the log module
+Host       ModSystem, commands, script discovery, editor scaffolding, the log module
 Scripting  ScriptValue / IScriptHost / ScriptOrigin
 Api        annotations, spec records, SpecBinder, DomainBinder
 Recipes    one domain and factory per recipe kind, over the shared owners below
 ```
+
+`ScriptRun` owns running the scripts. A server's startup and `/moontweaks check`
+both go through it, so what a check reports is what a start would do.
 
 MoonSharp appears in exactly one class, `Scripting/MoonSharpHost`. Lua values are
 reduced to a neutral `ScriptValue` tree at that boundary, so swapping interpreters
@@ -166,9 +178,12 @@ chosen, so a quantity there would be a field that could never mean anything.
 The reference is generated from the bindings, never written alongside them:
 
 ```sh
-./scripts/docs.sh            # docs/api.json, docs/library/moontweaks.lua, docs/index.html
+./scripts/docs.sh            # the reference, the library, and a scaffolded examples/
 ./scripts/docs.sh --check    # fail on any undocumented binding, write nothing
 ```
+
+It writes `docs/api.json`, `docs/library/`, `docs/index.html`, and scaffolds
+`examples/` with the same files the mod installs into a server.
 
 `ApiReflector` enumerates the surface through `DomainBinder.FunctionsOf` and
 `SpecBinder.FieldsOf` — the same helpers the interpreter uses to decide what
@@ -389,8 +404,13 @@ between MoonSharp's own `ReferenceEqualityComparer` and the one .NET 5 added to
 ```
 src/            the mod
 tools/docgen/   reference generator
-scripts/        build, docs, and testbed entry points
+scripts/        build, docs, install and testbed entry points
 patches/        patches applied to the vendored MoonSharp checkout
-examples/       scripts demonstrating the API
+examples/       one worked script per recipe kind, shipped with the mod
 third_party/    MoonSharp submodule
+TODO.md         work that is decided but not yet done
 ```
+
+`examples/` doubles as a MoonTweaks folder: `docs.sh` scaffolds it with the same
+library and editor files a server gets, so the examples are checked exactly where
+an author's scripts would be, and ship from there into every install.
