@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Text;
+using MoonTweaks.Host;
 
 namespace MoonTweaks.DocGen;
 
@@ -14,11 +15,23 @@ public static class LuaCatsWriter
     /// <summary>Renders the whole API as a definitions file.</summary>
     public static string Write(ApiModel api)
     {
+        var body = Body(api);
         var output = new StringBuilder();
         output.AppendLine("---@meta");
         output.AppendLine($"--- MoonTweaks {api.Version} scripting API.");
         output.AppendLine("--- Generated from the mod's bindings; do not edit.");
+        // Everything the header does not itself contain, so a reader of one line
+        // can tell whether a file on disk is the one this build would write.
+        output.AppendLine($"{LibraryHeader.BuildMarker}{LibraryHeader.Fingerprint(api.Version + body)}");
         output.AppendLine();
+        output.Append(body);
+        return output.ToString();
+    }
+
+    /// <summary>Everything below the header: the types, then the modules.</summary>
+    private static string Body(ApiModel api)
+    {
+        var output = new StringBuilder();
 
         foreach (var enumeration in api.Enums)
         {
@@ -34,12 +47,23 @@ public static class LuaCatsWriter
 
         foreach (var table in api.Tables)
         {
+            // A shape that accepts a string shorthand is a union, so its public name
+            // becomes an alias over the two and the fields hang off a private class.
+            var shape = table.Shorthand is null ? table.Name : $"{table.Name}Table";
+
             Comment(output, table.Summary);
             if (table.Shorthand is not null)
             {
+                // The shorthand stands in for one field, so it is written as whatever
+                // that field is: a code field keeps the values an editor suggests for
+                // it rather than widening to a bare string.
+                var written = table.Fields.FirstOrDefault(field => field.Name == table.Shorthand)?.Type ?? "string";
                 output.AppendLine($"--- A bare string is shorthand for `{{ {table.Shorthand} = <string> }}`.");
+                output.AppendLine($"---@alias {table.Name} {shape} | {written}");
+                output.AppendLine();
+                Comment(output, table.Summary);
             }
-            output.AppendLine($"---@class {table.Name}");
+            output.AppendLine($"---@class {shape}");
             foreach (var field in table.Fields)
             {
                 // The optional marker already says the field may be absent, so a

@@ -1,8 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using MoonTweaks.Scripting;
-using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 
 namespace MoonTweaks.Host;
@@ -10,21 +10,56 @@ namespace MoonTweaks.Host;
 /// <summary>The folder of scripts a server runs, and how they are ordered.</summary>
 public static class ScriptLibrary
 {
-    /// <summary>Folder under ModConfig that scripts are read from.</summary>
+    /// <summary>Folder under ModConfig holding everything MoonTweaks owns.</summary>
     public const string FolderName = "moontweaks";
 
-    /// <summary>Absolute path of the script folder, created if a server has none yet.</summary>
-    public static string PathFor(ICoreAPI api)
+    /// <summary>Folder scripts are read from, beneath <see cref="FolderName"/>.</summary>
+    public const string ScriptsFolder = "scripts";
+
+    /// <summary>The MoonTweaks folder for this install, created if there is none yet.</summary>
+    public static string PathFor()
     {
         var folder = Path.Combine(GamePaths.ModConfig, FolderName);
         Directory.CreateDirectory(folder);
         return folder;
     }
 
-    /// <summary>Every script in the folder, in filename order so authors can control precedence.</summary>
-    public static IReadOnlyList<ScriptFile> Discover(ICoreAPI api) =>
-        Directory.EnumerateFiles(PathFor(api), "*.lua")
-            .OrderBy(path => Path.GetFileName(path), System.StringComparer.Ordinal)
-            .Select(path => new ScriptFile(Path.GetFileName(path), File.ReadAllText(path)))
+    /// <summary>The scripts folder for this install, created if there is none yet.</summary>
+    public static string ScriptsPathFor()
+    {
+        var folder = Path.Combine(PathFor(), ScriptsFolder);
+        Directory.CreateDirectory(folder);
+        return folder;
+    }
+
+    /// <summary>
+    /// Every script beneath <paramref name="scriptsFolder"/>, at any depth, ordered
+    /// by the path each is named after. A subfolder therefore groups related scripts
+    /// into a package that one numeric prefix orders as a whole, while a prefix
+    /// inside it orders that package's own members.
+    /// </summary>
+    public static IReadOnlyList<ScriptFile> Discover(string scriptsFolder) =>
+        Directory.EnumerateFiles(scriptsFolder, "*.lua", SearchOption.AllDirectories)
+            .Select(path => new ScriptFile(NameOf(scriptsFolder, path), File.ReadAllText(path)))
+            .OrderBy(script => script.Name, StringComparer.Ordinal)
             .ToList();
+
+    /// <summary>
+    /// Scripts sitting in <paramref name="folder"/> itself rather than under
+    /// <see cref="ScriptsFolder"/>. These do not run, so a server is told about them
+    /// rather than left to wonder why nothing happened.
+    /// </summary>
+    public static IReadOnlyList<string> Misplaced(string folder) =>
+        Directory.EnumerateFiles(folder, "*.lua", SearchOption.TopDirectoryOnly)
+            .Select(path => Path.GetFileName(path))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+    /// <summary>
+    /// Path a script is known by: relative to the scripts folder and always written
+    /// with forward slashes, so both failure messages and run order read the same on
+    /// every platform.
+    /// </summary>
+    private static string NameOf(string root, string path) =>
+        Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/');
 }

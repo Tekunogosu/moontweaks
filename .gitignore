@@ -4,3 +4,6 @@ docs/
 obj/
 .testbed/
 *.user
+examples/.luarc.json
+examples/.vscode/
+examples/library/

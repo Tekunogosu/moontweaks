@@ -2,12 +2,27 @@
 
 Lua scripting for Vintage Story recipes. Drop a `.lua` file into a server's
 config folder and it rewrites the crafting registries at load, without compiling
-a mod or patching JSON.
+a mod or patching JSON. Starting the server once scaffolds that folder into a
+workspace your editor already understands.
 
 ## Writing scripts
 
-Scripts live in `<dataPath>/ModConfig/moontweaks/` and run in filename order, so
-a numeric prefix controls precedence.
+Scripts live in `<dataPath>/ModConfig/moontweaks/scripts/` and run in path order,
+at any depth. A subfolder groups related scripts into a package that one numeric
+prefix orders as a whole, while a prefix inside it orders that package's own
+members:
+
+```
+scripts/
+  10-core/
+    10-axes.lua
+    20-tools.lua
+  20-economy/
+    10-prices.lua
+  99-overrides.lua
+```
+
+A script is named by its path from `scripts/`, so that is what failures report.
 
 ```lua
 local grid = moontweaks.recipes.grid
@@ -53,6 +68,46 @@ reads as a working reference. A name changes only where the shape changed.
 Two shorthands: a bare string stands in for a table with only `code` set, and
 `type` is inferred by looking the code up in the item and block registries.
 
+An ingredient may name what an asset *is* rather than what it is called:
+
+```lua
+ingredients = {
+  A = { tags = { "tool-axe" }, isTool = true, toolDurabilityCost = 1 },
+  F = "game:firewood",
+}
+```
+
+`code = "game:axe-*"` would match only assets a mod happened to code as `axe-`;
+`tags = { "tool-axe" }` accepts any axe, however it is named. Every tag listed
+must be present, and a tag no item or block carries is refused by name rather
+than quietly matching nothing. Either `code` or `tags` is required; both together
+narrow a wildcard further.
+
+Knapping reads the same way, with one material rather than a grid of them:
+
+```lua
+local knap = moontweaks.recipes.knapping
+
+knap.remove("game:knifeblade-flint")
+
+knap.add {
+  ingredient = { code = "game:stone-*", name = "rock",
+                 allowedVariants = { "chert", "granite", "andesite" } },
+  pattern = { "___####___",
+              "___####___",
+              "____##____" },
+  output = { code = "game:knifeblade-{rock}", quantity = 2 },
+}
+```
+
+`#` is stone left in place and `_` is stone chipped away. A knapping surface is
+16 by 16 and a smaller pattern leaves the rest of it untouched. Rows outside that
+square, ragged rows, a pattern that leaves no stone, and any character other than
+those two are all refused with the row named.
+
+`examples/scripts/` holds a worked script per recipe kind, checked by
+`lua-language-server` on every documentation build.
+
 ## How it works
 
 **Scripts run at `ExecuteOrder` 1.1**, immediately after the vanilla recipe
@@ -82,18 +137,29 @@ Failures name the file, the line, the call, and the argument:
 ### Layers
 
 ```
-Host       ModSystem, script discovery, the log module
+Host       ModSystem, script discovery, editor scaffolding, the log module
 Scripting  ScriptValue / IScriptHost / ScriptOrigin
 Api        annotations, spec records, SpecBinder, DomainBinder
-Recipes    GridDomain, GridRecipeFactory, AssetKindResolver, MutationLog
+Recipes    one domain and factory per recipe kind, over the shared owners below
 ```
 
 MoonSharp appears in exactly one class, `Scripting/MoonSharpHost`. Lua values are
 reduced to a neutral `ScriptValue` tree at that boundary, so swapping interpreters
 means reimplementing `IScriptHost` and nothing else.
 
-`AssetKindResolver` is the sole owner of the item-versus-block question, so no
-recipe domain decides it independently.
+Three questions every recipe kind asks have one owner apiece, so no domain
+answers them for itself. `AssetKindResolver` decides whether a code names an item
+or a block. `RecipeAssets` turns the shapes scripts write into the records the
+game resolves. `RecipeRegistry` reaches the lists the game keeps outside the
+world: grid recipes hang off the world itself, but every other kind lives on a
+mod system.
+
+Specs share the same way. `Material` is a code that a wildcard may name a family
+of; an `Ingredient` is a `Material` the recipe also consumes a quantity of, or
+uses as a tool. Knapping takes a `Material` rather than an `Ingredient` because
+the stone decides which recipes a surface offers rather than how much is spent —
+the game consumes exactly one when the surface is placed, before a recipe is even
+chosen, so a quantity there would be a field that could never mean anything.
 
 ## The API reference
 
@@ -113,12 +179,143 @@ cannot document a function that is not bound, or omit one that is.
 value lacks a description. It runs in CI ahead of the Pages deploy, so an
 undocumented binding cannot reach `main`.
 
-`docs/library/moontweaks.lua` holds LuaCATS annotations. Point
-`lua-language-server` at it and script authors get completion, parameter hints
-and type checking against the real API.
-
 `docs/` is generated rather than committed; a checked-in copy would be a second
 source of truth free to go stale.
+
+## Editor setup
+
+Starting a server once is the whole setup. The mod scaffolds its own folder:
+
+```
+<dataPath>/ModConfig/moontweaks/
+  .luarc.json                 language server configuration
+  .vscode/extensions.json     recommends the Lua extension to VS Code
+  config.json                 settings, written with their defaults
+  library/moontweaks.lua      LuaCATS annotations for this build's bindings
+  library/codes.lua           every asset code this server's registries hold
+  examples/                   a worked script per recipe kind, to copy and edit
+  scripts/                    your scripts
+```
+
+Three rules keep that folder current without a server writing to disk on every
+start. `library/moontweaks.lua` carries a fingerprint of the bindings it was
+generated from, in a comment on its fourth line; a server compares that one line
+against the build it is running and rewrites the file only when the two disagree.
+`LibraryHeader` owns that format for both the generator that writes it and the
+server that reads it. The examples carry no such marker, so they are compared
+outright and rewritten only when their contents differ, which is what keeps a
+folder's examples in step as recipe kinds are added. `.luarc.json` and
+`.vscode/extensions.json` are written only when absent, since from then on they
+are the author's files.
+
+### Asset codes
+
+`library/codes.lua` lists every code in the server's item and block registries and
+every tag they carry, so an editor offers them inside a string rather than leaving
+an author to guess:
+
+```lua
+output = "game:axe-|"          -- suggestions appear here
+ingredient = { code = "game:|" }
+tags = { "tool-|" }
+```
+
+It is generated from the running game rather than shipped, so it covers whatever
+mods a server loads, and it is rewritten only when the set of codes changes.
+`/moontweaks export` regenerates it without a restart, for after a mod is added.
+
+The alias widens `string` rather than closing over the codes it lists. An editor
+therefore suggests them without rejecting anything absent from the list, which
+matters because a code may reach the game after the file was written.
+
+Expect the suggestion list to cost roughly 50 microseconds per code, all of which
+is the editor's, not the server's: around 300ms for a vanilla install's 7,000-odd
+codes, and proportionally more on a heavily modded one.
+
+An editor reports a required field left out before a server ever reads the
+script. It cannot report a *misspelled* one:
+`lua-language-server` does not check for unknown keys in a table literal, at any
+severity. The binder catches those when a server loads, naming the file, the line
+and the nearest field it knows:
+
+```
+[moontweaks] 99-broken.lua:1: moontweaks.recipes.grid.add argument 'recipe'
+             has no field 'ingredents'; did you mean 'ingredients'?
+```
+
+**Copy an example into `scripts/` before changing it.** Nothing under `examples/`
+runs, and a server restores anything edited there, because that folder mirrors the
+build rather than belonging to the author. Every example ships from
+`examples/scripts/` in this repository, so each one is a script the documentation
+build type-checks rather than prose that can rot.
+
+Open `<dataPath>/ModConfig/moontweaks/` as the project folder, not `scripts/`.
+Neovim resolves either, because `lua_ls` roots a workspace by walking up for
+`.luarc.json` ahead of `.git`; VS Code roots at the folder it was opened on and
+so needs the one holding the configuration.
+
+**Neovim** needs `lua-language-server` installed and the stock `lua_ls` setup;
+nothing MoonTweaks-specific goes in your configuration. **VS Code** and VSCodium
+need the `sumneko.lua` extension, which `.vscode/extensions.json` offers on first
+open and which is the same identifier on both the Marketplace and Open VSX. Any
+other editor driving `lua-language-server` reads the same `.luarc.json`, so
+nothing here is specific to those two.
+
+That configuration names the Lua version the interpreter reports and disables the
+standard libraries MoonSharp's hard sandbox withholds: `coroutine`, `debug`,
+`io`, `os`, `package` and `utf8`. `pcall`, `setmetatable` and `dofile` sit in a
+library the sandbox keeps only in part, so the server offers them although
+scripts cannot call them.
+
+`src/Host/Resources/` holds those files, embedded in the mod and written out
+verbatim. `./scripts/docs.sh` scaffolds `examples/` from the same resources and
+the same library, so the repository's own scripts are checked exactly as a
+server's are:
+
+```sh
+lua-language-server --check examples
+```
+
+It pairs with `./scripts/docs.sh --check`: the first fails on an example that
+disagrees with the generated types, the second on a binding without a
+description.
+
+## Commands
+
+```
+/moontweaks list       the changes this server's scripts applied at startup
+/moontweaks check      re-run every script and report what it would change
+/moontweaks export     rewrite library/codes.lua from the live registries
+```
+
+`check` is a compile test, not a reload. It runs every script against a fresh
+interpreter and reports the failure that stopped it, or the changes it would have
+made, and then discards them. Nothing is applied, so a script can be checked
+against a running server without that server and its players disagreeing about
+what the recipes are.
+
+It cannot be a reload. The server builds one assets packet at startup, caches it,
+and hands that same packet to every client that connects, freeing the underlying
+per-asset memory as it serialises. Changing a registry afterwards therefore
+reaches nobody, and rebuilding the packet would serialise assets already freed.
+Seeing a change still means restarting the server; `check` is what makes the
+attempts before that cheap.
+
+`config.json` decides who may run them:
+
+```json
+{
+  "commandPrivilege": "controlserver"
+}
+```
+
+`controlserver` is the privilege administrators hold, so a fresh server keeps
+these commands with its administrators until it says otherwise. Any privilege
+name the game knows may be used instead. One setting currently gates every
+command together; see `TODO.md` for the per-command version.
+
+A settings file that cannot be parsed is reported and the defaults are used, so
+bad JSON costs a server its settings rather than its startup.
 
 ## Building
 
@@ -129,15 +326,31 @@ Requires the .NET 10 SDK and a Vintage Story install.
 ./scripts/package.sh          # build, emit bin/Release/moontweaks-<version>.zip
 ```
 
+`package.sh` builds twice. The first pass produces the assembly the reference
+generator reflects over; the second embeds the library it wrote. The library is
+derived from the bindings and not from itself, so the second pass is a fixed
+point. A plain `dotnet build` embeds whichever library the last `docs.sh` wrote,
+or none at all, in which case the mod still runs scripts and says at startup that
+it cannot describe itself to an editor.
+
 `VINTAGE_STORY` overrides the client install path, which defaults to
 `~/.local/share/vintagestory`.
 
 ### Testing against a real game
 
 ```sh
-./scripts/run-server.sh       # package, install into .testbed/Mods, run a dedicated server
-./scripts/run-client.sh       # connect a client carrying only this mod
+./scripts/install.sh [dataPath]   # package and install into a server's Mods folder
+./scripts/run-server.sh           # install into .testbed and run a dedicated server
+./scripts/run-client.sh           # connect a client carrying only this mod
 ```
+
+`install.sh` replaces whatever version of the mod a data path already holds, and
+takes the path as its argument so a server other than the testbed can be updated
+without running one. `run-server.sh` calls it rather than installing itself.
+
+The version in `modinfo.json` names the zip and appears in the server's mod list,
+which is how a tester tells one build from another. Bump it with every change: the
+patch number for a fix, the minor number when something new is added.
 
 `run-client.sh` runs the client on a throwaway data path with `modPaths` reduced
 to the base game, so the tester's own mods stay out of the result. It copies the

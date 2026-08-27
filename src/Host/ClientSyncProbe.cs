@@ -1,5 +1,6 @@
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.GameContent;
 
 namespace MoonTweaks.Host;
 
@@ -16,7 +17,8 @@ public class ClientSyncProbe : ModSystem
     public override void StartClientSide(ICoreClientAPI api)
     {
         api.Event.LevelFinalize += () =>
-            api.Logger.Notification("[moontweaks probe] client sees {0} grid recipes",
-                api.World.GridRecipes.Count);
+            api.Logger.Notification("[moontweaks probe] client sees {0} grid and {1} knapping recipes",
+                api.World.GridRecipes.Count,
+                api.ModLoader.GetModSystem<RecipeRegistrySystem>()?.KnappingRecipes.Count ?? -1);
     }
 }

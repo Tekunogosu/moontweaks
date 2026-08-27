@@ -9,7 +9,7 @@ namespace MoonTweaks.Recipes;
 /// <summary>Builds Vintage Story grid recipes from the shape scripts declare.</summary>
 public sealed class GridRecipeFactory(IWorldAccessor world)
 {
-    private readonly AssetKindResolver kinds = new(world);
+    private readonly RecipeAssets assets = new(world);
 
     /// <summary>Translates one spec, rejecting patterns that cannot describe a grid.</summary>
     public GridRecipe Create(GridRecipeSpec spec, ScriptOrigin origin)
@@ -52,27 +52,8 @@ public sealed class GridRecipeFactory(IWorldAccessor world)
             CopyAttributesFrom = spec.CopyAttributesFrom,
             Ingredients = spec.Ingredients.ToDictionary(
                 entry => entry.Key,
-                entry => Ingredient(entry.Value, origin, $"ingredients.{entry.Key}")),
-            Output = Output(spec.Output, origin),
+                entry => assets.Ingredient(entry.Value, origin, $"ingredients.{entry.Key}")),
+            Output = assets.Output(spec.Output, origin),
         };
     }
-
-    private CraftingRecipeIngredient Ingredient(IngredientSpec spec, ScriptOrigin origin, string path) => new()
-    {
-        Type = kinds.Resolve(spec.Code, spec.Type, origin, path),
-        Code = new AssetLocation(spec.Code),
-        Quantity = spec.Quantity,
-        Name = spec.Name,
-        AllowedVariants = spec.AllowedVariants,
-        SkipVariants = spec.SkipVariants,
-        IsTool = spec.IsTool,
-        ToolDurabilityCost = spec.ToolDurabilityCost,
-    };
-
-    private CraftingRecipeIngredient Output(OutputSpec spec, ScriptOrigin origin) => new()
-    {
-        Type = kinds.Resolve(spec.Code, spec.Type, origin, "output"),
-        Code = new AssetLocation(spec.Code),
-        Quantity = spec.Quantity,
-    };
 }

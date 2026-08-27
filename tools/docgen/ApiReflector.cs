@@ -64,7 +64,7 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
                 var field = entry.Value.GetCustomAttribute<LuaFieldAttribute>()!;
                 return new FieldDoc(
                     field.Name,
-                    LuaNameOf(entry.Value.PropertyType),
+                    Suggested(field, entry.Value.PropertyType),
                     field.Required,
                     field.Default,
                     docs.Summary(entry.Value));
@@ -90,6 +90,16 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         .Where(type => type.IsEnum)
         .Distinct();
 
+    /// <summary>
+    /// The type a field is documented as. A suggestion names the values one element
+    /// may take, so a field holding a list of them is still written as a list.
+    /// </summary>
+    private string Suggested(LuaFieldAttribute field, Type type)
+    {
+        if (field.Suggests is not { } values) return LuaNameOf(type);
+        return type.IsArray ? $"{values}[]" : values;
+    }
+
     /// <summary>Renders a CLR type as the Lua type scripts actually write.</summary>
     private string LuaNameOf(Type type)
     {
@@ -101,6 +111,8 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         if (type == typeof(bool)) return "boolean";
         if (type == typeof(void)) return "nil";
         if (type == typeof(string[])) return "string[]";
+        // Written as rows, or as a list of them when a shape has more than one layer.
+        if (type == typeof(string[][])) return "string[] | string[][]";
         if (tableNames.TryGetValue(type, out var table)) return table;
         if (type.IsEnum) return type.Name;
 

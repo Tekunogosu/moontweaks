@@ -41,6 +41,11 @@ Directory.CreateDirectory(Path.Combine(outputDir, "library"));
 Write(Path.Combine(outputDir, "api.json"),
     JsonSerializer.Serialize(api, new JsonSerializerOptions { WriteIndented = true }));
 Write(Path.Combine(outputDir, "library", "moontweaks.lua"), LuaCatsWriter.Write(api));
+
+// A server writes the real one from its own registries. This empty one defines the
+// alias so a checkout type-checks without a game to read codes out of.
+Write(Path.Combine(outputDir, "library", MoonTweaks.Host.AssetCodeLibrary.FileName),
+    MoonTweaks.Host.AssetCodeLibrary.Render([], []));
 Write(Path.Combine(outputDir, "index.html"), HtmlWriter.Write(api));
 
 Console.WriteLine($"{Members(api)} member(s) documented across "

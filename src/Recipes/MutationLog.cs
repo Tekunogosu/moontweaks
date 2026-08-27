@@ -33,17 +33,35 @@ public sealed class MutationLog
     /// <summary>Records a change without performing it.</summary>
     public void Record(IMutation mutation) => pending.Add(mutation);
 
+    /// <summary>
+    /// What one applied change turned out to affect, kept so a server can report
+    /// afterwards what its scripts actually did.
+    /// </summary>
+    public sealed record Applied(ScriptOrigin Origin, string Description, int Recipes)
+    {
+        /// <inheritdoc/>
+        public override string ToString() => $"{Origin}: {Description} ({Recipes} recipe(s))";
+    }
+
+    private readonly List<Applied> applied = [];
+
+    /// <summary>Changes already applied, in the order they were performed.</summary>
+    public IReadOnlyList<Applied> Changes => applied;
+
     /// <summary>Applies every recorded change, reporting each one to the log.</summary>
     public int Apply(ICoreServerAPI api, ILogger logger)
     {
         var affected = 0;
+        applied.Clear();
 
         foreach (var mutation in pending)
         {
             var count = mutation.Apply(api);
             affected += count;
-            logger.Notification("[moontweaks] {0}: {1} ({2} recipe(s))",
-                mutation.Origin, mutation.Describe(), count);
+
+            var change = new Applied(mutation.Origin, mutation.Describe(), count);
+            applied.Add(change);
+            logger.Notification("[moontweaks] {0}", change);
         }
 
         return affected;

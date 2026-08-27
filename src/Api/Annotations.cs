@@ -19,7 +19,11 @@ public sealed class LuaFunctionAttribute(string name) : Attribute
 }
 
 /// <summary>Marks a class as a table shape that scripts pass as an argument.</summary>
-[AttributeUsage(AttributeTargets.Class)]
+/// <remarks>
+/// Not inherited: a shape that extends another names itself, so asking a derived
+/// spec for its table finds one attribute rather than two.
+/// </remarks>
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class LuaTableAttribute(string name) : Attribute
 {
     /// <summary>Name the shape is documented under.</summary>
@@ -33,7 +37,11 @@ public sealed class LuaTableAttribute(string name) : Attribute
 }
 
 /// <summary>Marks a property as a key of the enclosing Lua table.</summary>
-[AttributeUsage(AttributeTargets.Property)]
+/// <remarks>
+/// Not inherited: a shape that restates a key to describe it differently carries
+/// its own annotation, so asking for one finds a single answer.
+/// </remarks>
+[AttributeUsage(AttributeTargets.Property, Inherited = false)]
 public sealed class LuaFieldAttribute(string name) : Attribute
 {
     /// <summary>Key scripts write in the table literal.</summary>
@@ -44,4 +52,11 @@ public sealed class LuaFieldAttribute(string name) : Attribute
 
     /// <summary>Value used when the key is omitted, written as it would appear in Lua.</summary>
     public string? Default { get; init; }
+
+    /// <summary>
+    /// Named set of values an editor offers for this key, replacing the type it
+    /// would otherwise be documented as. The set only suggests: the binder still
+    /// reads whatever the property declares, so a value outside it is accepted.
+    /// </summary>
+    public string? Suggests { get; init; }
 }

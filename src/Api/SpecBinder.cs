@@ -110,6 +110,23 @@ public static class SpecBinder
                 .ToArray();
         }
 
+        if (underlying == typeof(string[][]))
+        {
+            if (value is not ScriptValue.List layers) throw Expected(origin, path, "a list of rows", value);
+
+            // Rows are the spelling; a shape with one layer is written as its rows
+            // directly, so a list that starts with a string is read as that layer.
+            if (layers.Items.Count > 0 && layers.Items[0] is ScriptValue.Str)
+            {
+                return new[] { (string[])Convert(typeof(string[]), value, origin, path)! };
+            }
+
+            return layers.Items
+                .Select((layer, index) =>
+                    (string[])Convert(typeof(string[]), layer, origin, $"{path}[{index + 1}]")!)
+                .ToArray();
+        }
+
         if (underlying.IsGenericType && underlying.GetGenericTypeDefinition() == typeof(Dictionary<,>))
         {
             if (value is not ScriptValue.Map map) throw Expected(origin, path, "a table", value);

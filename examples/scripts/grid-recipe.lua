@@ -26,3 +26,15 @@ grid.add {
 }
 
 moontweaks.log.info("done")
+
+-- Tags match on what an asset is rather than what it is called, so this accepts
+-- any axe, including one a mod adds under a code we could not have guessed.
+grid.add {
+  name = "moontweaks:sticks-from-firewood",
+  pattern = { "AF" },
+  ingredients = {
+    A = { tags = { "tool-axe" }, isTool = true, toolDurabilityCost = 1 },
+    F = "game:firewood",
+  },
+  output = { code = "game:stick", quantity = 4 },
+}

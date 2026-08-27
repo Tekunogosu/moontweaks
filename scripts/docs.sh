@@ -8,7 +8,22 @@ OUT="$ROOT/docs"
 VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$ROOT/modinfo.json")
 
 dotnet build "$ROOT/tools/docgen/docgen.csproj" -c Release --nologo -v q
-exec dotnet "$ROOT/tools/docgen/bin/Release/moontweaks-docgen.dll" \
+dotnet "$ROOT/tools/docgen/bin/Release/moontweaks-docgen.dll" \
     "$ROOT/bin/Release/moontweaks.dll" \
     "$ROOT/bin/Release/moontweaks.xml" \
     "$OUT" "$VERSION" "$@"
+
+# Check mode writes nothing, so there is nothing to scaffold from.
+case " $* " in *" --check "*) exit 0 ;; esac
+
+# examples/ is a MoonTweaks folder like any other, so give it exactly what the mod
+# writes into a server's own: the same editor files, and the same library.
+mkdir -p "$ROOT/examples/library" "$ROOT/examples/.vscode"
+cp "$ROOT/src/Host/Resources/luarc.json" "$ROOT/examples/.luarc.json"
+cp "$ROOT/src/Host/Resources/vscode-extensions.json" "$ROOT/examples/.vscode/extensions.json"
+cp "$OUT/library/moontweaks.lua" "$ROOT/examples/library/moontweaks.lua"
+cp "$OUT/library/codes.lua" "$ROOT/examples/library/codes.lua"
+echo "  examples/.luarc.json"
+echo "  examples/.vscode/extensions.json"
+echo "  examples/library/moontweaks.lua"
+echo "  examples/library/codes.lua"
