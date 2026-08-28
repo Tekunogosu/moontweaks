@@ -3,8 +3,8 @@
 Work that is decided but not yet done. Each entry says what it is and why it is
 worth doing, so it can be picked up without reconstructing the conversation.
 
-Ordered by how far each is from done: the permissions at the top need one
-decision, the interpreter at the bottom needs several.
+Ordered by how far each is from done: the ones at the top need one decision, the
+ones at the bottom need several.
 
 ## Recipe fields still unbound
 
@@ -17,31 +17,26 @@ worse than an absent one.
 read only as a product lands in a crafting output slot, and a knapping surface
 clones its resolved output stack directly rather than passing through there.
 
-## The recipe kinds still unbound
+## The recipe kind still unbound
 
-Grid, knapping, clay forming, smithing and barrel are bound. Two kinds are left,
-and neither resembles what exists:
-
-**Cooking** is not a `RecipeBase` at all. `CookingRecipeIngredient` holds a
-minimum and maximum quantity, a portion size in litres and a list of valid
-stacks, and the recipe itself carries `CooksInto`, `IsFood`, `PerishableProps`
-and a `Shape`. Nothing above it can be reused, so it wants its own spec tree.
-
-**Alloy** is a plain `IByteSerializable` holding `MetalAlloyIngredient[]` and an
-output — metal ratios rather than a shape. Small, and unlike everything else.
+Every kind is bound but one. **Cooking** is not a `RecipeBase` at all:
+`CookingRecipeIngredient` holds a minimum and maximum quantity, a portion size in
+litres and a list of valid stacks, and the recipe itself carries `CooksInto`,
+`IsFood`, `PerishableProps` and a `Shape`. Nothing above it can be reused, so it
+wants its own spec tree.
 
 ## Codes a handler compares are unverifiable
 
-`items.set` and every recipe kind refuse a code the server does not have, naming
-it and the line. A handler comparing `e.block` to a string gets no such help: the
-comparison is Lua, the string is never resolved against a registry, and a wrong
-one simply never matches.
+Not a task: a note, so it is not investigated twice. `items.set` and every recipe
+kind refuse a code the server does not have, naming it and the line. A handler
+comparing `e.block` to a string gets no such help, and nothing at load time can
+see it, since the comparison has not run.
 
-Nothing at load time can see it, since the comparison has not run. The reachable
-half is the editor: `AssetCode` is already a suggestion set, and a handler could be
-given the same completion if the event tables were typed against it rather than
-against `table`. That means a shape per event rather than one loose table, which is
-worth doing for the documentation alone.
+The reachable half is done: each event names the shape it hands over, so the keys
+complete and a code reads as an `AssetCode` rather than as a bare string. The sets
+that type names widen `string` rather than closing it, deliberately — a server's
+codes are its own, and a script naming one the editor has not seen is not wrong.
+So the value is suggested and never checked, and that is as far as this goes.
 
 ## Per-command permissions
 
@@ -50,6 +45,10 @@ command together and defaults to the privilege administrators hold. Replace it
 with a privilege per command, so a server can let a builder export asset codes
 without also letting them change recipes. Keep the single setting working as the
 default for any command the file does not name.
+
+Deliberately held until more of the API is bound: what the commands are worth
+gating separately depends on what a script can do through them, and that is still
+growing.
 
 ## Tag conditions beyond "must carry all of these"
 
@@ -111,17 +110,18 @@ Offering them means one place that marshals a call onto the main thread, and tha
 is the piece to build before the count goes past the main-thread events.
 
 The rest of `IServerEventAPI` is main-thread and wants nothing new: a subscribe
-method on `ScriptEvents`, a function on `EventDomain`, and whatever the event
-carries turned into the table a handler is given.
+method on `ScriptEvents`, a function on `EventDomain` naming the shape it hands
+over, and a payload class for that shape when no bound event already carries what
+this one does.
 
 ## What a handler can do to the world
 
 `moontweaks.players` reaches where a player is, their health, their hunger, their
 mode, their spawn, their chat, and whatever a script chose to remember about them.
-Nothing yet reaches a player's inventory, places or breaks a block, or touches an
-entity that is not a player. Each is a small domain of its own, and each wants the
-same treatment the recipe kinds had — one owner for reaching the thing, and a spec
-for what a script writes.
+`moontweaks.world` reads and places blocks and drops item stacks. Nothing yet
+reaches a player's inventory, or touches an entity that is not a player. Each is a
+small domain of its own, and each wants the same treatment the recipe kinds had —
+one owner for reaching the thing, and a spec for what a script writes.
 
 Deliberately unbound: `Role`, `SetRole` and `Disconnect`. A script that can set
 roles can grant itself anything, and the privilege on the `/moontweaks` command

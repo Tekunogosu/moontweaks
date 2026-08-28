@@ -9,6 +9,14 @@ using Vintagestory.API.Util;
 namespace MoonTweaks.Recipes;
 
 /// <summary>
+/// What one recipe makes, in the two forms a selector matches against: the code the
+/// recipe names, and the stack that code resolved to.
+/// </summary>
+/// <param name="Code">Code the recipe's output names, absent on a kind that states none.</param>
+/// <param name="Stack">Stack the code resolved to, which carries the product's tags.</param>
+public readonly record struct RecipeProduct(AssetLocation? Code, ItemStack? Stack);
+
+/// <summary>
 /// Which recipes a script asked for. Sole owner of that question, so every kind
 /// answers it the same way whether its recipes live on the world or on a mod system.
 /// </summary>
@@ -39,16 +47,16 @@ public sealed class RecipeSelector
     /// resolved to rather than its code, which is what lets them reach an output no
     /// wildcard would have caught.
     /// </summary>
-    public bool Matches(AssetLocation? outputCode, ItemStack? output)
+    public bool Matches(RecipeProduct made)
     {
-        if (pattern is not null && (outputCode is null || !WildcardUtil.Match(pattern, outputCode)))
+        if (pattern is not null && (made.Code is null || !WildcardUtil.Match(pattern, made.Code)))
         {
             return false;
         }
 
         if (condition.IsEmpty) return true;
 
-        return output?.Collectible is { } product && condition.Matches(product.Tags);
+        return made.Stack?.Collectible is { } product && condition.Matches(product.Tags);
     }
 
     private static string Describe(RecipeSelectorSpec spec) => (spec.Code, spec.Tags) switch

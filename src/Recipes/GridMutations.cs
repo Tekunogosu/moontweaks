@@ -41,7 +41,7 @@ public sealed class RemoveGridRecipes(ScriptOrigin origin, RecipeSelector select
     public int Apply(ICoreServerAPI api)
     {
         var doomed = api.World.GridRecipes
-            .Where(recipe => selector.Matches(recipe.Output?.Code, recipe.Output?.ResolvedItemStack))
+            .Where(recipe => selector.Matches(new RecipeProduct(recipe.Output?.Code, recipe.Output?.ResolvedItemStack)))
             .ToList();
 
         foreach (var recipe in doomed) api.World.GridRecipes.Remove(recipe);

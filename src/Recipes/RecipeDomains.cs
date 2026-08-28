@@ -174,3 +174,42 @@ public sealed class BarrelDomain(MutationLog log, IWorldAccessor world, RecipeRe
     [LuaFunction("count")]
     public int Count(ScriptOrigin origin) => registry.Barrel.Count;
 }
+
+/// <summary>Alloys a crucible smelts from a mix of metals.</summary>
+[LuaModule("moontweaks.recipes.alloy")]
+public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
+{
+    private const string Kind = "alloy";
+    private readonly AssetStacks stacks = new(world);
+    private readonly AlloyRecipeFactory factory = new(world);
+
+    /// <summary>
+    /// Registers a new alloy. Unlike every other kind, an alloy names one metal per
+    /// ingredient rather than a family: the game holds it as a list of shares rather
+    /// than as a recipe, so a wildcard has nothing to expand into and is refused.
+    /// </summary>
+    /// <param name="origin">Script line requesting the change.</param>
+    /// <param name="recipe">The alloy to add.</param>
+    [LuaFunction("add")]
+    public void Add(ScriptOrigin origin, AlloyRecipeSpec recipe) =>
+        log.Record(recipe, new AddRecipes<AlloyRecipe>(
+            origin, Kind, recipe.OutputCode, [factory.Build(recipe, origin)], registry));
+
+    /// <summary>
+    /// Removes every alloy smelting into the given output code. The code may contain
+    /// a <c>*</c> wildcard, so <c>"game:ingot-*"</c> removes the whole family.
+    /// </summary>
+    /// <param name="origin">Script line requesting the change.</param>
+    /// <param name="selector">Which alloys to remove, by output code or by tags.</param>
+    [LuaFunction("remove")]
+    public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
+        log.Record(new RemoveRecipes<AlloyRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
+
+    /// <summary>
+    /// Counts the alloys currently registered. Reads the registry as it stood before
+    /// this run's changes, which are applied only once every script has run.
+    /// </summary>
+    /// <param name="origin">Script line requesting the count.</param>
+    [LuaFunction("count")]
+    public int Count(ScriptOrigin origin) => registry.Alloy.Count;
+}

@@ -15,7 +15,7 @@ public sealed class AddRecipes<TRecipe>(
     string outputCode,
     IReadOnlyList<TRecipe> resolved,
     RecipeRegistry registry) : IMutation
-    where TRecipe : RecipeBase
+    where TRecipe : class
 {
     /// <inheritdoc/>
     public ScriptOrigin Origin { get; } = origin;
@@ -34,7 +34,7 @@ public sealed class AddRecipes<TRecipe>(
 /// <summary>Removes every recipe of one kind whose output code matches a pattern.</summary>
 public sealed class RemoveRecipes<TRecipe>(
     ScriptOrigin origin, string kind, RecipeSelector selector, RecipeRegistry registry) : IMutation
-    where TRecipe : RecipeBase
+    where TRecipe : class
 {
     /// <inheritdoc/>
     public ScriptOrigin Origin { get; } = origin;

@@ -99,18 +99,5 @@ public static class DomainBinder
         SpecBinder.Convert(parameter.ParameterType, value, origin, path);
 
     /// <summary>Lifts a return value back into the neutral model.</summary>
-    private static ScriptValue Lift(object? result) => result switch
-    {
-        null => ScriptValue.Nil.Instance,
-        string s => new ScriptValue.Str(s),
-        int i => new ScriptValue.Num(i),
-        double d => new ScriptValue.Num(d),
-        float f => new ScriptValue.Num(f),
-        bool b => new ScriptValue.Bool(b),
-        // A binding that has already built the shape it wants to return says so, which
-        // is how a reading function hands back a table rather than one number.
-        ScriptValue value => value,
-        Enum named => new ScriptValue.Str(named.ToString().ToLowerInvariant()),
-        _ => ScriptValue.Nil.Instance,
-    };
+    private static ScriptValue Lift(object? result) => PayloadWriter.Value(result);
 }

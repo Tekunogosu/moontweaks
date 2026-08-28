@@ -48,6 +48,7 @@ public sealed record ScriptRun(
         host.Bind(DomainBinder.Bind(new ClayFormingDomain(log, server.World, registry)));
         host.Bind(DomainBinder.Bind(new SmithingDomain(log, server.World, registry)));
         host.Bind(DomainBinder.Bind(new BarrelDomain(log, server.World, registry)));
+        host.Bind(DomainBinder.Bind(new AlloyDomain(log, server.World, registry)));
         host.Bind(DomainBinder.Bind(new ItemDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new BlockDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new LogDomain(server.Logger)));

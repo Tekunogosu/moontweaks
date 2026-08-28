@@ -23,7 +23,7 @@ public sealed class RecipeAssets(IWorldAccessor world)
     /// Sole owner of that translation, so a kind bound later cannot quietly leave one
     /// of them unread.
     /// </summary>
-    public TRecipe Recipe<TRecipe>(TRecipe recipe, RecipeSpec spec, ScriptOrigin origin)
+    public TRecipe Recipe<TRecipe>(TRecipe recipe, CraftingRecipeSpec spec, ScriptOrigin origin)
         where TRecipe : RecipeBase
     {
         // Checked whatever the server does with it, so a misspelled trait is the same
@@ -86,7 +86,7 @@ public sealed class RecipeAssets(IWorldAccessor world)
         ingredient.Name = spec.Name;
         ingredient.AllowedVariants = spec.AllowedVariants;
         ingredient.SkipVariants = spec.SkipVariants;
-        ingredient.Tags = stacks.Condition(spec.Tags, origin, path);
+        ingredient.Tags = stacks.Condition(spec.Tags, origin, $"{path}.tags");
         ingredient.Attributes = AssetStacks.Attributes(spec.Attributes);
 
         // Assigned only when a script names one, so a tags-only ingredient keeps the
@@ -142,6 +142,24 @@ public sealed class RecipeAssets(IWorldAccessor world)
         Quantity = spec.Quantity,
         Attributes = AssetStacks.Attributes(spec.Attributes),
     };
+
+    /// <summary>
+    /// One metal an alloy is mixed from, and the share of the mix it must make up.
+    /// The stack size the game holds beside it is never read: a crucible measures
+    /// what it holds against the shares, so one item stands for the metal itself.
+    /// </summary>
+    public MetalAlloyIngredient AlloyIngredient(AlloyIngredientSpec spec, ScriptOrigin origin, string path) => new()
+    {
+        Type = stacks.Resolve(spec.Code!, spec.Type, origin, path),
+        Code = new AssetLocation(spec.Code),
+        StackSize = 1,
+        MinRatio = (float)spec.MinRatio,
+        MaxRatio = (float)spec.MaxRatio,
+    };
+
+    /// <summary>The metal an alloy yields, which a crucible pours by the mix rather than by the stack.</summary>
+    public JsonItemStack AlloyOutput(AlloyOutputSpec spec, ScriptOrigin origin) =>
+        stacks.Stack(spec, origin, "output");
 
     /// <summary>A named asset and how many of it, as the game holds it.</summary>
     public JsonItemStack Stack(StackSpec spec, ScriptOrigin origin, string path) =>

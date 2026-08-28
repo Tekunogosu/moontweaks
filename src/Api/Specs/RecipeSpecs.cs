@@ -6,16 +6,11 @@ namespace MoonTweaks.Api;
 // One shape per way the game makes something, over the asset shapes above.
 
 /// <summary>
-/// What every recipe kind carries, whatever it is worked on. Mirrors the base the
-/// game's own recipes share, so a field it reads for every kind is declared once
-/// rather than once per kind.
+/// What every recipe kind carries, however the game stores it: whether it is
+/// registered at all, and what it makes.
 /// </summary>
 public abstract class RecipeSpec
 {
-    /// <summary>Identifies the recipe in logs and in the handbook. Defaults to the output code.</summary>
-    [LuaField("name")]
-    public string? Name { get; set; }
-
     /// <summary>
     /// Whether the recipe is registered. A disabled recipe is still built and
     /// checked, so a mistake in one is reported now rather than on the day it is
@@ -23,6 +18,26 @@ public abstract class RecipeSpec
     /// </summary>
     [LuaField("enabled", Default = "true")]
     public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Code of what this recipe produces, which names the recipe when nothing else
+    /// does. Not a key scripts write: every kind already declares its own output,
+    /// whose <c>code</c> is required, so a bound recipe always has one.
+    /// </summary>
+    public abstract string OutputCode { get; }
+}
+
+/// <summary>
+/// What the kinds built on the game's own recipe base carry. Mirrors that base, so a
+/// field it reads for every one of them is declared once rather than once per kind.
+/// Alloys are the kind that is not one of these: the game stores them as metal
+/// ratios rather than as a recipe, and none of these fields exists on them.
+/// </summary>
+public abstract class CraftingRecipeSpec : RecipeSpec
+{
+    /// <summary>Identifies the recipe in logs and in the handbook. Defaults to the output code.</summary>
+    [LuaField("name")]
+    public string? Name { get; set; }
 
     /// <summary>
     /// Character trait a player must hold to use this recipe, such as
@@ -33,7 +48,6 @@ public abstract class RecipeSpec
     [LuaSuggests(SuggestionSets.AssetTrait)]
     public string? RequiresTrait { get; set; }
 
-
     /// <summary>
     /// Arbitrary data carried on the recipe itself, written as a Lua table and
     /// stored as JSON. What a key means is the game's business rather than this
@@ -41,18 +55,11 @@ public abstract class RecipeSpec
     /// </summary>
     [LuaField("attributes")]
     public ScriptValue? Attributes { get; set; }
-
-    /// <summary>
-    /// Code of what this recipe produces, which names the recipe when nothing else
-    /// does. Not a key scripts write: every kind already declares its own output,
-    /// whose <c>code</c> is required, so a bound recipe always has one.
-    /// </summary>
-    public abstract string OutputCode { get; }
 }
 
 /// <summary>A crafting grid recipe.</summary>
 [LuaTable("GridRecipe")]
-public sealed class GridRecipeSpec : RecipeSpec
+public sealed class GridRecipeSpec : CraftingRecipeSpec
 {
     /// <summary>
     /// Rows of the crafting grid, one string per row and one character per column.
@@ -130,7 +137,7 @@ public sealed class RecipeSelectorSpec
 /// on an anvil. What differs is how many layers deep the kind works, which its own
 /// <c>pattern</c> says.
 /// </summary>
-public abstract class VoxelRecipeSpec : RecipeSpec
+public abstract class VoxelRecipeSpec : CraftingRecipeSpec
 {
     /// <summary>
     /// Rows of the working surface, one string per row and one character per column.
@@ -226,7 +233,7 @@ public sealed class BarrelIngredientSpec : MaterialSpec
 
 /// <summary>What a barrel recipe produces, which may be a liquid.</summary>
 [LuaTable("BarrelOutput", Shorthand = "code")]
-public sealed class BarrelOutputSpec : StackSpec
+public sealed class BarrelOutputSpec : CountedStackSpec
 {
     /// <summary>How much of a liquid the recipe yields. Zero for anything counted in items.</summary>
     [LuaField("litres", Default = "0")]
@@ -237,7 +244,7 @@ public sealed class BarrelOutputSpec : StackSpec
 /// A barrel recipe, either mixed on the spot or left to seal for a while.
 /// </summary>
 [LuaTable("BarrelRecipe")]
-public sealed class BarrelRecipeSpec : RecipeSpec
+public sealed class BarrelRecipeSpec : CraftingRecipeSpec
 {
     /// <summary>
     /// Identifies the recipe to the game, which requires every barrel recipe to carry
@@ -264,6 +271,74 @@ public sealed class BarrelRecipeSpec : RecipeSpec
     /// </summary>
     [LuaField("sealHours", Default = "0")]
     public double SealHours { get; set; }
+
+    /// <inheritdoc/>
+    public override string OutputCode => Output.Code!;
+}
+
+/// <summary>
+/// One metal an alloy is mixed from, and the share of the mix it must make up.
+/// </summary>
+/// <remarks>
+/// A crucible matches an ingredient by the exact stack its code resolves to, so
+/// neither a wildcard nor a tag reaches one, and neither a quantity nor any
+/// attributes narrow it: the shares alone decide what mixes.
+/// </remarks>
+[LuaTable("AlloyIngredient")]
+public sealed class AlloyIngredientSpec : AssetSpec
+{
+    /// <summary>Asset code of the metal, such as <c>game:ingot-copper</c>.</summary>
+    [LuaField("code", Required = true)]
+    [LuaSuggests(SuggestionSets.AssetCode)]
+    public override string? Code { get; set; }
+
+    /// <summary>
+    /// Least of the mix this metal may be, as a fraction of one. Measured against
+    /// what the crucible holds after every ore has been counted as the metal it
+    /// smelts into, so ore and ingot of the same metal count towards one share.
+    /// </summary>
+    [LuaField("minRatio", Required = true)]
+    public double MinRatio { get; set; }
+
+    /// <summary>Most of the mix this metal may be, as a fraction of one.</summary>
+    [LuaField("maxRatio", Required = true)]
+    public double MaxRatio { get; set; }
+}
+
+/// <summary>
+/// The metal an alloy yields. Carries no quantity: a crucible pours as much as went
+/// into it, so how much comes out is decided by the mix rather than by the recipe.
+/// </summary>
+[LuaTable("AlloyOutput", Shorthand = "code")]
+public sealed class AlloyOutputSpec : StackSpec
+{
+    /// <summary>
+    /// Asset code of the metal poured, such as <c>game:ingot-brass</c>. Names one
+    /// metal: an alloy has no variants to expand into, so neither a wildcard nor a
+    /// <c>{name}</c> placeholder belongs here.
+    /// </summary>
+    [LuaField("code", Required = true)]
+    [LuaSuggests(SuggestionSets.AssetCode)]
+    public override string? Code { get; set; }
+}
+
+/// <summary>
+/// An alloy a crucible smelts, named by the share each metal makes up rather than
+/// by any arrangement of them.
+/// </summary>
+[LuaTable("AlloyRecipe")]
+public sealed class AlloyRecipeSpec : RecipeSpec
+{
+    /// <summary>
+    /// The metals the mix is made of, each with the share of it that it must be.
+    /// Every one of them must be present for the alloy to smelt.
+    /// </summary>
+    [LuaField("ingredients", Required = true)]
+    public AlloyIngredientSpec[] Ingredients { get; set; } = [];
+
+    /// <summary>What the mix smelts into.</summary>
+    [LuaField("output", Required = true)]
+    public AlloyOutputSpec Output { get; set; } = new();
 
     /// <inheritdoc/>
     public override string OutputCode => Output.Code!;

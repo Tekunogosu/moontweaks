@@ -34,6 +34,14 @@ public sealed class LuaTableAttribute(string name) : Attribute
     /// for the whole table. Omitted when the shape has no such shorthand.
     /// </summary>
     public string? Shorthand { get; init; }
+
+    /// <summary>
+    /// Whether the shape is handed to a script rather than written by one, as an
+    /// event's table is. A given shape has no required keys and no defaults: every
+    /// key is filled in before a handler sees it, and a key that may be absent says
+    /// so by being nullable.
+    /// </summary>
+    public bool Given { get; init; }
 }
 
 /// <summary>Marks a property as a key of the enclosing Lua table.</summary>
@@ -85,4 +93,20 @@ public static class SuggestionSets
 
     /// <summary>Every character trait a server's assets define.</summary>
     public const string AssetTrait = "AssetTrait";
+}
+
+/// <summary>
+/// Names the shape of the table a handler is given, on the argument the handler is
+/// passed as.
+/// </summary>
+/// <remarks>
+/// A handler reaches the binder as a bare function, which says nothing about what it
+/// will be called with. This names that shape, so an editor completes an event's keys
+/// and the reference documents them, from the same class the host fills in.
+/// </remarks>
+[AttributeUsage(AttributeTargets.Parameter, Inherited = false)]
+public sealed class LuaPayloadAttribute(Type shape) : Attribute
+{
+    /// <summary>Class describing the table, which carries its own <see cref="LuaTableAttribute"/>.</summary>
+    public Type Shape { get; } = shape;
 }

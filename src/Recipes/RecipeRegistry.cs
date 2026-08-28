@@ -34,23 +34,45 @@ public sealed class RecipeRegistry
     /// <summary>Every barrel recipe currently registered.</summary>
     public List<BarrelRecipe> Barrel => system.BarrelRecipes;
 
+    /// <summary>Every alloy currently registered.</summary>
+    public List<AlloyRecipe> Alloy => system.MetalAlloys;
+
+    /// <summary>
+    /// How many recipes each kind this registry reaches now holds, named as a report
+    /// would name them. Kept beside the lists themselves, so a kind added here is
+    /// counted without a report having to be found and edited to match.
+    /// </summary>
+    public IEnumerable<KeyValuePair<string, int>> Tally() =>
+    [
+        new("knapping", Knapping.Count),
+        new("clay forming", ClayForming.Count),
+        new("smithing", Smithing.Count),
+        new("barrel", Barrel.Count),
+        new("alloy", Alloy.Count),
+    ];
+
     /// <summary>
     /// The list one kind of recipe lives in. Sole owner of which list that is, so the
     /// domains and the changes they record stay generic over the kind.
     /// </summary>
-    public List<TRecipe> ListOf<TRecipe>() where TRecipe : RecipeBase =>
+    /// <remarks>
+    /// Constrained to a class rather than to the game's recipe base: an alloy is
+    /// neither, and the kinds this reaches have no other ancestor in common.
+    /// </remarks>
+    public List<TRecipe> ListOf<TRecipe>() where TRecipe : class =>
         (List<TRecipe>)(object)(
             typeof(TRecipe) == typeof(KnappingRecipe) ? Knapping
             : typeof(TRecipe) == typeof(ClayFormingRecipe) ? ClayForming
             : typeof(TRecipe) == typeof(SmithingRecipe) ? Smithing
             : typeof(TRecipe) == typeof(BarrelRecipe) ? Barrel
+            : typeof(TRecipe) == typeof(AlloyRecipe) ? Alloy
             : throw new InvalidOperationException($"{typeof(TRecipe).Name} is not a registry this reaches"));
 
     /// <summary>
     /// Adds a recipe of any kind this reaches. Removal has no counterpart here and
     /// edits the list from <see cref="ListOf{TRecipe}"/> directly.
     /// </summary>
-    public void Register<TRecipe>(TRecipe recipe) where TRecipe : RecipeBase
+    public void Register<TRecipe>(TRecipe recipe) where TRecipe : class
     {
         switch (recipe)
         {
@@ -67,6 +89,11 @@ public sealed class RecipeRegistry
             // carry and are never numbered, so there is nothing here to renumber.
             case BarrelRecipe barrel:
                 system.RegisterBarrelRecipe(barrel);
+                break;
+            // An alloy carries no identifier at all: a crucible resolves one by the
+            // metals in it rather than by a number, so nothing can collide.
+            case AlloyRecipe alloy:
+                system.RegisterMetalAlloy(alloy);
                 break;
             default:
                 throw new InvalidOperationException($"{recipe.GetType().Name} has no registry here");
@@ -99,23 +126,33 @@ public sealed class RecipeRegistry
     }
 
     /// <summary>
-    /// Removes every recipe of one kind whose output code matches, and says how many
-    /// went. Sole owner of how a kind names what it produces: the output the recipe
-    /// base shares exposes a resolved stack and no code, so each kind has to be asked
-    /// for itself.
+    /// Removes every recipe of one kind whose output the selector names, and says how
+    /// many went.
     /// </summary>
-    public int Remove<TRecipe>(RecipeSelector selector) where TRecipe : RecipeBase
+    public int Remove<TRecipe>(RecipeSelector selector) where TRecipe : class
     {
         var registered = ListOf<TRecipe>();
         var doomed = registered
-            .Where(recipe => selector.Matches(OutputCodeOf(recipe), recipe.RecipeOutput?.ResolvedItemStack))
+            .Where(recipe => selector.Matches(ProductOf(recipe)))
             .ToList();
 
         foreach (var recipe in doomed) registered.Remove(recipe);
         return doomed.Count;
     }
 
-    /// <summary>The code a recipe's output names, whichever kind of recipe it is.</summary>
+    /// <summary>
+    /// What one recipe produces: the code it names, and the stack that code resolved
+    /// to. Sole owner of how a kind says what it makes, since the base the game
+    /// shares exposes a resolved stack and no code, and an alloy shares no base at all.
+    /// </summary>
+    private static RecipeProduct ProductOf(object recipe) => recipe switch
+    {
+        AlloyRecipe alloy => new(alloy.Output?.Code, alloy.Output?.ResolvedItemstack),
+        RecipeBase basic => new(OutputCodeOf(basic), basic.RecipeOutput?.ResolvedItemStack),
+        _ => new(null, null),
+    };
+
+    /// <summary>The code a recipe's output names, for the kinds built on the game's base.</summary>
     private static AssetLocation? OutputCodeOf(RecipeBase recipe) => recipe switch
     {
         LayeredVoxelRecipe voxel => voxel.Output?.Code,

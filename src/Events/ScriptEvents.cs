@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MoonTweaks.Api;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -55,18 +56,19 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     }
 
     /// <summary>
-    /// Calls every handler for one event with the table describing it.
+    /// Calls every handler for one event with the shape describing it, written into
+    /// the table a script reads.
     /// </summary>
     /// <remarks>
     /// A handler that throws is logged and dropped rather than allowed out: these run
     /// inside the game's own event dispatch, where an exception would take down
     /// whatever raised it, and a handler that failed once will fail every time.
     /// </remarks>
-    public void Raise(string name, IReadOnlyDictionary<string, ScriptValue> about)
+    public void Raise(string name, PlayerEventPayload about)
     {
         if (!handlers.TryGetValue(name, out var listening) || listening.Count == 0) return;
 
-        var payload = new ScriptValue.Map(about);
+        var payload = PayloadWriter.Table(about);
 
         foreach (var handler in listening.ToArray())
         {
@@ -89,8 +91,8 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// Using a block leaves it standing, so what stands there is what was used.
     /// </remarks>
     public void SubscribeDidUseBlock() =>
-        api.Event.DidUseBlock += (player, selection) =>
-            Raise(DidUseBlock, Where(player, selection?.Position, Standing(selection?.Position)));
+        api.Event.DidUseBlock += (player, selection) => Raise(DidUseBlock,
+            new BlockEventPayload(player, selection?.Position, Standing(selection?.Position)));
 
     /// <summary>Subscribes to the game's own block-broken event.</summary>
     /// <remarks>
@@ -98,46 +100,20 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// The game hands over what stood there, and that is what a handler is told.
     /// </remarks>
     public void SubscribeDidBreakBlock() =>
-        api.Event.DidBreakBlock += (player, brokenId, selection) =>
-            Raise(DidBreakBlock, Where(player, selection?.Position, api.World.GetBlock(brokenId)));
+        api.Event.DidBreakBlock += (player, brokenId, selection) => Raise(DidBreakBlock,
+            new BlockEventPayload(player, selection?.Position, api.World.GetBlock(brokenId)));
 
     /// <summary>Subscribes to the game's own player-joined event.</summary>
     public void SubscribePlayerJoin() =>
-        api.Event.PlayerJoin += player => Raise(PlayerJoin, Who(player));
+        api.Event.PlayerJoin += player => Raise(PlayerJoin, new PlayerEventPayload(player));
 
     /// <summary>Subscribes to the game's own player-died event.</summary>
     public void SubscribePlayerDeath() =>
-        api.Event.PlayerDeath += (player, _) => Raise(PlayerDeath, Who(player));
+        api.Event.PlayerDeath += (player, _) => Raise(PlayerDeath, new PlayerEventPayload(player));
 
     /// <summary>Subscribes to the game's own player-respawned event.</summary>
     public void SubscribePlayerRespawn() =>
-        api.Event.PlayerRespawn += player => Raise(PlayerRespawn, Who(player));
-
-    /// <summary>Who something happened to, as a script reads it.</summary>
-    private static Dictionary<string, ScriptValue> Who(IServerPlayer player) => new()
-    {
-        ["player"] = new ScriptValue.Str(player.PlayerUID),
-        ["playerName"] = new ScriptValue.Str(player.PlayerName),
-    };
-
-    /// <summary>
-    /// Who something happened to, and to which block where. The block is supplied
-    /// rather than looked up, because which block an event is about depends on what
-    /// the event did to it.
-    /// </summary>
-    private static Dictionary<string, ScriptValue> Where(
-        IServerPlayer player, BlockPos? at, Block? block)
-    {
-        var about = Who(player);
-
-        about["block"] = block?.Code is { } code
-            ? new ScriptValue.Str(code.ToString())
-            : ScriptValue.Nil.Instance;
-        about["x"] = new ScriptValue.Num(at?.X ?? 0);
-        about["y"] = new ScriptValue.Num(at?.Y ?? 0);
-        about["z"] = new ScriptValue.Num(at?.Z ?? 0);
-        return about;
-    }
+        api.Event.PlayerRespawn += player => Raise(PlayerRespawn, new PlayerEventPayload(player));
 
     /// <summary>Whatever stands at a position, for the events that leave it standing.</summary>
     private Block? Standing(BlockPos? at) =>

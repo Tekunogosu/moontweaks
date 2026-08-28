@@ -3,8 +3,8 @@
   "modid": "moontweaks",
   "name": "MoonTweaks",
   "description": "Lua scripting for Vintage Story recipes and registries.",
-  "authors": ["Tekunogosu"],
-  "version": "0.17.3",
+  "authors": ["Theysa"],
+  "version": "0.18.0",
   "side": "Universal",
   "requiredonclient": false,
   "dependencies": {

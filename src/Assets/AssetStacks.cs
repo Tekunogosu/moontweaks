@@ -30,7 +30,7 @@ public sealed class AssetStacks(IWorldAccessor world)
     {
         Type = kinds.Resolve(spec.Code!, spec.Type, origin, path),
         Code = new AssetLocation(spec.Code),
-        StackSize = spec.Quantity,
+        StackSize = spec.StackSize,
         Attributes = Attributes(spec.Attributes),
     };
 
@@ -47,6 +47,12 @@ public sealed class AssetStacks(IWorldAccessor world)
     /// This is the shape the game's own converter builds for a bare tag array, so a
     /// script's <c>tags</c> and a recipe file's mean the same thing.
     /// </remarks>
+    /// <param name="tags">Tag names the script wrote.</param>
+    /// <param name="origin">Script line that wrote them.</param>
+    /// <param name="path">
+    /// Where the tags themselves sit, as a failure should name them — the whole path
+    /// including the key, not the shape holding it.
+    /// </param>
     public ComplexTagCondition<TagSet> Condition(string[]? tags, ScriptOrigin origin, string path)
     {
         if (tags is null || tags.Length == 0) return default;
@@ -61,9 +67,9 @@ public sealed class AssetStacks(IWorldAccessor world)
                 registry.TryCreateTagSet(out _, [tag]) != TagRegistryError.None).ToList();
 
             throw new ScriptError(origin, unknown.Count > 0
-                ? $"{path}.tags names {string.Join(", ", unknown.Select(tag => $"'{tag}'"))}, "
+                ? $"{path} names {string.Join(", ", unknown.Select(tag => $"'{tag}'"))}, "
                   + "which no item or block carries"
-                : $"{path}.tags could not be read ({error})");
+                : $"{path} could not be read ({error})");
         }
 
         return new ComplexTagCondition<TagSet>

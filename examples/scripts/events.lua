@@ -18,12 +18,13 @@ events.didUseBlock(function(e)
   end
 end)
 
--- Every handler is given one table describing what happened. A block event carries
--- who did it, what they did it to, and where.
+-- Every handler is given one table describing what happened, and every event names
+-- the shape of its own: a block event carries who did it, what they did it to, and
+-- where, so an editor completes `e` and says what each key holds.
 --
--- Logging the code is the quickest way to learn what to write: a code compared in a
--- handler is only a string, so one the game does not have never matches and the
--- handler silently does nothing.
+-- The code itself is only suggested rather than checked, so logging it is still the
+-- quickest way to learn what to write: one the game does not have never matches, and
+-- the handler silently does nothing.
 events.didBreakBlock(function(e)
   moontweaks.log.info(("%s broke %s at %d %d %d")
     :format(e.playerName, e.block or "nothing", e.x, e.y, e.z))

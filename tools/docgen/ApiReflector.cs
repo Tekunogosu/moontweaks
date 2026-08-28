@@ -13,6 +13,8 @@ namespace MoonTweaks.DocGen;
 /// </summary>
 public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
 {
+    private readonly NullabilityInfoContext nullability = new();
+
     private readonly Dictionary<Type, string> tableNames = assembly.GetTypes()
         .Where(type => type.GetCustomAttribute<LuaTableAttribute>() is not null)
         .ToDictionary(type => type, type => type.GetCustomAttribute<LuaTableAttribute>()!.Name);
@@ -50,10 +52,20 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         DomainBinder.ArgumentsOf(method)
             .Select(parameter => new ParameterDoc(
                 parameter.Name ?? "?",
-                Suggested(parameter.GetCustomAttribute<LuaSuggestsAttribute>(), parameter.ParameterType),
+                Written(parameter),
                 docs.Parameter(method, parameter.Name ?? "")))
             .ToList(),
         Returns(method));
+
+    /// <summary>
+    /// The type one argument is documented as. A handler names the shape it will be
+    /// called with, so the table an event hands over completes as itself rather than
+    /// as any table at all.
+    /// </summary>
+    private string Written(ParameterInfo parameter) =>
+        parameter.GetCustomAttribute<LuaPayloadAttribute>() is { } payload
+            ? $"fun(event: {LuaNameOf(payload.Shape)})"
+            : Suggested(parameter.GetCustomAttribute<LuaSuggestsAttribute>(), parameter.ParameterType);
 
     /// <summary>
     /// What a function hands back. A binding that returns the neutral value tree
@@ -77,16 +89,25 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
                 return new FieldDoc(
                     field.Name,
                     Suggested(entry.Value.GetCustomAttribute<LuaSuggestsAttribute>(), entry.Value.PropertyType),
-                    field.Required,
-                    field.Default,
+                    attribute.Given ? AlwaysPresent(entry.Value) : field.Required,
+                    attribute.Given ? null : field.Default,
                     docs.Summary(entry.Value));
             })
             .OrderByDescending(field => field.Required)
             .ThenBy(field => field.Name, StringComparer.Ordinal)
             .ToList();
 
-        return new TableDoc(attribute.Name, docs.Summary(type), attribute.Shorthand, fields);
+        return new TableDoc(attribute.Name, docs.Summary(type), attribute.Shorthand, attribute.Given, fields);
     }
+
+    /// <summary>
+    /// Whether a key of a given shape is never nil, which its declared nullability
+    /// says. Nothing omits a key of a table the host writes, so what a script has to
+    /// guard against is the value rather than the key's absence.
+    /// </summary>
+    private bool AlwaysPresent(PropertyInfo property) =>
+        Nullable.GetUnderlyingType(property.PropertyType) is null
+        && nullability.Create(property).ReadState != NullabilityState.Nullable;
 
     private EnumDoc ReadEnum(Type type) => new(
         type.Name,

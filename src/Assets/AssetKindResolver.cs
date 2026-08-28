@@ -35,8 +35,12 @@ public sealed partial class AssetKindResolver(IWorldAccessor world)
             $"{path} names '{code}', which is neither a known item nor a known block");
     }
 
-    /// <summary>Whether a code needs searching rather than a direct lookup.</summary>
-    private static bool IsPattern(string code) => code.Contains('*') || code.Contains('{');
+    /// <summary>
+    /// Whether a code names a family rather than one asset, and so needs searching
+    /// rather than a direct lookup. Sole owner of that question, so a kind that
+    /// cannot expand a family refuses the same codes this one searches for.
+    /// </summary>
+    public static bool IsPattern(string code) => code.Contains('*') || code.Contains('{');
 
     [GeneratedRegex(@"\{[^}]*\}")]
     private static partial Regex PlaceholderPattern();

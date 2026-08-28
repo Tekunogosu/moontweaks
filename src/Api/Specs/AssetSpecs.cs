@@ -66,10 +66,8 @@ public class MaterialSpec : AssetSpec
 }
 
 /// <summary>
-/// A named asset and how many of it. Not written by scripts directly: the game's own
-/// recipe files give this one shape two names, and <see cref="OutputSpec"/> and
-/// <see cref="ReturnedStackSpec"/> are those names, so a recipe ported from JSON
-/// reads the same here as it did there.
+/// A named asset a recipe produces. Not written by scripts directly: every shape
+/// below is this plus whatever that shape says about how much of it there is.
 /// </summary>
 public abstract class StackSpec : AssetSpec
 {
@@ -81,10 +79,6 @@ public abstract class StackSpec : AssetSpec
     [LuaSuggests(SuggestionSets.AssetCode)]
     public override string? Code { get; set; }
 
-    /// <summary>How many the stack holds.</summary>
-    [LuaField("quantity", Default = "1")]
-    public int Quantity { get; set; } = 1;
-
     /// <summary>
     /// Arbitrary data the stack is created carrying, written as a Lua table and
     /// stored as JSON. What a key means is the game's business rather than this
@@ -92,11 +86,34 @@ public abstract class StackSpec : AssetSpec
     /// </summary>
     [LuaField("attributes")]
     public ScriptValue? Attributes { get; set; }
+
+    /// <summary>
+    /// How many the stack holds. Not a key scripts write: a shape whose count the
+    /// game works out for itself has none to offer, and answers with the one item
+    /// every stack holds at least.
+    /// </summary>
+    public virtual int StackSize => 1;
+}
+
+/// <summary>
+/// A named asset and how many of it. Not written by scripts directly: the game's own
+/// recipe files give this one shape two names, and <see cref="OutputSpec"/> and
+/// <see cref="ReturnedStackSpec"/> are those names, so a recipe ported from JSON
+/// reads the same here as it did there.
+/// </summary>
+public abstract class CountedStackSpec : StackSpec
+{
+    /// <summary>How many the stack holds.</summary>
+    [LuaField("quantity", Default = "1")]
+    public int Quantity { get; set; } = 1;
+
+    /// <inheritdoc/>
+    public override int StackSize => Quantity;
 }
 
 /// <summary>What a recipe produces.</summary>
 [LuaTable("Output", Shorthand = "code")]
-public sealed class OutputSpec : StackSpec;
+public sealed class OutputSpec : CountedStackSpec;
 
 /// <summary>
 /// What an ingredient hands back when the recipe consumes it, such as the empty
@@ -104,7 +121,7 @@ public sealed class OutputSpec : StackSpec;
 /// name the game's own recipe files use for it.
 /// </summary>
 [LuaTable("ReturnedStack", Shorthand = "code")]
-public sealed class ReturnedStackSpec : StackSpec;
+public sealed class ReturnedStackSpec : CountedStackSpec;
 
 /// <summary>
 /// One input a recipe consumes: a material, in a quantity, possibly as a tool.

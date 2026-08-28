@@ -154,7 +154,8 @@ axe where they chose a knife blade, and the surface saves that identifier, so it
 does so again after a restart. `RecipeRegistry` therefore assigns an identifier
 past every one in use rather than trusting the count, and reports at startup if
 two recipes ever end up sharing one. Cooking and barrel recipes are identified by
-their code instead and are not numbered at all.
+their code instead and are not numbered at all, and an alloy carries no identifier
+of any kind: a crucible resolves one by the metals in it.
 
 Failures name the file, the line, the call, and the argument:
 
@@ -169,7 +170,7 @@ Failures name the file, the line, the call, and the argument:
 ```
 Host       ModSystem, commands, script discovery, editor scaffolding, the log module
 Scripting  ScriptValue / IScriptHost / ScriptOrigin, and the JSON they convert to
-Api        annotations, the spec shapes, SpecBinder, DomainBinder
+Api        annotations, the spec shapes, SpecBinder, PayloadWriter, DomainBinder
 Assets     reaching items and blocks: codes, tags, stacks, properties
 Recipes    one domain and factory per recipe kind, over the shared owners below
 Players    reaching a player and the behaviours their state lives on
@@ -189,6 +190,12 @@ both go through it, so what a check reports is what a start would do.
 MoonSharp appears in exactly one class, `Scripting/MoonSharpHost`. Lua values are
 reduced to a neutral `ScriptValue` tree at that boundary, so swapping interpreters
 means reimplementing `IScriptHost` and nothing else.
+
+Tables cross that boundary in both directions and one annotation describes both.
+`SpecBinder` reads a table a script wrote into a spec; `PayloadWriter` writes an
+object out as the table a handler is given. Both work from the same `[LuaField]`
+metadata the reference is generated from, so an event's keys, its documentation
+and what a handler actually receives are one description rather than three.
 
 Four questions every recipe kind asks have one owner apiece, so no domain
 answers them for itself. `AssetKindResolver` decides whether a code names an item
@@ -351,9 +358,13 @@ string, so a wrong one never matches and the handler quietly does nothing:
 if e.block == "game:crock-burned" then   -- no such block; this is never true
 ```
 
-Nothing can catch that at load, because the comparison has not happened yet.
-Check a code against `library/codes.lua`, which lists what the server actually
-holds, or log `e.block` and go and break the thing to find out what it is called.
+Nothing can catch that at load, because the comparison has not happened yet. What
+the editor reaches instead is the table itself: every event names the shape it
+hands over, so `e` completes its own keys and `e.block` is typed as an asset code
+like every other code in the API, offering what the server actually holds. The
+string is still only suggested — the aliases widen `string` rather than closing
+it — so a wrong one is accepted here as it is anywhere else. Log `e.block` and go
+and break the thing if you want to know for certain what it is called.
 
 ### What a script costs
 

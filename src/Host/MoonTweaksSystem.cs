@@ -1,3 +1,4 @@
+using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Events;
 using MoonTweaks.Recipes;
@@ -155,12 +156,14 @@ public class MoonTweaksSystem : ModSystem
                 string.Join(", ", duplicates));
         }
 
+        // Grid recipes hang off the world rather than the registry, so they are the
+        // one kind counted here rather than asked for.
+        var held = registry.Tally().Select(kind => $"{kind.Value} {kind.Key}")
+            .Prepend($"{server.World.GridRecipes.Count} grid");
+
         server.Logger.Notification(
-            "[moontweaks] {0} script(s), {1} change(s), {2} affected; "
-            + "{3} grid, {4} knapping, {5} clay forming, {6} smithing and {7} barrel recipes now",
-            run.Scripts.Count, run.Log.Pending.Count, affected,
-            server.World.GridRecipes.Count, registry.Knapping.Count,
-            registry.ClayForming.Count, registry.Smithing.Count, registry.Barrel.Count);
+            "[moontweaks] {0} script(s), {1} change(s), {2} affected; {3} recipes now",
+            run.Scripts.Count, run.Log.Pending.Count, affected, string.Join(", ", held));
 
         if (events.Count > 0)
         {

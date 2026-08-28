@@ -107,18 +107,33 @@ public static partial class HtmlWriter
                             + $"<code>{{ {Escape(table.Shorthand)} = &lt;string&gt; }}</code>.</p>");
         }
 
-        page.AppendLine("<table><thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody>");
+        if (table.Given)
+        {
+            page.AppendLine("<p class=\"note\">Handed to your handler rather than written by you.</p>");
+        }
+
+        // A shape written by a script says what a key falls back to when it is left
+        // out; one handed to a script says whether the key can be nil instead, since
+        // nothing there is ever left out.
+        var third = table.Given ? "Value" : "Default";
+        page.AppendLine($"<table><thead><tr><th>Field</th><th>Type</th><th>{third}</th><th>Description</th></tr></thead><tbody>");
         foreach (var field in table.Fields)
         {
-            var fallback = field.Required
-                ? "<span class=\"required\">required</span>"
-                : field.Default is null ? "<span class=\"absent\">none</span>" : $"<code>{Escape(field.Default)}</code>";
             page.AppendLine($"<tr><td><code>{Escape(field.Name)}</code></td>"
-                            + $"<td>{TypeLink(field.Type)}</td><td>{fallback}</td>"
+                            + $"<td>{TypeLink(field.Type)}</td><td>{Fallback(table, field)}</td>"
                             + $"<td>{Markup(field.Summary)}</td></tr>");
         }
         page.AppendLine("</tbody></table></section>");
     }
+
+    /// <summary>What the third column says about one key, which depends on who writes it.</summary>
+    private static string Fallback(TableDoc table, FieldDoc field) => (table.Given, field.Required) switch
+    {
+        (true, true) => "<span class=\"required\">always</span>",
+        (true, false) => "<span class=\"absent\">may be nil</span>",
+        (false, true) => "<span class=\"required\">required</span>",
+        _ => field.Default is null ? "<span class=\"absent\">none</span>" : $"<code>{Escape(field.Default)}</code>",
+    };
 
     private static void WriteEnum(StringBuilder page, EnumDoc enumeration)
     {
