@@ -435,8 +435,23 @@ scripts/        build, docs, install and testbed entry points
 examples/       one worked script per recipe kind, shipped with the mod
 third_party/    MoonSharp submodule
 TODO.md         work that is decided but not yet done
+LICENSE         MIT, covering this project
+THIRD-PARTY-NOTICES.md   what the shipped assembly carries besides this project
 ```
 
 `examples/` doubles as a MoonTweaks folder: `docs.sh` scaffolds it with the same
 library and editor files a server gets, so the examples are checked exactly where
 an author's scripts would be, and ship from there into every install.
+
+## Licence
+
+MoonTweaks is MIT licensed; see `LICENSE`.
+
+The mod ships as one assembly with MoonSharp compiled into it, which makes every
+release a binary redistribution of MoonSharp's 3-clause BSD licensed code. Its
+notice therefore travels with the build: `scripts/package.sh` puts `LICENSE` and
+`THIRD-PARTY-NOTICES.md` in the zip beside `moontweaks.dll`, and the notice
+reproduces MoonSharp's licence in full. A release built any other way has to do
+the same.
+
+Vintage Story's assemblies are referenced at build time and never redistributed.
