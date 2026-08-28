@@ -124,10 +124,22 @@ public class MoonTweaksSystem : ModSystem
         applied = run.Log;
         RecipeBase.CollectiblePreSearchResultsCache.Clear();
 
+        // Nothing downstream reports this: a surface takes the first recipe whose
+        // identifier matches, and saves that identifier with the block, so a
+        // collision is wrong quietly and stays wrong across restarts.
+        if (registry.DuplicateIds() is { Count: > 0 } duplicates)
+        {
+            server.Logger.Error(
+                "[moontweaks] recipe identifier(s) {0} are held by more than one recipe; "
+                + "a surface can resolve a player's choice to the wrong one",
+                string.Join(", ", duplicates));
+        }
+
         server.Logger.Notification(
             "[moontweaks] {0} script(s), {1} change(s), {2} recipe(s) affected; "
-            + "{3} grid and {4} knapping recipes now",
+            + "{3} grid, {4} knapping, {5} clay forming, {6} smithing and {7} barrel recipes now",
             run.Scripts.Count, run.Log.Pending.Count, affected,
-            server.World.GridRecipes.Count, registry.Knapping.Count);
+            server.World.GridRecipes.Count, registry.Knapping.Count,
+            registry.ClayForming.Count, registry.Smithing.Count, registry.Barrel.Count);
     }
 }

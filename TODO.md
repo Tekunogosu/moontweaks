@@ -3,8 +3,8 @@
 Work that is decided but not yet done. Each entry says what it is and why it is
 worth doing, so it can be picked up without reconstructing the conversation.
 
-Ordered by how far each is from done: the converter at the top needs no
-decisions, the interpreter at the bottom needs several.
+Ordered by how far each is from done: the permissions at the top need one
+decision, the interpreter at the bottom needs several.
 
 ## Recipe fields still unbound
 
@@ -17,29 +17,18 @@ worse than an absent one.
 read only as a product lands in a crafting output slot, and a knapping surface
 clones its resolved output stack directly rather than passing through there.
 
-## A bridge from Lua tables to JsonObject
+## The recipe kinds still unbound
 
-`attributes` appears on the ingredient, on the output and on the recipe of every
-kind, and vanilla's grid recipes use it 85 times. All three need one thing: a Lua
-table turned into a `JsonObject`, which wraps a Newtonsoft `JToken`. The
-`ScriptValue` tree already maps onto JSON exactly, so this is one converter in
-`RecipeAssets` that unlocks every one of those uses and every kind still to come.
+Grid, knapping, clay forming, smithing and barrel are bound. Two kinds are left,
+and neither resembles what exists:
 
-## Unique identifiers for the other recipe kinds
+**Cooking** is not a `RecipeBase` at all. `CookingRecipeIngredient` holds a
+minimum and maximum quantity, a portion size in litres and a list of valid
+stacks, and the recipe itself carries `CooksInto`, `IsFood`, `PerishableProps`
+and a `Shape`. Nothing above it can be reused, so it wants its own spec tree.
 
-`RecipeRegistry.Register` renumbers a knapping recipe after the game numbers it by
-list length, which collides with a surviving recipe whenever one was removed
-first. `RegisterSmithingRecipe` numbers the same way, and the cooking and barrel
-registries have their own schemes. Give every kind the same treatment as it is
-bound, rather than rediscovering the bug once per kind.
-
-## Check the examples in CI
-
-`docs.sh --check` runs in CI and fails on an undocumented binding.
-`lua-language-server --check examples` is the other half of that guarantee — it
-fails on an example that disagrees with the generated types — and runs only by
-hand. Adding it means fetching the language server in the workflow, which is why
-it has not happened yet rather than because it is not worth it.
+**Alloy** is a plain `IByteSerializable` holding `MetalAlloyIngredient[]` and an
+output — metal ratios rather than a shape. Small, and unlike everything else.
 
 ## Per-command permissions
 
@@ -51,11 +40,19 @@ default for any command the file does not name.
 
 ## Tag conditions beyond "must carry all of these"
 
-`tags` builds one condition requiring every tag listed. The game's own shape is
-richer: `ComplexTagCondition` holds several conditions, each with required *and*
-forbidden tags, combined conjunctively or disjunctively. Nothing in vanilla's
-recipes uses more than the simple form, so the rest is unbuilt rather than
-unsupported — add it when a script wants it.
+`tags` builds the one shape the game's own converter builds for a bare tag array:
+a single condition holding every tag, disjunctive, which asks that an asset carry
+all of them. The game's full shape is richer — several conditions, each with
+required *and* forbidden tags, combined conjunctively or disjunctively — and its
+JSON spells that as `allOf`, `anyOf` and `noneOf`.
+
+The catch worth knowing before building it: `RequiredTags` means two different
+things depending on the flag beside it. Disjunctive asks that the asset contain
+all of them, conjunctive only that the two sets overlap. A `noneOf` alongside
+either is the straightforward part; the junction is where a mistake is silent.
+
+Nothing in vanilla's recipes uses more than the simple form, so the rest is
+unbuilt rather than unsupported — add it when a script wants it.
 
 ## Prune examples that a build no longer ships
 

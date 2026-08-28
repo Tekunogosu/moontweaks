@@ -1,7 +1,8 @@
 name: docs
 
 # The reference is generated from the mod's bindings, so it is rebuilt from
-# source rather than committed. A binding without documentation fails the job.
+# source rather than committed. A binding without documentation fails the job, and
+# so does an example that disagrees with the types that binding produced.
 on:
   push:
     branches: [main]
@@ -33,10 +34,24 @@ jobs:
         env:
           VS_VERSION: 1.22.7
 
+      - name: Fetch lua-language-server
+        run: |
+          mkdir -p "$HOME/lua-ls"
+          curl -sSfL "https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-linux-x64.tar.gz" \
+            | tar -xz -C "$HOME/lua-ls"
+          echo "$HOME/lua-ls/bin" >> "$GITHUB_PATH"
+        env:
+          LUA_LS_VERSION: 3.19.1
+
       - run: ./scripts/sync-moonsharp.sh
       - run: ./scripts/package.sh
       - run: ./scripts/docs.sh --check
       - run: ./scripts/docs.sh
+
+      # docs.sh scaffolds examples/ with this build's library, so the check runs
+      # against the types this commit generates rather than a checked-in copy.
+      - name: Check the examples against the generated types
+        run: lua-language-server --check examples --checklevel Warning
 
       - uses: actions/upload-pages-artifact@v3
         with:

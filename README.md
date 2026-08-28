@@ -147,10 +147,14 @@ and what the startup lines are written from, so the two cannot disagree.
 
 **Added recipes are renumbered.** The game identifies a new recipe by how many
 the list already holds, which collides with a surviving recipe whenever a script
-removed one first. A knapping surface resolves the recipe a player picked by that
-identifier, so a duplicate silently hands them another recipe's output — an axe
-where they chose a knife blade. `RecipeRegistry` therefore assigns an identifier
-past every one in use rather than trusting the count.
+removed one first. Knapping, clay forming and smithing all number that way, and
+each of their surfaces resolves the recipe a player picked by taking the first
+identifier that matches — so a duplicate hands them another recipe's output, an
+axe where they chose a knife blade, and the surface saves that identifier, so it
+does so again after a restart. `RecipeRegistry` therefore assigns an identifier
+past every one in use rather than trusting the count, and reports at startup if
+two recipes ever end up sharing one. Cooking and barrel recipes are identified by
+their code instead and are not numbered at all.
 
 Failures name the file, the line, the call, and the argument:
 
@@ -323,7 +327,9 @@ lua-language-server --check examples
 
 It pairs with `./scripts/docs.sh --check`: the first fails on an example that
 disagrees with the generated types, the second on a binding without a
-description.
+description. Both run in CI, the example check against the library `docs.sh` has
+just written rather than a checked-in copy, so an example cannot drift from the
+bindings it demonstrates.
 
 ## Commands
 

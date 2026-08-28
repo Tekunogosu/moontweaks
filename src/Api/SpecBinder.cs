@@ -72,6 +72,10 @@ public static class SpecBinder
     {
         var underlying = Nullable.GetUnderlyingType(target) ?? target;
 
+        // A field the game stores as arbitrary data has no shape to bind against,
+        // so the tree reaches the domain as it was written and is converted there.
+        if (underlying == typeof(ScriptValue)) return value;
+
         if (underlying == typeof(string))
         {
             return value is ScriptValue.Str s ? s.Value : throw Expected(origin, path, "a string", value);
@@ -80,6 +84,11 @@ public static class SpecBinder
         if (underlying == typeof(int))
         {
             return value is ScriptValue.Num n ? (int)n.Value : throw Expected(origin, path, "a number", value);
+        }
+
+        if (underlying == typeof(double))
+        {
+            return value is ScriptValue.Num d ? d.Value : throw Expected(origin, path, "a number", value);
         }
 
         if (underlying == typeof(bool))
@@ -125,6 +134,21 @@ public static class SpecBinder
                 .Select((layer, index) =>
                     (string[])Convert(typeof(string[]), layer, origin, $"{path}[{index + 1}]")!)
                 .ToArray();
+        }
+
+        // A list of table shapes, for the kinds that number their ingredients rather
+        // than key them by a pattern character.
+        if (underlying.IsArray
+            && underlying.GetElementType() is { } element
+            && element.GetCustomAttribute<LuaTableAttribute>() is not null)
+        {
+            if (value is not ScriptValue.List entries) throw Expected(origin, path, "a list", value);
+            var bound = Array.CreateInstance(element, entries.Items.Count);
+            for (var index = 0; index < entries.Items.Count; index++)
+            {
+                bound.SetValue(Bind(element, entries.Items[index], origin, $"{path}[{index + 1}]"), index);
+            }
+            return bound;
         }
 
         if (underlying.IsGenericType && underlying.GetGenericTypeDefinition() == typeof(Dictionary<,>))

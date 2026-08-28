@@ -28,6 +28,9 @@ public sealed record ScriptRun(IReadOnlyList<ScriptFile> Scripts, MutationLog Lo
         using var host = new MoonSharpHost();
         host.Bind(DomainBinder.Bind(new GridDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new KnappingDomain(log, server.World, registry)));
+        host.Bind(DomainBinder.Bind(new ClayFormingDomain(log, server.World, registry)));
+        host.Bind(DomainBinder.Bind(new SmithingDomain(log, server.World, registry)));
+        host.Bind(DomainBinder.Bind(new BarrelDomain(log, server.World, registry)));
         host.Bind(DomainBinder.Bind(new LogDomain(server.Logger)));
 
         foreach (var script in scripts)

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MoonTweaks.Scripting;
 
 namespace MoonTweaks.Api;
 
@@ -62,6 +63,14 @@ public class MaterialSpec : AssetSpec
     [LuaField("tags")]
     [LuaSuggests(SuggestionSets.AssetTag)]
     public string[]? Tags { get; set; }
+
+    /// <summary>
+    /// Arbitrary data a match must carry to satisfy this material, written as a Lua
+    /// table and stored as JSON. What a key means is the game's business rather
+    /// than this mod's: liquid ingredients need one, and a mod reads what it wrote.
+    /// </summary>
+    [LuaField("attributes")]
+    public ScriptValue? Attributes { get; set; }
 }
 
 /// <summary>
@@ -83,6 +92,14 @@ public abstract class StackSpec : AssetSpec
     /// <summary>How many the stack holds.</summary>
     [LuaField("quantity", Default = "1")]
     public int Quantity { get; set; } = 1;
+
+    /// <summary>
+    /// Arbitrary data the stack is created carrying, written as a Lua table and
+    /// stored as JSON. What a key means is the game's business rather than this
+    /// mod's: liquid ingredients need one, and a mod reads what it wrote.
+    /// </summary>
+    [LuaField("attributes")]
+    public ScriptValue? Attributes { get; set; }
 }
 
 /// <summary>What a recipe produces.</summary>
@@ -151,6 +168,15 @@ public abstract class RecipeSpec
     [LuaSuggests(SuggestionSets.AssetTrait)]
     public string? RequiresTrait { get; set; }
 
+
+    /// <summary>
+    /// Arbitrary data carried on the recipe itself, written as a Lua table and
+    /// stored as JSON. What a key means is the game's business rather than this
+    /// mod's: liquid ingredients need one, and a mod reads what it wrote.
+    /// </summary>
+    [LuaField("attributes")]
+    public ScriptValue? Attributes { get; set; }
+
     /// <summary>
     /// Code of what this recipe produces, which names the recipe when nothing else
     /// does. Not a key scripts write: every kind already declares its own output,
@@ -179,7 +205,14 @@ public sealed class GridRecipeSpec : RecipeSpec
     [LuaField("output", Required = true)]
     public OutputSpec Output { get; set; } = new();
 
-    /// <summary>Ingredients may be placed in any arrangement rather than the pattern shown.</summary>
+    /// <summary>
+    /// Ingredients may be placed in any arrangement rather than the pattern shown.
+    /// The pattern still says which ingredients the recipe takes and how many, and
+    /// its width and height still bound it: a grid narrower or shorter than the
+    /// pattern never matches, however the ingredients are arranged. Write one
+    /// compactly for that reason — four ingredients as two rows of two rather than
+    /// one row of four, which a three-wide grid could never satisfy.
+    /// </summary>
     [LuaField("shapeless", Default = "false")]
     public bool Shapeless { get; set; }
 
@@ -199,26 +232,146 @@ public sealed class GridRecipeSpec : RecipeSpec
     public override string OutputCode => Output.Code!;
 }
 
-/// <summary>A knapping recipe, chipped from a stone laid on a knapping surface.</summary>
-[LuaTable("KnappingRecipe")]
-public sealed class KnappingRecipeSpec : RecipeSpec
+/// <summary>
+/// A recipe shaped voxel by voxel rather than by arranging items: the same pattern,
+/// material and output whether it is chipped from stone, raised in clay or hammered
+/// on an anvil. What differs is how many layers deep the kind works, which its own
+/// <c>pattern</c> says.
+/// </summary>
+public abstract class VoxelRecipeSpec : RecipeSpec
 {
     /// <summary>
-    /// Rows of the knapping surface, one string per row and one character per
-    /// column. <c>#</c> leaves stone in place and <c>_</c> chips it away. The
-    /// surface is 16 by 16 and a smaller pattern leaves the rest of it untouched.
-    /// Knapping shapes one layer, so the rows are written directly.
+    /// Rows of the working surface, one string per row and one character per column.
+    /// <c>#</c> keeps material and <c>_</c> leaves the cell empty. The surface is 16
+    /// by 16 and a smaller pattern is centred on it.
     /// </summary>
     [LuaField("pattern", Required = true)]
-    public string[][] Pattern { get; set; } = [];
+    public virtual string[][] Pattern { get; set; } = [];
 
-    /// <summary>The stone being knapped, which decides where the recipe is offered.</summary>
+    /// <summary>The material being worked, which decides where the recipe is offered.</summary>
     [LuaField("ingredient", Required = true)]
     public MaterialSpec Ingredient { get; set; } = new();
 
     /// <summary>What the recipe produces.</summary>
     [LuaField("output", Required = true)]
     public OutputSpec Output { get; set; } = new();
+
+    /// <inheritdoc/>
+    public override string OutputCode => Output.Code!;
+}
+
+/// <summary>A knapping recipe, chipped from a stone laid on a knapping surface.</summary>
+[LuaTable("KnappingRecipe")]
+public sealed class KnappingRecipeSpec : VoxelRecipeSpec
+{
+    /// <summary>
+    /// Rows of the knapping surface, one string per row and one character per column.
+    /// <c>#</c> leaves stone in place and <c>_</c> chips it away. The surface is 16 by
+    /// 16 and a smaller pattern is centred on it. Knapping shapes one layer, so the
+    /// rows are written directly.
+    /// </summary>
+    [LuaField("pattern", Required = true)]
+    public override string[][] Pattern { get; set; } = [];
+}
+
+/// <summary>A clay forming recipe, raised layer by layer from a clay lump.</summary>
+[LuaTable("ClayFormingRecipe")]
+public sealed class ClayFormingRecipeSpec : VoxelRecipeSpec
+{
+    /// <summary>
+    /// Layers of the clay, bottom first, each a list of rows. <c>#</c> places clay and
+    /// <c>_</c> leaves the cell empty. The surface is 16 by 16 and clay forming builds
+    /// up to 16 layers, every one of which must be the same size as the first.
+    /// </summary>
+    [LuaField("pattern", Required = true)]
+    public override string[][] Pattern { get; set; } = [];
+}
+
+/// <summary>A smithing recipe, hammered from a hot ingot on an anvil.</summary>
+[LuaTable("SmithingRecipe")]
+public sealed class SmithingRecipeSpec : VoxelRecipeSpec
+{
+    /// <summary>
+    /// Layers of the work, bottom first, each a list of rows. <c>#</c> keeps metal and
+    /// <c>_</c> is metal to be cut or hammered away. The surface is 16 by 16 and an
+    /// anvil works up to 6 layers, every one of which must be the same size as the
+    /// first.
+    /// </summary>
+    [LuaField("pattern", Required = true)]
+    public override string[][] Pattern { get; set; } = [];
+
+    /// <summary>
+    /// Groups the recipe on the anvil's selection dialog, and may contain
+    /// <c>{name}</c> placeholders naming a wildcard ingredient. Defaults to the
+    /// output code.
+    /// </summary>
+    [LuaField("code")]
+    public string? Code { get; set; }
+}
+
+/// <summary>
+/// One input a barrel recipe consumes, measured in items, in litres, or in both.
+/// </summary>
+[LuaTable("BarrelIngredient", Shorthand = "code")]
+public sealed class BarrelIngredientSpec : MaterialSpec
+{
+    /// <summary>How many items the barrel must hold. Left at one for a liquid, which <c>litres</c> measures instead.</summary>
+    [LuaField("quantity", Default = "1")]
+    public int Quantity { get; set; } = 1;
+
+    /// <summary>How much of a liquid the barrel must hold. Zero for anything counted in items.</summary>
+    [LuaField("litres", Default = "0")]
+    public double Litres { get; set; }
+
+    /// <summary>How many items the recipe takes, when it takes fewer than it needs present. Takes all of them when omitted.</summary>
+    [LuaField("consumeQuantity")]
+    public int? ConsumeQuantity { get; set; }
+
+    /// <summary>How much liquid the recipe takes, when it takes less than it needs present. Takes all of it when omitted.</summary>
+    [LuaField("consumeLitres")]
+    public double? ConsumeLitres { get; set; }
+}
+
+/// <summary>What a barrel recipe produces, which may be a liquid.</summary>
+[LuaTable("BarrelOutput", Shorthand = "code")]
+public sealed class BarrelOutputSpec : StackSpec
+{
+    /// <summary>How much of a liquid the recipe yields. Zero for anything counted in items.</summary>
+    [LuaField("litres", Default = "0")]
+    public double Litres { get; set; }
+}
+
+/// <summary>
+/// A barrel recipe, either mixed on the spot or left to seal for a while.
+/// </summary>
+[LuaTable("BarrelRecipe")]
+public sealed class BarrelRecipeSpec : RecipeSpec
+{
+    /// <summary>
+    /// Identifies the recipe to the game, which requires every barrel recipe to carry
+    /// one and leaves the choice open. Unrelated to the codes that name assets.
+    /// </summary>
+    [LuaField("code", Required = true)]
+    public string Code { get; set; } = "";
+
+    /// <summary>
+    /// What the barrel must hold, listed rather than keyed: a barrel has no grid, so
+    /// nothing places an ingredient anywhere in particular.
+    /// </summary>
+    [LuaField("ingredients", Required = true)]
+    public BarrelIngredientSpec[] Ingredients { get; set; } = [];
+
+    /// <summary>What the recipe produces.</summary>
+    [LuaField("output", Required = true)]
+    public BarrelOutputSpec Output { get; set; } = new();
+
+    /// <summary>
+    /// How long the barrel must stay sealed, in in-game hours. Left at zero the
+    /// recipe mixes the moment its ingredients are in, which is how the game tells
+    /// the two kinds of barrel recipe apart.
+    /// </summary>
+    [LuaField("sealHours", Default = "0")]
+    public double SealHours { get; set; }
 
     /// <inheritdoc/>
     public override string OutputCode => Output.Code!;

@@ -108,13 +108,18 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         if (underlying is not null) return LuaNameOf(underlying) + "?";
 
         if (type == typeof(string)) return "string";
-        if (type == typeof(int) || type == typeof(double)) return "integer";
+        if (type == typeof(int)) return "integer";
+        if (type == typeof(double)) return "number";
         if (type == typeof(bool)) return "boolean";
         if (type == typeof(void)) return "nil";
+        // Arbitrary data: the binder constrains nothing, so neither does the type.
+        if (type == typeof(MoonTweaks.Scripting.ScriptValue)) return "table";
         if (type == typeof(string[])) return "string[]";
         // Written as rows, or as a list of them when a shape has more than one layer.
         if (type == typeof(string[][])) return "string[] | string[][]";
         if (tableNames.TryGetValue(type, out var table)) return table;
+        if (type.IsArray && type.GetElementType() is { } element
+            && tableNames.TryGetValue(element, out var each)) return $"{each}[]";
         if (type.IsEnum) return type.Name;
 
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>))
