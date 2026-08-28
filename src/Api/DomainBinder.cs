@@ -91,18 +91,12 @@ public static class DomainBinder
         }
     }
 
-    /// <summary>Converts one argument, sending table shapes through the spec binder.</summary>
-    private static object? Coerce(ParameterInfo parameter, ScriptValue value, ScriptOrigin origin, string path)
-    {
-        if (parameter.ParameterType == typeof(string))
-        {
-            return value is ScriptValue.Str s
-                ? s.Value
-                : throw new ScriptError(origin, $"{path} expects a string, got {value.TypeName}");
-        }
-
-        return SpecBinder.Bind(parameter.ParameterType, value, origin, path);
-    }
+    /// <summary>
+    /// Converts one argument through the same conversion a table key uses, so a
+    /// function may take anything a table may hold.
+    /// </summary>
+    private static object? Coerce(ParameterInfo parameter, ScriptValue value, ScriptOrigin origin, string path) =>
+        SpecBinder.Convert(parameter.ParameterType, value, origin, path);
 
     /// <summary>Lifts a return value back into the neutral model.</summary>
     private static ScriptValue Lift(object? result) => result switch
@@ -110,7 +104,13 @@ public static class DomainBinder
         null => ScriptValue.Nil.Instance,
         string s => new ScriptValue.Str(s),
         int i => new ScriptValue.Num(i),
+        double d => new ScriptValue.Num(d),
+        float f => new ScriptValue.Num(f),
         bool b => new ScriptValue.Bool(b),
+        // A binding that has already built the shape it wants to return says so, which
+        // is how a reading function hands back a table rather than one number.
+        ScriptValue value => value,
+        Enum named => new ScriptValue.Str(named.ToString().ToLowerInvariant()),
         _ => ScriptValue.Nil.Instance,
     };
 }

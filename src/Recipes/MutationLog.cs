@@ -15,8 +15,14 @@ public interface IMutation
     /// <summary>One-line summary for the change report.</summary>
     string Describe();
 
-    /// <summary>Performs the change, returning how many recipes it affected.</summary>
+    /// <summary>Performs the change, returning how many things it affected.</summary>
     int Apply(ICoreServerAPI api);
+
+    /// <summary>
+    /// What this change counts, singular. Most changes are to recipes; the ones that
+    /// are not say so, rather than having the report call an item a recipe.
+    /// </summary>
+    string Counts => "recipe";
 }
 
 /// <summary>
@@ -34,6 +40,9 @@ public sealed class DisabledRecipe(IMutation change) : IMutation
 {
     /// <inheritdoc/>
     public ScriptOrigin Origin => change.Origin;
+
+    /// <inheritdoc/>
+    public string Counts => change.Counts;
 
     /// <inheritdoc/>
     public string Describe() => $"{change.Describe()} — disabled, so nothing is registered";
@@ -70,10 +79,10 @@ public sealed class MutationLog
     /// What one applied change turned out to affect, kept so a server can report
     /// afterwards what its scripts actually did.
     /// </summary>
-    public sealed record Applied(ScriptOrigin Origin, string Description, int Recipes)
+    public sealed record Applied(ScriptOrigin Origin, string Description, int Affected, string Counts)
     {
         /// <inheritdoc/>
-        public override string ToString() => $"{Origin}: {Description} ({Recipes} recipe(s))";
+        public override string ToString() => $"{Origin}: {Description} ({Affected} {Counts}(s))";
     }
 
     private readonly List<Applied> applied = [];
@@ -92,7 +101,7 @@ public sealed class MutationLog
             var count = mutation.Apply(api);
             affected += count;
 
-            var change = new Applied(mutation.Origin, mutation.Describe(), count);
+            var change = new Applied(mutation.Origin, mutation.Describe(), count, mutation.Counts);
             applied.Add(change);
             logger.Notification("[moontweaks] {0}", change);
         }

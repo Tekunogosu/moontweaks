@@ -3,7 +3,7 @@ using MoonTweaks.Api;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 
-namespace MoonTweaks.Recipes;
+namespace MoonTweaks.Assets;
 
 /// <summary>
 /// Decides whether an asset code names an item or a block. Sole owner of that

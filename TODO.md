@@ -30,6 +30,19 @@ and a `Shape`. Nothing above it can be reused, so it wants its own spec tree.
 **Alloy** is a plain `IByteSerializable` holding `MetalAlloyIngredient[]` and an
 output — metal ratios rather than a shape. Small, and unlike everything else.
 
+## Codes a handler compares are unverifiable
+
+`items.set` and every recipe kind refuse a code the server does not have, naming
+it and the line. A handler comparing `e.block` to a string gets no such help: the
+comparison is Lua, the string is never resolved against a registry, and a wrong
+one simply never matches.
+
+Nothing at load time can see it, since the comparison has not run. The reachable
+half is the editor: `AssetCode` is already a suggestion set, and a handler could be
+given the same completion if the event tables were typed against it rather than
+against `table`. That means a shape per event rather than one loose table, which is
+worth doing for the documentation alone.
+
 ## Per-command permissions
 
 `config.json` carries one `commandPrivilege`, which gates every `/moontweaks`
@@ -54,6 +67,29 @@ either is the straightforward part; the junction is where a mistake is silent.
 Nothing in vanilla's recipes uses more than the simple form, so the rest is
 unbuilt rather than unsupported — add it when a script wants it.
 
+## Item and block properties still unbound
+
+`moontweaks.items.set` and `moontweaks.blocks.set` carry what a script is likely
+to want. Three things the client is told are still unbound, each of them a shape
+with no obvious Lua spelling yet:
+
+`transitionableProps` decides how something spoils, dries or ripens, and is a
+list rather than one shape. `creativeInventoryStacks` and `creativeInventoryTabs`
+decide where it appears in creative. `combustible.smeltingType` is bound but the
+`crushing.quantity` spread only reaches its average and variance, not the
+distribution shape the game also allows.
+
+## Names and descriptions are out of reach
+
+Not a task: a note, so it is not investigated twice. An item's displayed name
+comes from `Lang.GetMatching("<domain>:item-<code>")` and its tooltip description
+from `"<domain>:itemdesc-<code>"`. `Lang` is loaded on each side from that side's
+own assets, and nothing textual is in `Packet_ServerAssets`, so the client renders
+its own strings against a code that reaches it unchanged.
+
+Changing them means shipping MoonTweaks to clients as well, which is a different
+mod: every player would have to install it, where today they need nothing.
+
 ## Prune examples that a build no longer ships
 
 `examples/` mirrors the build, but a renamed example leaves its old copy behind on
@@ -61,21 +97,33 @@ a server that already had it, where it can go on referencing an API that no long
 exists. Deliberately not done: it deletes files, and renames are rare enough that
 the cost of getting it wrong outweighs the tidiness.
 
-## An interpreter that outlives the run
+## Events the interpreter cannot yet be trusted with
 
-Scripts run once and the interpreter is disposed with them, and `ScriptValue` has
-no case for a function. So there is currently no way to hold a Lua callback at
-all, which is what every event feature needs — `IServerEventAPI` offers 34 of
-them, including `PlayerDeath`, `PlayerRespawn`, `PlayerJoin`, `BreakBlock` and
-`DidPlaceBlock`.
+Five of the game's events are bound, all of them raised on the main thread:
+`didUseBlock`, `didBreakBlock`, `playerJoin`, `playerDeath` and `playerRespawn`.
+`IServerEventAPI` offers 34.
 
-Four things have to be true before any of that is reachable:
+The ones deliberately left out are those the game raises on another thread —
+`BeginChunkColumnLoadChunkThread`, `OnTrySpawnGroupNearOffthread` and
+`PhysicsThreadStart` among them. MoonSharp is not thread safe and nothing here
+serialises calls into it, so binding one would be a race rather than a feature.
+Offering them means one place that marshals a call onto the main thread, and that
+is the piece to build before the count goes past the main-thread events.
 
-- `ScriptValue` gains a function case, a callable handle across the host boundary.
-- The host is owned by the mod system rather than by a `using` inside one run.
-- A callback that throws logs and unsubscribes rather than taking the server down.
-- Those events do not all fire on the main thread, and MoonSharp is not thread
-  safe, so calls into the interpreter need one place that serialises them.
+The rest of `IServerEventAPI` is main-thread and wants nothing new: a subscribe
+method on `ScriptEvents`, a function on `EventDomain`, and whatever the event
+carries turned into the table a handler is given.
 
-This is an architectural step rather than a field, and it is worth taking on its
-own terms before a feature is designed on top of it.
+## What a handler can do to the world
+
+`moontweaks.players` reaches where a player is, their health, their hunger, their
+mode, their spawn, their chat, and whatever a script chose to remember about them.
+Nothing yet reaches a player's inventory, places or breaks a block, or touches an
+entity that is not a player. Each is a small domain of its own, and each wants the
+same treatment the recipe kinds had — one owner for reaching the thing, and a spec
+for what a script writes.
+
+Deliberately unbound: `Role`, `SetRole` and `Disconnect`. A script that can set
+roles can grant itself anything, and the privilege on the `/moontweaks` command
+gates who may run the command rather than what a script file may do. That wants
+deciding alongside per-command permissions rather than before it.

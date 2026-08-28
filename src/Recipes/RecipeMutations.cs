@@ -33,15 +33,15 @@ public sealed class AddRecipes<TRecipe>(
 
 /// <summary>Removes every recipe of one kind whose output code matches a pattern.</summary>
 public sealed class RemoveRecipes<TRecipe>(
-    ScriptOrigin origin, string kind, string outputCode, RecipeRegistry registry) : IMutation
+    ScriptOrigin origin, string kind, RecipeSelector selector, RecipeRegistry registry) : IMutation
     where TRecipe : RecipeBase
 {
     /// <inheritdoc/>
     public ScriptOrigin Origin { get; } = origin;
 
     /// <inheritdoc/>
-    public string Describe() => $"remove {kind} recipes producing {outputCode}";
+    public string Describe() => $"remove {kind} recipes producing {selector.Described}";
 
     /// <inheritdoc/>
-    public int Apply(ICoreServerAPI api) => registry.Remove<TRecipe>(outputCode);
+    public int Apply(ICoreServerAPI api) => registry.Remove<TRecipe>(selector);
 }

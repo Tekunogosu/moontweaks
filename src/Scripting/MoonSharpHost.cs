@@ -92,17 +92,27 @@ public sealed class MoonSharpHost : IScriptHost
     }
 
     /// <summary>Reduces a MoonSharp value to the neutral model.</summary>
-    private static ScriptValue ToScriptValue(DynValue value) => value.Type switch
+    private ScriptValue ToScriptValue(DynValue value) => value.Type switch
     {
         DataType.String => new ScriptValue.Str(value.String),
         DataType.Number => new ScriptValue.Num(value.Number),
         DataType.Boolean => new ScriptValue.Bool(value.Boolean),
         DataType.Table => ToScriptValue(value.Table),
+        DataType.Function or DataType.ClrFunction => Callable(value),
         _ => ScriptValue.Nil.Instance,
     };
 
+    /// <summary>
+    /// Wraps a script function so the host can call it after the run that declared it
+    /// has finished. The interpreter is not thread safe, so callers are responsible
+    /// for arriving on the thread the game runs its events on.
+    /// </summary>
+    private ScriptValue.Func Callable(DynValue function) =>
+        new(arguments => ToScriptValue(
+            script.Call(function, [.. System.Linq.Enumerable.Select(arguments, ToDynValue)])));
+
     /// <summary>A table with any integer key at 1 is a list; anything else is a map.</summary>
-    private static ScriptValue ToScriptValue(Table table)
+    private ScriptValue ToScriptValue(Table table)
     {
         if (table.Get(1).Type != DataType.Nil)
         {
@@ -120,11 +130,31 @@ public sealed class MoonSharpHost : IScriptHost
     }
 
     /// <summary>Lifts a neutral value back into the interpreter.</summary>
-    private static DynValue ToDynValue(ScriptValue value) => value switch
+    private DynValue ToDynValue(ScriptValue value) => value switch
     {
         ScriptValue.Str s => DynValue.NewString(s.Value),
         ScriptValue.Num n => DynValue.NewNumber(n.Value),
         ScriptValue.Bool b => DynValue.NewBoolean(b.Value),
+        // Tables travel this way only when the host calls a script rather than the
+        // other way round, which is what an event handler is.
+        ScriptValue.List list => ToDynValue(list),
+        ScriptValue.Map map => ToDynValue(map),
         _ => DynValue.Nil,
     };
+
+    /// <summary>A list as a Lua table with consecutive integer keys from 1.</summary>
+    private DynValue ToDynValue(ScriptValue.List list)
+    {
+        var table = new Table(script);
+        for (var i = 0; i < list.Items.Count; i++) table[i + 1] = ToDynValue(list.Items[i]);
+        return DynValue.NewTable(table);
+    }
+
+    /// <summary>A map as a Lua table with string keys.</summary>
+    private DynValue ToDynValue(ScriptValue.Map map)
+    {
+        var table = new Table(script);
+        foreach (var (key, entry) in map.Entries) table[key] = ToDynValue(entry);
+        return DynValue.NewTable(table);
+    }
 }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using MoonTweaks.Api;
+using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 
@@ -10,6 +11,7 @@ namespace MoonTweaks.Recipes;
 public sealed class GridDomain(MutationLog log, IWorldAccessor world)
 {
     private readonly GridRecipeFactory factory = new(world);
+    private readonly AssetStacks stacks = new(world);
 
     /// <summary>
     /// Registers a new grid recipe. An ingredient whose code contains a wildcard
@@ -44,12 +46,10 @@ public sealed class GridDomain(MutationLog log, IWorldAccessor world)
     /// contain a <c>*</c> wildcard, so <c>"game:axe-*"</c> removes the whole family.
     /// </summary>
     /// <param name="origin">Script line requesting the change.</param>
-    /// <param name="outputCode">Output code to match, such as <c>game:axe-flint</c>.</param>
+    /// <param name="selector">Which recipes to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
-    public void Remove(
-        ScriptOrigin origin,
-        [LuaSuggests(SuggestionSets.AssetCode)] string outputCode) =>
-        log.Record(new RemoveGridRecipes(origin, outputCode));
+    public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
+        log.Record(new RemoveGridRecipes(origin, new RecipeSelector(selector, stacks, origin)));
 
     /// <summary>
     /// Counts the grid recipes currently registered. Reads the registry as it stood

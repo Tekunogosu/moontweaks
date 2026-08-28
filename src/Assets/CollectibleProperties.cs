@@ -1,0 +1,148 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using MoonTweaks.Api;
+using MoonTweaks.Scripting;
+using Vintagestory.API.Common;
+using Vintagestory.API.MathTools;
+
+namespace MoonTweaks.Assets;
+
+/// <summary>
+/// The properties a script may change on an item or a block, written onto the
+/// registry objects the game already holds. Sole owner of that translation, so
+/// nothing else decides what a key means or which of them a script left alone.
+/// </summary>
+/// <remarks>
+/// These reach players as well as the server. The item and block registries are
+/// sent to every client in one packet built at run phase <c>WorldReady</c>, which is
+/// long after scripts run, so what a script changes here is what a client is told
+/// and what its tooltip shows. Names and descriptions are not among them: those are
+/// looked up in each side's own language files against a code that never changes.
+/// </remarks>
+public static class CollectibleProperties
+{
+    /// <summary>Applies every property a script named, leaving the rest as they were.</summary>
+    public static void ApplyTo(
+        CollectibleObject asset, AssetPropertiesSpec spec, AssetStacks stacks, ScriptOrigin origin)
+    {
+        if (spec.Durability is { } durability) asset.Durability = durability;
+        if (spec.MaxStackSize is { } stack) asset.MaxStackSize = stack;
+        if (spec.AttackPower is { } power) asset.AttackPower = (float)power;
+        if (spec.AttackRange is { } range) asset.AttackRange = (float)range;
+        if (spec.ToolTier is { } tier) asset.ToolTier = tier;
+        if (spec.MaterialDensity is { } density) asset.MaterialDensity = density;
+        if (spec.MiningSpeed is { } speeds) asset.MiningSpeed = Speeds(speeds);
+        if (spec.Attributes is not null) asset.Attributes = AssetStacks.Attributes(spec.Attributes);
+        if (spec.StorageFlags is { } storage) asset.StorageFlags = Flags(storage);
+        if (spec.DamagedBy is { } sources) asset.DamagedBy = Sources(sources);
+        if (spec.Combustible is { } fire) Burn(asset, fire, stacks, origin);
+        if (spec.Nutrition is { } food) Eat(asset, food, stacks, origin);
+        if (spec.Grinding is { } grind) Grind(asset, grind, stacks, origin);
+        if (spec.Crushing is { } crush) Crush(asset, crush, stacks, origin);
+    }
+
+    /// <summary>
+    /// What burning or smelting it does, merged into whatever it already said. Merged
+    /// rather than replaced so the rule holds one level down as well: a script that
+    /// names a melting point moves that and nothing else.
+    /// </summary>
+    private static void Burn(
+        CollectibleObject asset, CombustibleSpec spec, AssetStacks stacks, ScriptOrigin origin)
+    {
+        var props = asset.CombustibleProps ??= new CombustibleProperties();
+
+        if (spec.BurnTemperature is { } temperature) props.BurnTemperature = temperature;
+        if (spec.BurnDuration is { } duration) props.BurnDuration = (float)duration;
+        if (spec.SmokeLevel is { } smoke) props.SmokeLevel = (float)smoke;
+        if (spec.MeltingPoint is { } melting) props.MeltingPoint = melting;
+        if (spec.MeltingDuration is { } melts) props.MeltingDuration = (float)melts;
+        if (spec.MaxTemperature is { } maximum) props.MaxTemperature = maximum;
+        if (spec.HeatResistance is { } resistance) props.HeatResistance = resistance;
+        if (spec.SmeltedRatio is { } ratio) props.SmeltedRatio = ratio;
+        if (spec.RequiresContainer is { } container) props.RequiresContainer = container;
+        if (spec.SmeltingType is { } kind) props.SmeltingType = ValueSet.As<EnumSmeltType>(kind);
+        if (spec.SmeltedStack is { } smelted)
+        {
+            props.SmeltedStack = Resolved(stacks.Stack(smelted, origin, "combustible.smeltedStack"), stacks, origin);
+        }
+    }
+
+    /// <summary>What eating it does, merged into whatever it already said.</summary>
+    private static void Eat(
+        CollectibleObject asset, NutritionSpec spec, AssetStacks stacks, ScriptOrigin origin)
+    {
+        var props = asset.NutritionProps ??= new FoodNutritionProperties();
+
+        if (spec.FoodCategory is { } category) props.FoodCategory = ValueSet.As<EnumFoodCategory>(category);
+        if (spec.Satiety is { } satiety) props.Satiety = (float)satiety;
+        if (spec.Health is { } health) props.Health = (float)health;
+        if (spec.SatietyLossDelay is { } delay) props.SaturationLossDelay = (float)delay;
+        if (spec.Intoxication is { } intoxication) props.Intoxication = (float)intoxication;
+        if (spec.EatenStack is { } eaten)
+        {
+            props.EatenStack = Resolved(stacks.Stack(eaten, origin, "nutrition.eatenStack"), stacks, origin);
+        }
+    }
+
+    /// <summary>What grinding it yields.</summary>
+    private static void Grind(
+        CollectibleObject asset, GrindingSpec spec, AssetStacks stacks, ScriptOrigin origin)
+    {
+        asset.GrindingProps ??= new GrindingProperties();
+        asset.GrindingProps.GroundStack =
+            Resolved(stacks.Stack(spec.GroundStack, origin, "grinding.groundStack"), stacks, origin);
+    }
+
+    /// <summary>What crushing it yields, merged into whatever it already said.</summary>
+    private static void Crush(
+        CollectibleObject asset, CrushingSpec spec, AssetStacks stacks, ScriptOrigin origin)
+    {
+        var props = asset.CrushingProps ??= new CrushingProperties();
+
+        props.CrushedStack = Resolved(stacks.Stack(spec.CrushedStack, origin, "crushing.crushedStack"), stacks, origin);
+        if (spec.HardnessTier is { } tier) props.HardnessTier = tier;
+        if (spec.Quantity is { } spread)
+        {
+            props.Quantity = NatFloat.createUniform((float)spread.Average, (float)spread.Variance);
+        }
+    }
+
+    /// <summary>
+    /// A stack the game can hand out. These are resolved when their owner is loaded,
+    /// which has already happened by the time a script names one, so an unresolved
+    /// stack would reach a player as nothing at all.
+    /// </summary>
+    private static JsonItemStack Resolved(JsonItemStack stack, AssetStacks stacks, ScriptOrigin origin)
+    {
+        if (!stack.Resolve(stacks.World, $"moontweaks {origin}"))
+        {
+            throw new ScriptError(origin, $"'{stack.Code}' could not be resolved to a stack");
+        }
+
+        return stack;
+    }
+
+    /// <summary>Whether a script named anything at all to change.</summary>
+    public static bool ChangesAnything(AssetPropertiesSpec spec) =>
+        spec.Durability is not null || spec.MaxStackSize is not null
+        || spec.AttackPower is not null || spec.AttackRange is not null
+        || spec.ToolTier is not null || spec.MaterialDensity is not null
+        || spec.MiningSpeed is not null || spec.StorageFlags is not null
+        || spec.DamagedBy is not null || spec.Attributes is not null
+        || spec.Combustible is not null || spec.Nutrition is not null
+        || spec.Grinding is not null || spec.Crushing is not null;
+
+    /// <summary>Which inventories something may be put in, as the flags the game holds.</summary>
+    private static EnumItemStorageFlags Flags(EnumStorageKind[] kinds) =>
+        kinds.Select(kind => ValueSet.As<EnumItemStorageFlags>(kind))
+            .Aggregate(default(EnumItemStorageFlags), (all, flag) => all | flag);
+
+    /// <summary>What wears something down, as the sources the game holds.</summary>
+    private static EnumItemDamageSource[] Sources(EnumDamageKind[] kinds) =>
+        [.. kinds.Select(kind => ValueSet.As<EnumItemDamageSource>(kind))];
+
+    /// <summary>Mining speeds keyed by the block material each applies to.</summary>
+    private static Dictionary<EnumBlockMaterial, float> Speeds(Dictionary<EnumBlockKind, double> speeds) =>
+        speeds.ToDictionary(each => ValueSet.As<EnumBlockMaterial>(each.Key), each => (float)each.Value);
+}

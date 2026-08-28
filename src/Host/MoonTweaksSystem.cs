@@ -1,4 +1,5 @@
 using MoonTweaks.Api;
+using MoonTweaks.Events;
 using MoonTweaks.Recipes;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
@@ -14,6 +15,16 @@ public class MoonTweaksSystem : ModSystem
 {
     /// <summary>What this server's scripts applied at startup, for the list command.</summary>
     private MutationLog? applied;
+
+    /// <summary>
+    /// The interpreter the startup run left behind, kept alive for as long as the
+    /// handlers inside it may be called. Disposed with the mod rather than with the
+    /// run that made it.
+    /// </summary>
+    private IScriptHost? host;
+
+    /// <summary>What this server's scripts are listening for.</summary>
+    private ScriptEvents? events;
 
     /// <summary>The vanilla recipe loader runs at 1.0; scripts must observe its output.</summary>
     public override double ExecuteOrder() => 1.1;
@@ -51,7 +62,10 @@ public class MoonTweaksSystem : ModSystem
                 .WithDescription("Re-run every script and report what it would change, changing nothing")
                 .HandleWith(_ =>
                 {
-                    var run = ScriptRun.Execute(api, ScriptLibrary.ScriptsPathFor(), new RecipeRegistry(api));
+                    // A check is a dry run, so its handlers are never called and its
+                    // interpreter goes with it rather than joining the live one.
+                    using var run = ScriptRun.Execute(
+                        api, ScriptLibrary.ScriptsPathFor(), new RecipeRegistry(api), new ScriptEvents(api));
 
                     if (run.Failure is { } failure) return TextCommandResult.Error(failure.Message);
                     if (run.Scripts.Count == 0) return TextCommandResult.Success("no scripts to check");
@@ -103,16 +117,19 @@ public class MoonTweaksSystem : ModSystem
         }
 
         var registry = new RecipeRegistry(server);
-        var run = ScriptRun.Execute(server, scriptsFolder, registry);
+        events = new ScriptEvents(server);
+        var run = ScriptRun.Execute(server, scriptsFolder, registry, events);
 
         if (run.Scripts.Count == 0)
         {
+            run.Dispose();
             server.Logger.Notification("[moontweaks] no scripts in {0}", scriptsFolder);
             return;
         }
 
         if (run.Failure is { } failure)
         {
+            run.Dispose();
             // Nothing has been applied yet, so abandoning the run leaves the
             // registries exactly as the vanilla loader left them.
             server.Logger.Error("[moontweaks] {0}", failure.Message);
@@ -122,6 +139,9 @@ public class MoonTweaksSystem : ModSystem
 
         var affected = run.Log.Apply(server, server.Logger);
         applied = run.Log;
+        // Kept rather than disposed: a script may have left a handler behind, and it
+        // is only callable while the interpreter that made it is alive.
+        host = run.Host;
         RecipeBase.CollectiblePreSearchResultsCache.Clear();
 
         // Nothing downstream reports this: a surface takes the first recipe whose
@@ -136,10 +156,23 @@ public class MoonTweaksSystem : ModSystem
         }
 
         server.Logger.Notification(
-            "[moontweaks] {0} script(s), {1} change(s), {2} recipe(s) affected; "
+            "[moontweaks] {0} script(s), {1} change(s), {2} affected; "
             + "{3} grid, {4} knapping, {5} clay forming, {6} smithing and {7} barrel recipes now",
             run.Scripts.Count, run.Log.Pending.Count, affected,
             server.World.GridRecipes.Count, registry.Knapping.Count,
             registry.ClayForming.Count, registry.Smithing.Count, registry.Barrel.Count);
+
+        if (events.Count > 0)
+        {
+            server.Logger.Notification("[moontweaks] {0} event handler(s) listening", events.Count);
+        }
+    }
+
+    /// <inheritdoc/>
+    public override void Dispose()
+    {
+        host?.Dispose();
+        host = null;
+        base.Dispose();
     }
 }

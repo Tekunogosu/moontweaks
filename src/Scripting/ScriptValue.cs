@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace MoonTweaks.Scripting;
@@ -30,6 +31,14 @@ public abstract record ScriptValue
     /// <summary>A table with string keys.</summary>
     public sealed record Map(IReadOnlyDictionary<string, ScriptValue> Entries) : ScriptValue;
 
+    /// <summary>
+    /// A function a script wrote, held so the host can call it back later. The
+    /// interpreter that made it has to outlive the run that declared it, which is why
+    /// the host is owned by the mod system rather than by one run.
+    /// </summary>
+    /// <param name="Call">Invokes it, and says what it returned.</param>
+    public sealed record Func(Func<IReadOnlyList<ScriptValue>, ScriptValue> Call) : ScriptValue;
+
     /// <summary>Renders the Lua type name, for use in error messages.</summary>
     public string TypeName => this switch
     {
@@ -39,6 +48,7 @@ public abstract record ScriptValue
         Bool => "boolean",
         List => "list",
         Map => "table",
+        Func => "function",
         _ => "unknown",
     };
 }

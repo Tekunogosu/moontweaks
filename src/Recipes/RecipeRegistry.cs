@@ -104,12 +104,11 @@ public sealed class RecipeRegistry
     /// base shares exposes a resolved stack and no code, so each kind has to be asked
     /// for itself.
     /// </summary>
-    public int Remove<TRecipe>(string outputCode) where TRecipe : RecipeBase
+    public int Remove<TRecipe>(RecipeSelector selector) where TRecipe : RecipeBase
     {
-        var pattern = new AssetLocation(outputCode);
         var registered = ListOf<TRecipe>();
         var doomed = registered
-            .Where(recipe => OutputCodeOf(recipe) is { } code && WildcardUtil.Match(pattern, code))
+            .Where(recipe => selector.Matches(OutputCodeOf(recipe), recipe.RecipeOutput?.ResolvedItemStack))
             .ToList();
 
         foreach (var recipe in doomed) registered.Remove(recipe);

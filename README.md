@@ -168,10 +168,20 @@ Failures name the file, the line, the call, and the argument:
 
 ```
 Host       ModSystem, commands, script discovery, editor scaffolding, the log module
-Scripting  ScriptValue / IScriptHost / ScriptOrigin
-Api        annotations, spec records, SpecBinder, DomainBinder
+Scripting  ScriptValue / IScriptHost / ScriptOrigin, and the JSON they convert to
+Api        annotations, the spec shapes, SpecBinder, DomainBinder
+Assets     reaching items and blocks: codes, tags, stacks, properties
 Recipes    one domain and factory per recipe kind, over the shared owners below
+Players    reaching a player and the behaviours their state lives on
+Events     what the game raises while it runs, and the handlers listening
 ```
+
+Each layer names only the ones beneath it. Within a layer, a *system* reaches
+something and owns a question about it, while a *domain* is the thin surface a
+script calls — `PlayerAccess` finds a player and their behaviours, `PlayerDomain`
+lists what a script may do with one. Utilities reach nothing at all and sit apart
+from both: `ScriptJson` converts the value tree, `ValueSet` matches a declared set
+to the game's own.
 
 `ScriptRun` owns running the scripts. A server's startup and `/moontweaks check`
 both go through it, so what a check reports is what a start would do.
@@ -330,6 +340,37 @@ disagrees with the generated types, the second on a binding without a
 description. Both run in CI, the example check against the library `docs.sh` has
 just written rather than a checked-in copy, so an example cannot drift from the
 bindings it demonstrates.
+
+### Codes inside a handler are not checked
+
+A code written into a spec is refused by name if the server does not have it, at
+the moment the script is read. A code compared inside a handler is only a Lua
+string, so a wrong one never matches and the handler quietly does nothing:
+
+```lua
+if e.block == "game:crock-burned" then   -- no such block; this is never true
+```
+
+Nothing can catch that at load, because the comparison has not happened yet.
+Check a code against `library/codes.lua`, which lists what the server actually
+holds, or log `e.block` and go and break the thing to find out what it is called.
+
+### What a script costs
+
+A call from a script into the mod costs roughly **600ns**, against about 3ns for
+the same method called from C#. Around 400ns of that is crossing the boundary and
+the rest is marshalling arguments; returning a table adds about 250ns more.
+
+That fixes the scale of what a handler can sensibly do. A thousand calls cost
+under a millisecond, which is nothing; a hundred thousand cost a tenth of a
+second on the main thread, which players feel. Anything shaped like a loop over a
+region should ask how many calls it makes before it asks anything else.
+
+Block writes have their own cost on top, and it is not per block: `setBlock`
+relights and re-sends the chunk it touched before the next call runs, while
+`queueBlock` stages writes for a `commit` that pays that once per chunk. Filling
+a shape one block at a time is the expensive mistake, and it is expensive in the
+engine rather than in the interpreter.
 
 ## Commands
 

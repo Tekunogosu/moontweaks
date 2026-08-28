@@ -53,7 +53,19 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
                 Suggested(parameter.GetCustomAttribute<LuaSuggestsAttribute>(), parameter.ParameterType),
                 docs.Parameter(method, parameter.Name ?? "")))
             .ToList(),
-        method.ReturnType == typeof(void) ? "nil" : LuaNameOf(method.ReturnType));
+        Returns(method));
+
+    /// <summary>
+    /// What a function hands back. A binding that returns the neutral value tree
+    /// returns whatever it was asked for rather than a table in particular, which is
+    /// the same type read as an argument but not the same promise.
+    /// </summary>
+    private string Returns(MethodInfo method)
+    {
+        if (method.ReturnType == typeof(void)) return "nil";
+        if (method.ReturnType == typeof(MoonTweaks.Scripting.ScriptValue)) return "any";
+        return LuaNameOf(method.ReturnType);
+    }
 
     private TableDoc ReadTable(Type type)
     {
@@ -83,12 +95,47 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
             .Select(name => new EnumValueDoc(name.ToLowerInvariant(), docs.Summary(type, name)))
             .ToList());
 
-    /// <summary>Every enumeration reachable from a documented field or parameter.</summary>
-    private IEnumerable<Type> ReferencedEnums() => tableNames.Keys
-        .SelectMany(type => SpecBinder.FieldsOf(type).Values)
-        .Select(property => Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType)
+    /// <summary>
+    /// Every enumeration reachable from a documented field, whether the field is one
+    /// of them, a list of them, or a table keyed by them. A set that is declared but
+    /// never reached this way would go undocumented, and a field pointing at an
+    /// undeclared set would leave an editor with a type it cannot resolve.
+    /// </summary>
+    private IEnumerable<Type> ReferencedEnums() => FieldTypes()
+        .Concat(FunctionTypes())
+        .SelectMany(type => Within(Nullable.GetUnderlyingType(type) ?? type))
         .Where(type => type.IsEnum)
         .Distinct();
+
+    /// <summary>Every type a table key is written as.</summary>
+    private IEnumerable<Type> FieldTypes() => tableNames.Keys
+        .SelectMany(type => SpecBinder.FieldsOf(type).Values)
+        .Select(property => property.PropertyType);
+
+    /// <summary>
+    /// Every type a function takes or hands back. A set that only ever appears on a
+    /// function would otherwise go undeclared, leaving an editor with a name it
+    /// cannot resolve on a surface that reads perfectly well in the source.
+    /// </summary>
+    private IEnumerable<Type> FunctionTypes() => assembly.GetTypes()
+        .Where(type => type.GetCustomAttribute<LuaModuleAttribute>() is not null)
+        .SelectMany(DomainBinder.FunctionsOf)
+        .SelectMany(method => DomainBinder.ArgumentsOf(method)
+            .Select(parameter => parameter.ParameterType)
+            .Append(method.ReturnType));
+
+    /// <summary>The types a field reaches: itself, what it holds, and what it is keyed by.</summary>
+    private static IEnumerable<Type> Within(Type type)
+    {
+        yield return type;
+
+        if (type.IsArray && type.GetElementType() is { } element) yield return element;
+
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+        {
+            foreach (var argument in type.GetGenericArguments()) yield return argument;
+        }
+    }
 
     /// <summary>
     /// The type a table key or a function argument is documented as. A suggestion
@@ -111,15 +158,21 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         if (type == typeof(int)) return "integer";
         if (type == typeof(double)) return "number";
         if (type == typeof(bool)) return "boolean";
+        if (type == typeof(float)) return "number";
         if (type == typeof(void)) return "nil";
         // Arbitrary data: the binder constrains nothing, so neither does the type.
         if (type == typeof(MoonTweaks.Scripting.ScriptValue)) return "table";
+        // A handler the host calls back, given one table describing what happened.
+        if (type == typeof(MoonTweaks.Scripting.ScriptValue.Func)) return "fun(event: table)";
         if (type == typeof(string[])) return "string[]";
         // Written as rows, or as a list of them when a shape has more than one layer.
         if (type == typeof(string[][])) return "string[] | string[][]";
         if (tableNames.TryGetValue(type, out var table)) return table;
-        if (type.IsArray && type.GetElementType() is { } element
-            && tableNames.TryGetValue(element, out var each)) return $"{each}[]";
+        if (type.IsArray && type.GetElementType() is { } element)
+        {
+            if (tableNames.TryGetValue(element, out var each)) return $"{each}[]";
+            if (element.IsEnum) return $"{element.Name}[]";
+        }
         if (type.IsEnum) return type.Name;
 
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>))

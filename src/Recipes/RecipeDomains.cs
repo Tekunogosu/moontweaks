@@ -1,4 +1,5 @@
 using MoonTweaks.Api;
+using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
@@ -10,6 +11,7 @@ namespace MoonTweaks.Recipes;
 public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
 {
     private const string Kind = "knapping";
+    private readonly AssetStacks stacks = new(world);
     private readonly VoxelRecipeFactory factory = new(world);
 
     /// <summary>
@@ -29,12 +31,10 @@ public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, Recipe
     /// contain a <c>*</c> wildcard, so <c>"game:knifeblade-*"</c> removes the whole family.
     /// </summary>
     /// <param name="origin">Script line requesting the change.</param>
-    /// <param name="outputCode">Output code to match, such as <c>game:knifeblade-flint</c>.</param>
+    /// <param name="selector">Which recipes to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
-    public void Remove(
-        ScriptOrigin origin,
-        [LuaSuggests(SuggestionSets.AssetCode)] string outputCode) =>
-        log.Record(new RemoveRecipes<KnappingRecipe>(origin, Kind, outputCode, registry));
+    public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
+        log.Record(new RemoveRecipes<KnappingRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
 
     /// <summary>
     /// Counts the knapping recipes currently registered. Reads the registry as it
@@ -51,6 +51,7 @@ public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, Recipe
 public sealed class ClayFormingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
 {
     private const string Kind = "clay forming";
+    private readonly AssetStacks stacks = new(world);
     private readonly VoxelRecipeFactory factory = new(world);
 
     /// <summary>
@@ -70,12 +71,10 @@ public sealed class ClayFormingDomain(MutationLog log, IWorldAccessor world, Rec
     /// may contain a <c>*</c> wildcard, so <c>"game:bowl-*"</c> removes the whole family.
     /// </summary>
     /// <param name="origin">Script line requesting the change.</param>
-    /// <param name="outputCode">Output code to match, such as <c>game:bowl-raw</c>.</param>
+    /// <param name="selector">Which recipes to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
-    public void Remove(
-        ScriptOrigin origin,
-        [LuaSuggests(SuggestionSets.AssetCode)] string outputCode) =>
-        log.Record(new RemoveRecipes<ClayFormingRecipe>(origin, Kind, outputCode, registry));
+    public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
+        log.Record(new RemoveRecipes<ClayFormingRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
 
     /// <summary>
     /// Counts the clay forming recipes currently registered. Reads the registry as
@@ -92,6 +91,7 @@ public sealed class ClayFormingDomain(MutationLog log, IWorldAccessor world, Rec
 public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
 {
     private const string Kind = "smithing";
+    private readonly AssetStacks stacks = new(world);
     private readonly VoxelRecipeFactory factory = new(world);
 
     /// <summary>
@@ -121,12 +121,10 @@ public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, Recipe
     /// contain a <c>*</c> wildcard, so <c>"game:axehead-*"</c> removes the whole family.
     /// </summary>
     /// <param name="origin">Script line requesting the change.</param>
-    /// <param name="outputCode">Output code to match, such as <c>game:axehead-copper</c>.</param>
+    /// <param name="selector">Which recipes to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
-    public void Remove(
-        ScriptOrigin origin,
-        [LuaSuggests(SuggestionSets.AssetCode)] string outputCode) =>
-        log.Record(new RemoveRecipes<SmithingRecipe>(origin, Kind, outputCode, registry));
+    public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
+        log.Record(new RemoveRecipes<SmithingRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
 
     /// <summary>
     /// Counts the smithing recipes currently registered. Reads the registry as it
@@ -143,6 +141,7 @@ public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, Recipe
 public sealed class BarrelDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
 {
     private const string Kind = "barrel";
+    private readonly AssetStacks stacks = new(world);
     private readonly BarrelRecipeFactory factory = new(world);
 
     /// <summary>
@@ -162,12 +161,10 @@ public sealed class BarrelDomain(MutationLog log, IWorldAccessor world, RecipeRe
     /// contain a <c>*</c> wildcard, so <c>"game:*-cured"</c> removes the whole family.
     /// </summary>
     /// <param name="origin">Script line requesting the change.</param>
-    /// <param name="outputCode">Output code to match, such as <c>game:brineportion</c>.</param>
+    /// <param name="selector">Which recipes to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
-    public void Remove(
-        ScriptOrigin origin,
-        [LuaSuggests(SuggestionSets.AssetCode)] string outputCode) =>
-        log.Record(new RemoveRecipes<BarrelRecipe>(origin, Kind, outputCode, registry));
+    public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
+        log.Record(new RemoveRecipes<BarrelRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
 
     /// <summary>
     /// Counts the barrel recipes currently registered. Reads the registry as it stood

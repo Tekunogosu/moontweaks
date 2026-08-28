@@ -29,20 +29,19 @@ public sealed class AddGridRecipe(ScriptOrigin origin, string outputCode, IReadO
 }
 
 /// <summary>Removes every grid recipe whose output code matches a pattern.</summary>
-public sealed class RemoveGridRecipes(ScriptOrigin origin, string outputCode) : IMutation
+public sealed class RemoveGridRecipes(ScriptOrigin origin, RecipeSelector selector) : IMutation
 {
     /// <inheritdoc/>
     public ScriptOrigin Origin { get; } = origin;
 
     /// <inheritdoc/>
-    public string Describe() => $"remove grid recipes producing {outputCode}";
+    public string Describe() => $"remove grid recipes producing {selector.Described}";
 
     /// <inheritdoc/>
     public int Apply(ICoreServerAPI api)
     {
-        var pattern = new AssetLocation(outputCode);
         var doomed = api.World.GridRecipes
-            .Where(recipe => recipe.Output?.Code is { } code && WildcardUtil.Match(pattern, code))
+            .Where(recipe => selector.Matches(recipe.Output?.Code, recipe.Output?.ResolvedItemStack))
             .ToList();
 
         foreach (var recipe in doomed) api.World.GridRecipes.Remove(recipe);

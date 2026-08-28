@@ -67,13 +67,25 @@ public static class SpecBinder
         return spec;
     }
 
-    /// <summary>Converts one script value to the CLR type the property declares.</summary>
-    private static object? Convert(Type target, ScriptValue value, ScriptOrigin origin, string path)
+    /// <summary>
+    /// Converts one script value to the CLR type asked for. Sole owner of that
+    /// question: a table key and a function argument are the same problem, and
+    /// answering it twice is how one of them ends up supporting fewer types.
+    /// </summary>
+    public static object? Convert(Type target, ScriptValue value, ScriptOrigin origin, string path)
     {
         var underlying = Nullable.GetUnderlyingType(target) ?? target;
 
+        // A function the host will call back later, which no other target accepts.
+        if (underlying == typeof(ScriptValue.Func))
+        {
+            return value is ScriptValue.Func handler
+                ? handler
+                : throw Expected(origin, path, "a function", value);
+        }
+
         // A field the game stores as arbitrary data has no shape to bind against,
-        // so the tree reaches the domain as it was written and is converted there.
+        // so the tree reaches the domain as the script wrote it and is converted there.
         if (underlying == typeof(ScriptValue)) return value;
 
         if (underlying == typeof(string))
@@ -107,6 +119,19 @@ public static class SpecBinder
                 throw new ScriptError(origin, $"{path} must be one of {allowed}, got '{name.Value}'");
             }
             return Enum.Parse(underlying, match);
+        }
+
+        // A list of values from a closed set, so a misspelling is refused by the same
+        // path a single one would be.
+        if (underlying.IsArray && underlying.GetElementType() is { IsEnum: true } choice)
+        {
+            if (value is not ScriptValue.List chosen) throw Expected(origin, path, "a list", value);
+            var picked = Array.CreateInstance(choice, chosen.Items.Count);
+            for (var index = 0; index < chosen.Items.Count; index++)
+            {
+                picked.SetValue(Convert(choice, chosen.Items[index], origin, $"{path}[{index + 1}]"), index);
+            }
+            return picked;
         }
 
         if (underlying == typeof(string[]))
@@ -154,11 +179,23 @@ public static class SpecBinder
         if (underlying.IsGenericType && underlying.GetGenericTypeDefinition() == typeof(Dictionary<,>))
         {
             if (value is not ScriptValue.Map map) throw Expected(origin, path, "a table", value);
+            var keyType = underlying.GetGenericArguments()[0];
             var elementType = underlying.GetGenericArguments()[1];
             var result = (System.Collections.IDictionary)Activator.CreateInstance(underlying)!;
             foreach (var (key, entry) in map.Entries)
             {
-                result[key] = Bind(elementType, entry, origin, $"{path}.{key}");
+                // A table keyed by a closed set reads its keys through the same
+                // conversion its values would use, so an unknown key is named.
+                if (keyType.IsEnum)
+                {
+                    result[Convert(keyType, new ScriptValue.Str(key), origin, $"{path}.{key}")!] =
+                        Convert(elementType, entry, origin, $"{path}.{key}");
+                    continue;
+                }
+
+                // Converted rather than bound, so a table of numbers reads as readily
+                // as a table of shapes; a shape still lands in the branch below.
+                result[key] = Convert(elementType, entry, origin, $"{path}.{key}");
             }
             return result;
         }
