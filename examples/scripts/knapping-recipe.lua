@@ -20,9 +20,11 @@ knap.add {
 }
 
 -- One declaration covering three stones, via wildcard expansion. The variant
--- that matched `name` is substituted into the output's `{rock}`.
+-- that matched `name` is substituted into the output's `{rock}`. The fields every
+-- recipe kind shares work here too, so this one is gated behind a character trait.
 knap.add {
   name = "moontweaks:knifeblade-stone-wide",
+  requiresTrait = "technical",
   ingredient = { code = "game:stone-*", name = "rock",
                  allowedVariants = { "chert", "granite", "andesite" } },
   pattern = { "___####___",

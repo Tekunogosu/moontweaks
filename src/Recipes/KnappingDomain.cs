@@ -37,10 +37,10 @@ public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, Recipe
         if (resolved.Count == 0)
         {
             throw new ScriptError(origin,
-                $"no recipe resolved for {recipe.Output.Code}; check that every code exists");
+                $"no recipe resolved for {recipe.OutputCode}; check that every code exists");
         }
 
-        log.Record(new AddKnappingRecipe(origin, recipe.Output.Code, resolved, registry));
+        log.Record(recipe, new AddKnappingRecipe(origin, recipe.OutputCode, resolved, registry));
     }
 
     /// <summary>
@@ -50,7 +50,9 @@ public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, Recipe
     /// <param name="origin">Script line requesting the change.</param>
     /// <param name="outputCode">Output code to match, such as <c>game:knifeblade-flint</c>.</param>
     [LuaFunction("remove")]
-    public void Remove(ScriptOrigin origin, string outputCode) =>
+    public void Remove(
+        ScriptOrigin origin,
+        [LuaSuggests(SuggestionSets.AssetCode)] string outputCode) =>
         log.Record(new RemoveKnappingRecipes(origin, outputCode, registry));
 
     /// <summary>

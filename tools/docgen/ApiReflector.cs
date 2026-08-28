@@ -50,7 +50,7 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         DomainBinder.ArgumentsOf(method)
             .Select(parameter => new ParameterDoc(
                 parameter.Name ?? "?",
-                LuaNameOf(parameter.ParameterType),
+                Suggested(parameter.GetCustomAttribute<LuaSuggestsAttribute>(), parameter.ParameterType),
                 docs.Parameter(method, parameter.Name ?? "")))
             .ToList(),
         method.ReturnType == typeof(void) ? "nil" : LuaNameOf(method.ReturnType));
@@ -64,7 +64,7 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
                 var field = entry.Value.GetCustomAttribute<LuaFieldAttribute>()!;
                 return new FieldDoc(
                     field.Name,
-                    Suggested(field, entry.Value.PropertyType),
+                    Suggested(entry.Value.GetCustomAttribute<LuaSuggestsAttribute>(), entry.Value.PropertyType),
                     field.Required,
                     field.Default,
                     docs.Summary(entry.Value));
@@ -91,13 +91,14 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         .Distinct();
 
     /// <summary>
-    /// The type a field is documented as. A suggestion names the values one element
-    /// may take, so a field holding a list of them is still written as a list.
+    /// The type a table key or a function argument is documented as. A suggestion
+    /// names the values one element may take, so a member holding a list of them is
+    /// still written as a list.
     /// </summary>
-    private string Suggested(LuaFieldAttribute field, Type type)
+    private string Suggested(LuaSuggestsAttribute? suggests, Type type)
     {
-        if (field.Suggests is not { } values) return LuaNameOf(type);
-        return type.IsArray ? $"{values}[]" : values;
+        if (suggests is null) return LuaNameOf(type);
+        return type.IsArray ? $"{suggests.Values}[]" : suggests.Values;
     }
 
     /// <summary>Renders a CLR type as the Lua type scripts actually write.</summary>

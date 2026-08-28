@@ -62,11 +62,28 @@ has one spelling and cannot disagree with itself.
 
 Everywhere else the field names are Vintage Story's own — `ingredients`,
 `output`, `code`, `quantity`, `shapeless`, `allowedVariants`,
-`copyAttributesFrom` — so a vanilla recipe under `assets/survival/recipes/grid/`
-reads as a working reference. A name changes only where the shape changed.
+`copyAttributesFrom`, `requiresTrait`, `enabled`, `averageDurability`,
+`returnedStack` — so a vanilla recipe under `assets/survival/recipes/grid/` reads
+as a working reference. A name changes only where the shape changed.
 
 Two shorthands: a bare string stands in for a table with only `code` set, and
 `type` is inferred by looking the code up in the item and block registries.
+
+Every recipe kind carries `name`, `enabled` and `requiresTrait`, because the
+game reads all three for every kind. `requiresTrait` gates a recipe behind a
+character trait, and a trait this server's assets do not define is refused by
+name. Servers that turn the `classExclusiveRecipes` world configuration off drop
+the trait from a scripted recipe exactly as the game drops it from its own.
+
+`enabled = false` keeps a recipe in the file without registering it. The recipe
+is still built, expanded and resolved, so a mistake in a disabled one is reported
+on the run that declares it rather than on the day it is switched back on — the
+one place MoonTweaks does more than the game's loader, which reads `enabled`
+before it parses anything.
+
+`averageDurability` is bound on grid recipes alone. It is read as the product
+lands in the crafting output slot, and no other kind passes through there: a
+knapping surface clones its resolved output stack directly.
 
 An ingredient may name what an asset *is* rather than what it is called:
 
@@ -159,19 +176,26 @@ MoonSharp appears in exactly one class, `Scripting/MoonSharpHost`. Lua values ar
 reduced to a neutral `ScriptValue` tree at that boundary, so swapping interpreters
 means reimplementing `IScriptHost` and nothing else.
 
-Three questions every recipe kind asks have one owner apiece, so no domain
+Four questions every recipe kind asks have one owner apiece, so no domain
 answers them for itself. `AssetKindResolver` decides whether a code names an item
 or a block. `RecipeAssets` turns the shapes scripts write into the records the
 game resolves. `RecipeRegistry` reaches the lists the game keeps outside the
 world: grid recipes hang off the world itself, but every other kind lives on a
 mod system.
 
+`TraitRegistry` answers which character traits exist, reading the `config/traits`
+assets rather than the character system that also reads them: that system fills
+its own registry at run phase `ModsAndConfigReady`, after scripts have run.
+
 Specs share the same way. `Material` is a code that a wildcard may name a family
 of; an `Ingredient` is a `Material` the recipe also consumes a quantity of, or
-uses as a tool. Knapping takes a `Material` rather than an `Ingredient` because
-the stone decides which recipes a surface offers rather than how much is spent —
-the game consumes exactly one when the surface is placed, before a recipe is even
-chosen, so a quantity there would be a field that could never mean anything.
+uses as a tool, and may hand a `ReturnedStack` back for. `Output` and
+`ReturnedStack` are one shape under the two names the game's own recipe files
+give it, so a recipe ported from JSON reads the same here as it did there.
+Knapping takes a `Material` rather than an `Ingredient` because the stone decides
+which recipes a surface offers rather than how much is spent — the game consumes
+exactly one when the surface is placed, before a recipe is even chosen, so a
+quantity there would be a field that could never mean anything.
 
 ## The API reference
 

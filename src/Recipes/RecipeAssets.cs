@@ -14,6 +14,41 @@ namespace MoonTweaks.Recipes;
 public sealed class RecipeAssets(IWorldAccessor world)
 {
     private readonly AssetKindResolver kinds = new(world);
+    private readonly TraitRegistry traits = new(world.Api);
+
+    /// <summary>
+    /// The fields every recipe kind carries, set on the recipe a factory has built.
+    /// Sole owner of that translation, so a kind bound later cannot quietly leave one
+    /// of them unread.
+    /// </summary>
+    public TRecipe Recipe<TRecipe>(TRecipe recipe, RecipeSpec spec, ScriptOrigin origin)
+        where TRecipe : RecipeBase
+    {
+        // Checked whatever the server does with it, so a misspelled trait is the same
+        // error everywhere rather than one that surfaces on some servers only.
+        var trait = Trait(spec.RequiresTrait, origin);
+
+        recipe.Name = new AssetLocation(spec.Name ?? $"moontweaks:{spec.OutputCode}");
+        recipe.Enabled = spec.Enabled;
+        // The game drops the trait from every recipe it loads on a server that does
+        // not run class-exclusive recipes, so a scripted recipe gates exactly where a
+        // vanilla one does.
+        recipe.RequiresTrait = world.Config.GetBool("classExclusiveRecipes", true) ? trait : null;
+        return recipe;
+    }
+
+    /// <summary>
+    /// Checks a trait name against the ones this server defines. Naming a trait
+    /// nothing holds would gate a recipe behind a class no player can pick, which is
+    /// indistinguishable from the recipe simply not working.
+    /// </summary>
+    private string? Trait(string? trait, ScriptOrigin origin)
+    {
+        if (trait is null || traits.Codes.Contains(trait)) return trait;
+
+        throw new ScriptError(origin,
+            $"requiresTrait names '{trait}', which is not a character trait this server defines");
+    }
 
     /// <summary>A material a recipe is worked from, named by code, by tags, or by both.</summary>
     public CraftingRecipeIngredient Ingredient(MaterialSpec spec, ScriptOrigin origin, string path)
@@ -76,6 +111,9 @@ public sealed class RecipeAssets(IWorldAccessor world)
         ingredient.Quantity = spec.Quantity;
         ingredient.IsTool = spec.IsTool;
         ingredient.ToolDurabilityCost = spec.ToolDurabilityCost;
+        ingredient.ReturnedStack = spec.ReturnedStack is { } returned
+            ? Stack(returned, origin, $"{path}.returnedStack")
+            : null;
         return ingredient;
     }
 
@@ -87,10 +125,10 @@ public sealed class RecipeAssets(IWorldAccessor world)
         Quantity = spec.Quantity,
     };
 
-    /// <summary>A product, for the recipe kinds that describe one as a stack.</summary>
-    public JsonItemStack Stack(OutputSpec spec, ScriptOrigin origin) => new()
+    /// <summary>A named asset and how many of it, for the fields the game holds as a stack.</summary>
+    public JsonItemStack Stack(StackSpec spec, ScriptOrigin origin, string path) => new()
     {
-        Type = kinds.Resolve(spec.Code!, spec.Type, origin, "output"),
+        Type = kinds.Resolve(spec.Code!, spec.Type, origin, path),
         Code = new AssetLocation(spec.Code),
         StackSize = spec.Quantity,
     };

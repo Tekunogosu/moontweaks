@@ -22,15 +22,14 @@ public sealed class KnappingRecipeFactory(IWorldAccessor world)
     {
         var rows = OnlyLayer(spec.Pattern, origin);
 
-        return new KnappingRecipe
+        return assets.Recipe(new KnappingRecipe
         {
-            Name = new AssetLocation(spec.Name ?? $"moontweaks:{spec.Output.Code}"),
             Pattern = [rows],
             // Set through the array rather than the Ingredient property, which
             // writes into an array this recipe does not have yet.
             Ingredients = [assets.Ingredient(spec.Ingredient, origin, "ingredient")],
-            Output = assets.Stack(spec.Output, origin),
-        };
+            Output = assets.Stack(spec.Output, origin, "output"),
+        }, spec, origin);
     }
 
     /// <summary>Takes the single layer knapping shapes, and checks it describes a surface.</summary>

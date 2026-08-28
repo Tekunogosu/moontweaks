@@ -42,18 +42,18 @@ public sealed class GridRecipeFactory(IWorldAccessor world)
             throw new ScriptError(origin, $"ingredients declares '{key}' but the pattern never uses it");
         }
 
-        return new GridRecipe
+        return assets.Recipe(new GridRecipe
         {
-            Name = new AssetLocation(spec.Name ?? $"moontweaks:{spec.Output.Code}"),
             IngredientPattern = string.Join(",", spec.Pattern),
             Width = width,
             Height = spec.Pattern.Length,
             Shapeless = spec.Shapeless,
             CopyAttributesFrom = spec.CopyAttributesFrom,
+            AverageDurability = spec.AverageDurability,
             Ingredients = spec.Ingredients.ToDictionary(
                 entry => entry.Key,
                 entry => assets.Ingredient(entry.Value, origin, $"ingredients.{entry.Key}")),
             Output = assets.Output(spec.Output, origin),
-        };
+        }, spec, origin);
     }
 }

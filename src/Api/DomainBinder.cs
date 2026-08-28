@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using MoonTweaks.Scripting;
 
 namespace MoonTweaks.Api;
@@ -67,8 +68,27 @@ public static class DomainBinder
                 index++;
             }
 
-            return Lift(method.Invoke(domain, supplied));
+            return Lift(Invoke(method, domain, supplied));
         });
+    }
+
+    /// <summary>
+    /// Calls the bound method, unwrapping what reflection wraps around whatever it
+    /// threw. A <see cref="ScriptError"/> has to reach the run loop as itself: caught
+    /// there it names the script, the line and the mistake, and uncaught it takes the
+    /// mod down with a stack trace in place of that sentence.
+    /// </summary>
+    private static object? Invoke(MethodInfo method, object domain, object?[] supplied)
+    {
+        try
+        {
+            return method.Invoke(domain, supplied);
+        }
+        catch (TargetInvocationException wrapped) when (wrapped.InnerException is { } cause)
+        {
+            ExceptionDispatchInfo.Capture(cause).Throw();
+            throw;
+        }
     }
 
     /// <summary>Converts one argument, sending table shapes through the spec binder.</summary>

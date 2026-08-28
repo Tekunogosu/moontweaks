@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using MoonTweaks.Api;
 using Vintagestory.API.Common;
 
 namespace MoonTweaks.Host;
@@ -16,11 +17,11 @@ public static class AssetCodeLibrary
     /// <summary>Name of the generated file inside the library folder.</summary>
     public const string FileName = "codes.lua";
 
-    /// <summary>Type name the generated reference points a code field at.</summary>
-    public const string AliasName = "AssetCode";
+    /// <summary>Type name the generated reference points a code member at.</summary>
+    public const string AliasName = SuggestionSets.AssetCode;
 
-    /// <summary>Type name the generated reference points a tags field at.</summary>
-    public const string TagAliasName = "AssetTag";
+    /// <summary>Type name the generated reference points a tags member at.</summary>
+    public const string TagAliasName = SuggestionSets.AssetTag;
 
     /// <summary>
     /// Writes the file unless the codes already listed there are this server's.

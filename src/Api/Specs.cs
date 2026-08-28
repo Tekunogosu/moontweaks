@@ -22,7 +22,8 @@ public abstract class AssetSpec
     /// Asset code such as <c>game:stick</c>. May contain a <c>*</c> wildcard.
     /// Required unless <c>tags</c> names what to match instead.
     /// </summary>
-    [LuaField("code", Suggests = "AssetCode")]
+    [LuaField("code")]
+    [LuaSuggests(SuggestionSets.AssetCode)]
     public virtual string? Code { get; set; }
 
     /// <summary>Registry the code names. Inferred by looking the code up when omitted.</summary>
@@ -58,9 +59,43 @@ public class MaterialSpec : AssetSpec
     /// as readily as a vanilla one. Used alone, or alongside <c>code</c> to narrow
     /// a wildcard further.
     /// </summary>
-    [LuaField("tags", Suggests = "AssetTag")]
+    [LuaField("tags")]
+    [LuaSuggests(SuggestionSets.AssetTag)]
     public string[]? Tags { get; set; }
 }
+
+/// <summary>
+/// A named asset and how many of it. Not written by scripts directly: the game's own
+/// recipe files give this one shape two names, and <see cref="OutputSpec"/> and
+/// <see cref="ReturnedStackSpec"/> are those names, so a recipe ported from JSON
+/// reads the same here as it did there.
+/// </summary>
+public abstract class StackSpec : AssetSpec
+{
+    /// <summary>
+    /// Asset code of the stack. May contain <c>{name}</c> placeholders naming a
+    /// wildcard ingredient, which expands into one recipe per matched variant.
+    /// </summary>
+    [LuaField("code", Required = true)]
+    [LuaSuggests(SuggestionSets.AssetCode)]
+    public override string? Code { get; set; }
+
+    /// <summary>How many the stack holds.</summary>
+    [LuaField("quantity", Default = "1")]
+    public int Quantity { get; set; } = 1;
+}
+
+/// <summary>What a recipe produces.</summary>
+[LuaTable("Output", Shorthand = "code")]
+public sealed class OutputSpec : StackSpec;
+
+/// <summary>
+/// What an ingredient hands back when the recipe consumes it, such as the empty
+/// bucket left by a bucket of milk. The same shape as an <c>Output</c>, under the
+/// name the game's own recipe files use for it.
+/// </summary>
+[LuaTable("ReturnedStack", Shorthand = "code")]
+public sealed class ReturnedStackSpec : StackSpec;
 
 /// <summary>
 /// One input a recipe consumes: a material, in a quantity, possibly as a tool.
@@ -79,27 +114,53 @@ public sealed class IngredientSpec : MaterialSpec
     /// <summary>Durability removed when this is used as a tool.</summary>
     [LuaField("toolDurabilityCost", Default = "0")]
     public int ToolDurabilityCost { get; set; }
+
+    /// <summary>
+    /// Handed back to the crafter once this ingredient is consumed. Nothing is
+    /// handed back when omitted.
+    /// </summary>
+    [LuaField("returnedStack")]
+    public ReturnedStackSpec? ReturnedStack { get; set; }
 }
 
-/// <summary>What a recipe produces.</summary>
-[LuaTable("Output", Shorthand = "code")]
-public sealed class OutputSpec : AssetSpec
+/// <summary>
+/// What every recipe kind carries, whatever it is worked on. Mirrors the base the
+/// game's own recipes share, so a field it reads for every kind is declared once
+/// rather than once per kind.
+/// </summary>
+public abstract class RecipeSpec
 {
-    /// <summary>
-    /// Asset code of the product. May contain <c>{name}</c> placeholders naming a
-    /// wildcard ingredient, which expands into one recipe per matched variant.
-    /// </summary>
-    [LuaField("code", Required = true, Suggests = "AssetCode")]
-    public override string? Code { get; set; }
+    /// <summary>Identifies the recipe in logs and in the handbook. Defaults to the output code.</summary>
+    [LuaField("name")]
+    public string? Name { get; set; }
 
-    /// <summary>How many the recipe yields.</summary>
-    [LuaField("quantity", Default = "1")]
-    public int Quantity { get; set; } = 1;
+    /// <summary>
+    /// Whether the recipe is registered. A disabled recipe is still built and
+    /// checked, so a mistake in one is reported now rather than on the day it is
+    /// switched back on.
+    /// </summary>
+    [LuaField("enabled", Default = "true")]
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Character trait a player must hold to use this recipe, such as
+    /// <c>clothier</c>. Servers that turn the <c>classExclusiveRecipes</c> world
+    /// configuration off ignore it, on this recipe exactly as on the game's own.
+    /// </summary>
+    [LuaField("requiresTrait")]
+    public string? RequiresTrait { get; set; }
+
+    /// <summary>
+    /// Code of what this recipe produces, which names the recipe when nothing else
+    /// does. Not a key scripts write: every kind already declares its own output,
+    /// whose <c>code</c> is required, so a bound recipe always has one.
+    /// </summary>
+    public abstract string OutputCode { get; }
 }
 
 /// <summary>A crafting grid recipe.</summary>
 [LuaTable("GridRecipe")]
-public sealed class GridRecipeSpec
+public sealed class GridRecipeSpec : RecipeSpec
 {
     /// <summary>
     /// Rows of the crafting grid, one string per row and one character per column.
@@ -117,10 +178,6 @@ public sealed class GridRecipeSpec
     [LuaField("output", Required = true)]
     public OutputSpec Output { get; set; } = new();
 
-    /// <summary>Identifies the recipe in logs and in the handbook. Defaults to the output code.</summary>
-    [LuaField("name")]
-    public string? Name { get; set; }
-
     /// <summary>Ingredients may be placed in any arrangement rather than the pattern shown.</summary>
     [LuaField("shapeless", Default = "false")]
     public bool Shapeless { get; set; }
@@ -128,11 +185,22 @@ public sealed class GridRecipeSpec
     /// <summary>Copies item attributes from the ingredient under this pattern character onto the output.</summary>
     [LuaField("copyAttributesFrom")]
     public string? CopyAttributesFrom { get; set; }
+
+    /// <summary>
+    /// Gives the product the durability the tools that made it averaged. Bound on
+    /// this kind alone: it is read as the product lands in the crafting output slot,
+    /// which no other kind passes through.
+    /// </summary>
+    [LuaField("averageDurability", Default = "true")]
+    public bool AverageDurability { get; set; } = true;
+
+    /// <inheritdoc/>
+    public override string OutputCode => Output.Code!;
 }
 
 /// <summary>A knapping recipe, chipped from a stone laid on a knapping surface.</summary>
 [LuaTable("KnappingRecipe")]
-public sealed class KnappingRecipeSpec
+public sealed class KnappingRecipeSpec : RecipeSpec
 {
     /// <summary>
     /// Rows of the knapping surface, one string per row and one character per
@@ -151,7 +219,6 @@ public sealed class KnappingRecipeSpec
     [LuaField("output", Required = true)]
     public OutputSpec Output { get; set; } = new();
 
-    /// <summary>Identifies the recipe in logs and in the handbook. Defaults to the output code.</summary>
-    [LuaField("name")]
-    public string? Name { get; set; }
+    /// <inheritdoc/>
+    public override string OutputCode => Output.Code!;
 }

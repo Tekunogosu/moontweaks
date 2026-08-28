@@ -3,46 +3,37 @@
 Work that is decided but not yet done. Each entry says what it is and why it is
 worth doing, so it can be picked up without reconstructing the conversation.
 
-Ordered by how far each is from done: the fields at the top need no decisions,
+Ordered by how far each is from done: the export at the top needs no decisions,
 the interpreter at the bottom needs several.
 
-## Recipe fields the game's own recipes use
+## Export the traits
 
-Four fields exist on every recipe kind and are bound on none, listed with how
-often vanilla's own recipe files use them:
-
-| field | uses | what it does |
-| --- | --- | --- |
-| `requiresTrait` | 124 | gates a recipe behind a character trait |
-| `averageDurability` | 47 | averages the durability of combined tools |
-| `returnedStack` | 32 | what an ingredient leaves behind, such as an empty bucket |
-| `enabled` | 28 | the game's own switch for turning a recipe off |
-
-`showInCreatedBy`, `mergeAttributesFrom`, `durabilityChange` and `matchingType`
-are bound on none either, and vanilla uses them zero times. Leave them out until
-something asks: an offered field that does nothing is worse than an absent one.
-
-## Asset code suggestions on command parameters
-
-`AssetCode` is offered on every `code` field of a table, because a field carries
-its suggestions in `LuaFieldAttribute`. Function parameters take their type from
-the CLR signature alone, so `grid.remove("game:axe-flint")` gets no suggestions
-even though it names exactly the same thing. Give parameters the same annotation.
-
-## Export the traits, and generalise the registry accessor
-
-`requiresTrait` names one of 26 traits held in `CharacterSystem.TraitsByCode` —
-a mod system field, the same shape `RecipeRegistry` already reaches
-`RecipeRegistrySystem` through. Exporting them as an `AssetTrait` alias costs
-what tags cost, and turns a bare string an author has to already know into one an
-editor offers.
+`requiresTrait` is bound and checked against `TraitRegistry`, which reads the
+`config/traits` assets. What is missing is offering those codes to an editor:
+declaring the list as an `AssetTrait` alias beside `AssetCode` and `AssetTag`
+costs what tags cost, and turns a bare string an author has to already know into
+one an editor completes. `LuaSuggestsAttribute` and `SuggestionSets` are the two
+places it hangs off.
 
 The rule this is the third instance of: anything a script writes as a bare string
 that the game keeps a registry of should be exported and suggested. Codes and
 tags are done, traits are next, entity codes will want the same.
 
-It also means `RecipeRegistry` is really "reach a mod system's registry" and
-wants renaming once it holds a second one.
+`RecipeRegistry` still reaches exactly one mod system, so the rename this entry
+used to predict has not come due. Traits did not trigger it:
+`CharacterSystem.TraitsByCode` fills at run phase `ModsAndConfigReady`, after
+scripts have run, so `TraitRegistry` reads the assets rather than that field.
+
+## Recipe fields still unbound
+
+`showInCreatedBy`, `mergeAttributesFrom`, `durabilityChange` and `matchingType`
+are bound on none of the kinds, and vanilla's own recipe files use them zero
+times. Leave them out until something asks: an offered field that does nothing is
+worse than an absent one.
+
+`averageDurability` is bound on grid recipes alone for the same reason. It is
+read only as a product lands in a crafting output slot, and a knapping surface
+clones its resolved output stack directly rather than passing through there.
 
 ## A bridge from Lua tables to JsonObject
 

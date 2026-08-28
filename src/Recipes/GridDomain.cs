@@ -33,10 +33,10 @@ public sealed class GridDomain(MutationLog log, IWorldAccessor world)
         if (resolved.Count == 0)
         {
             throw new ScriptError(origin,
-                $"no recipe resolved for {recipe.Output.Code}; check that every ingredient code exists");
+                $"no recipe resolved for {recipe.OutputCode}; check that every ingredient code exists");
         }
 
-        log.Record(new AddGridRecipe(origin, recipe.Output.Code, resolved));
+        log.Record(recipe, new AddGridRecipe(origin, recipe.OutputCode, resolved));
     }
 
     /// <summary>
@@ -46,7 +46,9 @@ public sealed class GridDomain(MutationLog log, IWorldAccessor world)
     /// <param name="origin">Script line requesting the change.</param>
     /// <param name="outputCode">Output code to match, such as <c>game:axe-flint</c>.</param>
     [LuaFunction("remove")]
-    public void Remove(ScriptOrigin origin, string outputCode) =>
+    public void Remove(
+        ScriptOrigin origin,
+        [LuaSuggests(SuggestionSets.AssetCode)] string outputCode) =>
         log.Record(new RemoveGridRecipes(origin, outputCode));
 
     /// <summary>

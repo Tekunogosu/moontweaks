@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MoonTweaks.Api;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -19,6 +20,29 @@ public interface IMutation
 }
 
 /// <summary>
+/// A change a disabled recipe asked for. The recipe was built, expanded and resolved
+/// like any other, so a mistake in one is reported on the run that declared it rather
+/// than on the day it is switched back on; only the registration is withheld.
+/// </summary>
+/// <remarks>
+/// The game honours <c>enabled</c> in its recipe loader, which reads it before it
+/// parses anything and which scripted recipes do not pass through. Nothing reads it
+/// again once a recipe is registered, so this is the only place the field can mean
+/// what it says.
+/// </remarks>
+public sealed class DisabledRecipe(IMutation change) : IMutation
+{
+    /// <inheritdoc/>
+    public ScriptOrigin Origin => change.Origin;
+
+    /// <inheritdoc/>
+    public string Describe() => $"{change.Describe()} — disabled, so nothing is registered";
+
+    /// <inheritdoc/>
+    public int Apply(ICoreServerAPI api) => 0;
+}
+
+/// <summary>
 /// Changes requested by scripts, applied in one pass once every script has run.
 /// A script that fails partway therefore contributes nothing rather than leaving
 /// the registries half-edited.
@@ -32,6 +56,15 @@ public sealed class MutationLog
 
     /// <summary>Records a change without performing it.</summary>
     public void Record(IMutation mutation) => pending.Add(mutation);
+
+    /// <summary>
+    /// Records a change, unless the recipe asking for it is disabled, in which case
+    /// the change is kept for the report and never applied. Sole owner of what
+    /// <c>enabled = false</c> means, so a kind bound later cannot register a disabled
+    /// recipe by forgetting to ask.
+    /// </summary>
+    public void Record(RecipeSpec spec, IMutation mutation) =>
+        Record(spec.Enabled ? mutation : new DisabledRecipe(mutation));
 
     /// <summary>
     /// What one applied change turned out to affect, kept so a server can report

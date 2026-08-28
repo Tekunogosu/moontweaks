@@ -52,11 +52,34 @@ public sealed class LuaFieldAttribute(string name) : Attribute
 
     /// <summary>Value used when the key is omitted, written as it would appear in Lua.</summary>
     public string? Default { get; init; }
+}
 
-    /// <summary>
-    /// Named set of values an editor offers for this key, replacing the type it
-    /// would otherwise be documented as. The set only suggests: the binder still
-    /// reads whatever the property declares, so a value outside it is accepted.
-    /// </summary>
-    public string? Suggests { get; init; }
+/// <summary>
+/// Names the set of values an editor offers for a table key or a function argument.
+/// </summary>
+/// <remarks>
+/// The set only suggests, and replaces the type the member would otherwise be
+/// documented as: every binder still reads whatever the CLR signature declares, so a
+/// value outside the set is accepted. One annotation covers both kinds of member,
+/// because a key and an argument naming the same thing should offer the same values.
+/// </remarks>
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter, Inherited = false)]
+public sealed class LuaSuggestsAttribute(string values) : Attribute
+{
+    /// <summary>Name of the set, which the generated reference declares as a type.</summary>
+    public string Values { get; } = values;
+}
+
+/// <summary>
+/// The sets <see cref="LuaSuggestsAttribute"/> names. An attribute argument has to be
+/// a constant, so the names live here rather than beside the generator that emits the
+/// declarations, and neither side can rename a set without the other following.
+/// </summary>
+public static class SuggestionSets
+{
+    /// <summary>Every code the item and block registries hold.</summary>
+    public const string AssetCode = "AssetCode";
+
+    /// <summary>Every tag any item or block carries.</summary>
+    public const string AssetTag = "AssetTag";
 }
