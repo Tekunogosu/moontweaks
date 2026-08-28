@@ -3,26 +3,8 @@
 Work that is decided but not yet done. Each entry says what it is and why it is
 worth doing, so it can be picked up without reconstructing the conversation.
 
-Ordered by how far each is from done: the export at the top needs no decisions,
-the interpreter at the bottom needs several.
-
-## Export the traits
-
-`requiresTrait` is bound and checked against `TraitRegistry`, which reads the
-`config/traits` assets. What is missing is offering those codes to an editor:
-declaring the list as an `AssetTrait` alias beside `AssetCode` and `AssetTag`
-costs what tags cost, and turns a bare string an author has to already know into
-one an editor completes. `LuaSuggestsAttribute` and `SuggestionSets` are the two
-places it hangs off.
-
-The rule this is the third instance of: anything a script writes as a bare string
-that the game keeps a registry of should be exported and suggested. Codes and
-tags are done, traits are next, entity codes will want the same.
-
-`RecipeRegistry` still reaches exactly one mod system, so the rename this entry
-used to predict has not come due. Traits did not trigger it:
-`CharacterSystem.TraitsByCode` fills at run phase `ModsAndConfigReady`, after
-scripts have run, so `TraitRegistry` reads the assets rather than that field.
+Ordered by how far each is from done: the converter at the top needs no
+decisions, the interpreter at the bottom needs several.
 
 ## Recipe fields still unbound
 

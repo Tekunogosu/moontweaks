@@ -1,40 +1,78 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using MoonTweaks.Api;
+using MoonTweaks.Recipes;
 using Vintagestory.API.Common;
 
 namespace MoonTweaks.Host;
 
 /// <summary>
-/// The asset codes and tags a server's registries actually hold, written as the
-/// values an editor suggests inside a string. Generated from the running game
-/// rather than shipped, so the suggestions cover whatever mods a server loads.
+/// One set of values an editor offers inside a string, as the generated library
+/// declares it. <see cref="Name"/> is what a member's <see cref="LuaSuggestsAttribute"/>
+/// points at, so an annotation and the declaration it relies on cannot name
+/// different types.
+/// </summary>
+/// <param name="Name">Type the alias is declared under.</param>
+/// <param name="Label">Plural noun for the values, for a line reporting what was written.</param>
+/// <param name="Summary">What the set is, written as the comment above the alias.</param>
+/// <param name="Values">Every value, in the order they are offered.</param>
+public sealed record SuggestionSet(
+    string Name, string Label, string Summary, IReadOnlyList<string> Values);
+
+/// <summary>
+/// The values a server's registries actually hold, written as the sets an editor
+/// suggests inside a string. Generated from the running game rather than shipped, so
+/// the suggestions cover whatever mods a server loads.
 /// </summary>
 public static class AssetCodeLibrary
 {
     /// <summary>Name of the generated file inside the library folder.</summary>
     public const string FileName = "codes.lua";
 
-    /// <summary>Type name the generated reference points a code member at.</summary>
-    public const string AliasName = SuggestionSets.AssetCode;
+    /// <summary>
+    /// Every set the library declares. Values are read from <paramref name="world"/>,
+    /// or left empty when there is none: a checkout still needs the aliases declared
+    /// so it type-checks without a game to read them out of.
+    /// </summary>
+    /// <remarks>
+    /// Sole owner of what the library contains. A registry the game keeps and a script
+    /// writes as a bare string becomes one more entry here and one more
+    /// <see cref="SuggestionSets"/> constant, and needs nothing else.
+    /// </remarks>
+    public static IReadOnlyList<SuggestionSet> SetsOf(IWorldAccessor? world) =>
+    [
+        new(SuggestionSets.AssetCode, "codes",
+            "An asset code. The values below are what this server's registries held\n"
+            + "when this file was written; any other string is still accepted.",
+            world is null ? [] : CodesOf(world)),
 
-    /// <summary>Type name the generated reference points a tags member at.</summary>
-    public const string TagAliasName = SuggestionSets.AssetTag;
+        new(SuggestionSets.AssetTag, "tags",
+            "A tag an item or block carries, naming what it is rather than what it is\n"
+            + "called. Any other string is still accepted.",
+            world is null ? [] : TagsOf(world)),
+
+        new(SuggestionSets.AssetTrait, "traits",
+            "A character trait, which a recipe may demand of whoever crafts it.\n"
+            + "Any other string is still accepted.",
+            world is null ? [] : TraitsOf(world)),
+    ];
 
     /// <summary>
-    /// Writes the file unless the codes already listed there are this server's.
-    /// Returns how many codes it lists, or null when nothing needed writing.
+    /// Writes the file unless what is already listed there is this server's. Returns
+    /// the sets it wrote, or null when nothing needed writing.
     /// </summary>
-    public static int? Install(string folder, IWorldAccessor world, bool force = false) =>
-        Install(folder, CodesOf(world), TagsOf(world), force);
+    public static IReadOnlyList<SuggestionSet>? Install(
+        string folder, IWorldAccessor world, bool force = false) =>
+        Install(folder, SetsOf(world), force);
 
     /// <inheritdoc cref="Install(string, IWorldAccessor, bool)"/>
-    public static int? Install(
-        string folder, IReadOnlyList<string> codes, IReadOnlyList<string> tags, bool force = false)
+    public static IReadOnlyList<SuggestionSet>? Install(
+        string folder, IReadOnlyList<SuggestionSet> sets, bool force = false)
     {
-        var contents = Render(codes, tags);
+        var contents = Render(sets);
         var target = Path.Combine(folder, EditorSupport.LibraryFolder, FileName);
 
         if (!force && File.Exists(target)
@@ -46,8 +84,12 @@ public static class AssetCodeLibrary
 
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         File.WriteAllText(target, contents);
-        return codes.Count;
+        return sets;
     }
+
+    /// <summary>How many values each set holds, for a line reporting what was written.</summary>
+    public static string Describe(IEnumerable<SuggestionSet> sets) =>
+        string.Join(", ", sets.Select(set => $"{set.Values.Count} {set.Label}"));
 
     /// <summary>Every tag any item or block carries, in one sorted list.</summary>
     public static IReadOnlyList<string> TagsOf(IWorldAccessor world)
@@ -57,7 +99,7 @@ public static class AssetCodeLibrary
             .Where(asset => !asset.IsMissing)
             .SelectMany(asset => registry.SlowEnumerateTagNames(asset.Tags))
             .Distinct()
-            .OrderBy(tag => tag, System.StringComparer.Ordinal)
+            .OrderBy(tag => tag, StringComparer.Ordinal)
             .ToList();
     }
 
@@ -67,30 +109,35 @@ public static class AssetCodeLibrary
             .Where(asset => !asset.IsMissing && asset.Code is not null)
             .Select(asset => asset.Code.ToString())
             .Distinct()
-            .OrderBy(code => code, System.StringComparer.Ordinal)
+            .OrderBy(code => code, StringComparer.Ordinal)
+            .ToList();
+
+    /// <summary>Every character trait this server's assets define, in one sorted list.</summary>
+    public static IReadOnlyList<string> TraitsOf(IWorldAccessor world) =>
+        new TraitRegistry(world.Api).Codes
+            .OrderBy(trait => trait, StringComparer.Ordinal)
             .ToList();
 
     /// <summary>
-    /// Renders the codes as an open alias. It widens <c>string</c> rather than
-    /// closing over these values, so an editor offers them without rejecting a code
-    /// that reached the game after this file was written.
+    /// Renders each set as an open alias. They widen <c>string</c> rather than closing
+    /// over their values, so an editor offers them without rejecting one that reached
+    /// the game after this file was written.
     /// </summary>
-    public static string Render(IReadOnlyList<string> codes, IReadOnlyList<string> tags)
+    public static string Render(IReadOnlyList<SuggestionSet> sets)
     {
         var body = new StringBuilder();
-        body.AppendLine("--- An asset code. The values below are what this server's registries held");
-        body.AppendLine("--- when this file was written; any other string is still accepted.");
-        body.AppendLine($"---@alias {AliasName} string");
-        foreach (var code in codes) body.AppendLine($"---| \"{code}\"");
-        body.AppendLine();
-        body.AppendLine("--- A tag an item or block carries, naming what it is rather than what it is");
-        body.AppendLine("--- called. Any other string is still accepted.");
-        body.AppendLine($"---@alias {TagAliasName} string");
-        foreach (var tag in tags) body.AppendLine($"---| \"{tag}\"");
+
+        foreach (var set in sets)
+        {
+            if (body.Length > 0) body.AppendLine();
+            foreach (var line in set.Summary.Split('\n')) body.AppendLine($"--- {line}");
+            body.AppendLine($"---@alias {set.Name} string");
+            foreach (var value in set.Values) body.AppendLine($"---| \"{value}\"");
+        }
 
         var output = new StringBuilder();
         output.AppendLine("---@meta");
-        output.AppendLine($"--- Asset codes and tags this server offers: {codes.Count} codes, {tags.Count} tags.");
+        output.AppendLine($"--- Values this server offers: {Describe(sets)}.");
         output.AppendLine("--- Generated from the running game; do not edit.");
         output.AppendLine($"{LibraryHeader.BuildMarker}{LibraryHeader.Fingerprint(body.ToString())}");
         output.AppendLine();

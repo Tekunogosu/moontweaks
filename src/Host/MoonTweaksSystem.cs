@@ -67,9 +67,14 @@ public class MoonTweaksSystem : ModSystem
                 .WithDescription("Rewrite the asset codes an editor suggests, from the live registries")
                 .HandleWith(_ =>
                 {
-                    var codes = AssetCodeLibrary.Install(folder, api.World, force: true);
+                    // Read first and report from that, rather than from what the
+                    // write returned: a forced write always happens, so its result
+                    // would only be the same sets behind a null the type still carries.
+                    var sets = AssetCodeLibrary.SetsOf(api.World);
+                    AssetCodeLibrary.Install(folder, sets, force: true);
                     return TextCommandResult.Success(
-                        $"wrote {EditorSupport.LibraryFolder}/{AssetCodeLibrary.FileName} with {codes} asset code(s)");
+                        $"wrote {EditorSupport.LibraryFolder}/{AssetCodeLibrary.FileName} "
+                        + $"with {AssetCodeLibrary.Describe(sets)}");
                 })
             .EndSubCommand();
     }
@@ -85,10 +90,10 @@ public class MoonTweaksSystem : ModSystem
 
         // The registries are populated by now, so the codes an author may write are
         // exactly the ones an editor can offer.
-        if (AssetCodeLibrary.Install(folder, server.World) is { } codes)
+        if (AssetCodeLibrary.Install(folder, server.World) is { } sets)
         {
-            server.Logger.Notification("[moontweaks] wrote {0}/{1} with {2} asset code(s)",
-                EditorSupport.LibraryFolder, AssetCodeLibrary.FileName, codes);
+            server.Logger.Notification("[moontweaks] wrote {0}/{1} with {2}",
+                EditorSupport.LibraryFolder, AssetCodeLibrary.FileName, AssetCodeLibrary.Describe(sets));
         }
 
         foreach (var misplaced in ScriptLibrary.Misplaced(folder))

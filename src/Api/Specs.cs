@@ -148,6 +148,7 @@ public abstract class RecipeSpec
     /// configuration off ignore it, on this recipe exactly as on the game's own.
     /// </summary>
     [LuaField("requiresTrait")]
+    [LuaSuggests(SuggestionSets.AssetTrait)]
     public string? RequiresTrait { get; set; }
 
     /// <summary>

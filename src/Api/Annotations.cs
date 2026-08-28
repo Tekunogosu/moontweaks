@@ -82,4 +82,7 @@ public static class SuggestionSets
 
     /// <summary>Every tag any item or block carries.</summary>
     public const string AssetTag = "AssetTag";
+
+    /// <summary>Every character trait a server's assets define.</summary>
+    public const string AssetTrait = "AssetTrait";
 }

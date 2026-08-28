@@ -249,23 +249,29 @@ are the author's files.
 
 ### Asset codes
 
-`library/codes.lua` lists every code in the server's item and block registries and
-every tag they carry, so an editor offers them inside a string rather than leaving
-an author to guess:
+`library/codes.lua` declares one alias per registry the game keeps and a script
+writes as a bare string — every asset code, every tag those assets carry, and
+every character trait — so an editor offers them inside a string rather than
+leaving an author to guess:
 
 ```lua
 output = "game:axe-|"          -- suggestions appear here
 ingredient = { code = "game:|" }
 tags = { "tool-|" }
+requiresTrait = "cloth|"
 ```
 
 It is generated from the running game rather than shipped, so it covers whatever
-mods a server loads, and it is rewritten only when the set of codes changes.
+mods a server loads, and it is rewritten only when what it lists changes.
 `/moontweaks export` regenerates it without a restart, for after a mod is added.
 
-The alias widens `string` rather than closing over the codes it lists. An editor
-therefore suggests them without rejecting anything absent from the list, which
-matters because a code may reach the game after the file was written.
+`AssetCodeLibrary.SetsOf` is the sole owner of what the file contains: a registry
+worth suggesting becomes one entry there and one `SuggestionSets` constant for a
+`[LuaSuggests]` annotation to name, and needs nothing else.
+
+The aliases widen `string` rather than closing over the values they list. An
+editor therefore suggests them without rejecting anything absent from the list,
+which matters because a code may reach the game after the file was written.
 
 Expect the suggestion list to cost roughly 50 microseconds per code, all of which
 is the editor's, not the server's: around 300ms for a vanilla install's 7,000-odd
@@ -378,14 +384,17 @@ it cannot describe itself to an editor.
 ### Testing against a real game
 
 ```sh
-./scripts/install.sh [dataPath]   # package and install into a server's Mods folder
-./scripts/run-server.sh           # install into .testbed and run a dedicated server
-./scripts/run-client.sh           # connect a client carrying only this mod
+./scripts/install.sh [directory...]   # package and install into the given folders
+./scripts/run-server.sh               # install into .testbed and run a dedicated server
+./scripts/run-client.sh               # connect a client carrying only this mod
 ```
 
-`install.sh` replaces whatever version of the mod a data path already holds, and
-takes the path as its argument so a server other than the testbed can be updated
-without running one. `run-server.sh` calls it rather than installing itself.
+`install.sh` replaces whatever version of the mod each directory already holds,
+so an old zip cannot linger beside a new one. It packages once however many
+destinations it is given, and copies into each one as given rather than treating
+it as a data path to append `Mods` to — so an install names its own `Mods` folder
+and any other directory works the same way. `run-server.sh` calls it rather than
+installing for itself.
 
 The version in `modinfo.json` names the zip and appears in the server's mod list,
 which is how a tester tells one build from another. Bump it with every change: the

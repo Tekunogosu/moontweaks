@@ -10,7 +10,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SERVER=${VS_SERVER:-/mnt/media/vintagestory-server}
 DATA=${MOONTWEAKS_TESTBED:-$ROOT/.testbed}
 
-"$ROOT/scripts/install.sh" "$DATA"
+"$ROOT/scripts/install.sh" "$DATA/Mods"
 
 cd "$SERVER"
 exec dotnet VintagestoryServer.dll --dataPath "$DATA"
