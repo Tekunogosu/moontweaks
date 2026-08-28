@@ -1,34 +1,19 @@
 #!/bin/sh
-# Fetch MoonSharp at the pinned commit and prepare its sources for compilation
-# into moontweaks.dll. Idempotent: the forced checkout discards any previous run.
+# Fetch MoonSharp at the pinned commit, ready for compilation into moontweaks.dll.
+# Idempotent: the forced checkout discards whatever a previous run or a local
+# experiment left behind.
 #
 # MoonSharp is vendored as source rather than consumed from NuGet because the
 # published package (3.0.0-beta.1) predates upstream fixes this mod depends on.
+# The pin is a commit on the moontweaks branch of the fork, which carries those
+# fixes and the nullable context the sources are compiled under.
 set -eu
 
-PIN=cb4a978093bae3fd7b0b331643a8cd9b6fb8ed16
+PIN=6716ae4af1a80a9c33c3ac39774d7164741434da
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SUB="$ROOT/third_party/moonsharp"
-SRC="$SUB/src/MoonSharp.Interpreter"
 
 git -C "$ROOT" submodule update --init --quiet third_party/moonsharp
 git -C "$SUB" fetch --quiet origin
 git -C "$SUB" checkout --quiet --force "$PIN"
 echo "moonsharp pinned to $(git -C "$SUB" log -1 --format='%h %cd %s' --date=short)"
-
-for patch in "$ROOT"/patches/*.patch; do
-    git -C "$SUB" apply "$patch"
-    echo "applied $(basename "$patch")"
-done
-
-# Vendored sources predate nullable reference types; opting each file out keeps
-# moontweaks' own code under a strict nullable context without 775 warnings.
-python3 - "$SRC" <<'PY'
-import pathlib, sys
-n = 0
-for f in pathlib.Path(sys.argv[1]).rglob("*.cs"):
-    text = f.read_text(encoding="utf-8-sig")
-    f.write_text("#nullable disable\n" + text, encoding="utf-8")
-    n += 1
-print(f"nullable context disabled for {n} vendored sources")
-PY

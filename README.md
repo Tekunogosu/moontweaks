@@ -411,17 +411,20 @@ into `moontweaks.dll`, so the mod ships as a single assembly. The published
 NuGet package is a prerelease that predates fixes this mod depends on, which is
 why the build works from source.
 
-`scripts/sync-moonsharp.sh` performs a forced checkout of the pinned commit
-before patching, making it idempotent. It applies everything in `patches/` and
-then disables the nullable context per vendored file, which keeps MoonTweaks' own
-code under a strict nullable context without inheriting several hundred warnings.
-The submodule working tree is expected to read as modified afterwards; that is
-the patch and the pragmas, not drift.
+The submodule points at a fork, whose `moontweaks` branch carries two commits on
+top of upstream. `scripts/sync-moonsharp.sh` checks that pin out by force, which
+is the whole of what it does and is what makes it idempotent. The submodule
+working tree reads as clean afterwards.
 
-`patches/0001-qualify-ReferenceEqualityComparer.patch` resolves an ambiguity
-between MoonSharp's own `ReferenceEqualityComparer` and the one .NET 5 added to
-`System.Collections.Generic`. The conflict only appears when MoonSharp's
-`netstandard2.0` sources are compiled into a modern target, and belongs upstream.
+The first commit qualifies `DataStructs.ReferenceEqualityComparer`, resolving an
+ambiguity with the one .NET 5 added to `System.Collections.Generic`. The conflict
+appears only when MoonSharp's `netstandard2.0` sources are compiled into a modern
+target, so it belongs upstream and is kept alone to stay cherry-pickable there.
+
+The second disables the nullable context per vendored file, which keeps
+MoonTweaks' own code under a strict nullable context without inheriting several
+hundred warnings. That one is consumer-side formatting rather than a change to
+the interpreter, which is why it sits above the fix rather than beside it.
 
 ## Layout
 
@@ -429,7 +432,6 @@ between MoonSharp's own `ReferenceEqualityComparer` and the one .NET 5 added to
 src/            the mod
 tools/docgen/   reference generator
 scripts/        build, docs, install and testbed entry points
-patches/        patches applied to the vendored MoonSharp checkout
 examples/       one worked script per recipe kind, shipped with the mod
 third_party/    MoonSharp submodule
 TODO.md         work that is decided but not yet done
