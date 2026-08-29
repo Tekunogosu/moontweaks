@@ -24,6 +24,24 @@ public sealed class PlayerAccess(ICoreServerAPI api)
         api.World.PlayerByUid(player) as IServerPlayer
         ?? throw new ScriptError(origin, $"no player is connected with the identifier '{player}'");
 
+    /// <summary>
+    /// Hands a stack to a player, and says whether all of it reached them. The game
+    /// puts it wherever it fits; nowhere to put it is a full inventory rather than a
+    /// mistake, so the caller decides what to do about the rest.
+    /// </summary>
+    /// <remarks>
+    /// What the game returns is not the answer. <c>TryGiveItemstack</c> reports
+    /// whether it was able to try at all, and says yes even when no slot would take
+    /// anything, so it is true for a full inventory as readily as for an empty one.
+    /// What it does do is take from the stack it was handed as slots accept it, so
+    /// what is left in that stack afterwards is how much never arrived.
+    /// </remarks>
+    public bool Give(string player, ItemStack stack, ScriptOrigin origin)
+    {
+        Find(player, origin).InventoryManager.TryGiveItemstack(stack, true);
+        return stack.StackSize == 0;
+    }
+
     /// <summary>How much punishment a player can take, and has taken.</summary>
     public EntityBehaviorHealth Health(string player, ScriptOrigin origin) =>
         Behaviour<EntityBehaviorHealth>(player, origin, "health");

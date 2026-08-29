@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using MoonTweaks.Api;
+using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -14,7 +15,7 @@ namespace MoonTweaks.Players;
 /// outlives the player it refers to.
 /// </summary>
 [LuaModule("moontweaks.players")]
-public sealed class PlayerDomain(PlayerAccess players)
+public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
 {
     /// <summary>
     /// Moves where a player will respawn. Survives a restart, because the game saves
@@ -49,6 +50,20 @@ public sealed class PlayerDomain(PlayerAccess players)
         players.Find(player, origin).SendMessage(GlobalConstants.GeneralChatGroup, message, EnumChatType.Notification);
 
     /// <summary>
+    /// Hands a stack of something to a player, and says whether all of it reached
+    /// them. The game puts it wherever it fits; a full inventory takes none of it and
+    /// answers false, which is a thing to tell them about rather than a mistake.
+    /// Anything that did not fit is gone, so a script that must not lose it should
+    /// drop what is left where they stand.
+    /// </summary>
+    /// <param name="origin">Script line handing it over.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    /// <param name="stack">What to give them, which a bare code names one of.</param>
+    [LuaFunction("give")]
+    public bool Give(ScriptOrigin origin, string player, ItemStackSpec stack) =>
+        players.Give(player, stacks.Resolved(stack, origin, "stack"), origin);
+
+    /// <summary>
     /// Where a player is, as a table of <c>x</c>, <c>y</c> and <c>z</c>.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
@@ -62,6 +77,25 @@ public sealed class PlayerDomain(PlayerAccess players)
             ["x"] = new ScriptValue.Num(at.X),
             ["y"] = new ScriptValue.Num(at.Y),
             ["z"] = new ScriptValue.Num(at.Z),
+        });
+    }
+
+    /// <summary>
+    /// Which way a player is looking, as a table of <c>x</c>, <c>y</c> and <c>z</c>
+    /// one block long. Multiplying it by a speed is how something is thrown the way
+    /// they are facing rather than in a fixed direction.
+    /// </summary>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    [LuaFunction("facing")]
+    public ScriptValue Facing(ScriptOrigin origin, string player)
+    {
+        var view = players.Find(player, origin).Entity.Pos.GetViewVector();
+        return new ScriptValue.Map(new Dictionary<string, ScriptValue>
+        {
+            ["x"] = new ScriptValue.Num(view.X),
+            ["y"] = new ScriptValue.Num(view.Y),
+            ["z"] = new ScriptValue.Num(view.Z),
         });
     }
 

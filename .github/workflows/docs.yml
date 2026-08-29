@@ -45,6 +45,12 @@ jobs:
 
       - run: ./scripts/sync-moonsharp.sh
       - run: ./scripts/package.sh
+
+      # Fails on two engines recording different values for the same Lua where
+      # nothing already says why they would. Timings are reported and never fail.
+      - name: Check the script engines agree
+        run: ./scripts/bench.sh --quick
+
       - run: ./scripts/docs.sh --check
       - run: ./scripts/docs.sh
 

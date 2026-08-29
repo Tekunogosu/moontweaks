@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using MoonTweaks.Api;
 using MoonTweaks.Assets;
+using MoonTweaks.Commands;
 using MoonTweaks.Events;
 using MoonTweaks.Players;
 using MoonTweaks.World;
@@ -31,18 +32,25 @@ public sealed record ScriptRun(
     /// is exactly what a start would do.
     /// </summary>
     /// <remarks>
-    /// The host is returned rather than disposed here. A script may leave a function
+    /// The interpreter is handed in rather than built here, so which engine a run
+    /// uses is the caller's to decide and this stays the one place the bindings are
+    /// hung on it. The host is returned rather than disposed here. A script may leave a function
     /// behind for an event to call, and that function is only callable while the
     /// interpreter that made it lives, so whoever wants those callbacks keeps the
     /// host and whoever does not disposes it.
     /// </remarks>
     public static ScriptRun Execute(
-        ICoreServerAPI server, string scriptsFolder, RecipeRegistry registry, ScriptEvents events)
+        ICoreServerAPI server,
+        IScriptHost host,
+        string scriptsFolder,
+        RecipeRegistry registry,
+        ScriptEvents events,
+        ScriptCommands commands,
+        ScriptTimers timers)
     {
         var log = new MutationLog();
         var scripts = ScriptLibrary.Discover(scriptsFolder);
 
-        var host = new MoonSharpHost();
         host.Bind(DomainBinder.Bind(new GridDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new KnappingDomain(log, server.World, registry)));
         host.Bind(DomainBinder.Bind(new ClayFormingDomain(log, server.World, registry)));
@@ -53,9 +61,11 @@ public sealed record ScriptRun(
         host.Bind(DomainBinder.Bind(new ItemDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new BlockDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new LogDomain(server.Logger)));
+        host.Bind(DomainBinder.Bind(new ServerDomain(server, timers)));
         host.Bind(DomainBinder.Bind(new EventDomain(events)));
-        host.Bind(DomainBinder.Bind(new PlayerDomain(new PlayerAccess(server))));
-        host.Bind(DomainBinder.Bind(new WorldDomain(new WorldAccess(server.World))));
+        host.Bind(DomainBinder.Bind(new CommandDomain(commands)));
+        host.Bind(DomainBinder.Bind(new PlayerDomain(new PlayerAccess(server), new AssetStacks(server.World))));
+        host.Bind(DomainBinder.Bind(new WorldDomain(new WorldAccess(server.World), new AssetStacks(server.World))));
 
         foreach (var script in scripts)
         {

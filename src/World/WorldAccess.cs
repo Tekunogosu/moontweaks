@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
@@ -23,10 +24,26 @@ public sealed class WorldAccess(IWorldAccessor world)
     /// </summary>
     private readonly IBulkBlockAccessor bulk = world.GetBlockAccessorBulkUpdate(true, true);
 
+    /// <summary>
+    /// What a code names, kept so the same one is looked up once however often it is
+    /// written. A script filling a shape names a handful of blocks tens of thousands
+    /// of times, and each lookup otherwise parses the code into a location and
+    /// searches the registry for it. Identifiers do not change while a world is
+    /// loaded, so what is remembered cannot go stale.
+    /// </summary>
+    private readonly Dictionary<string, int> ids = [];
+
     /// <summary>The block identifier a code names, which the world stores rather than the code.</summary>
-    public int IdOf(string code, ScriptOrigin origin) =>
-        world.GetBlock(new AssetLocation(code))?.BlockId
-        ?? throw new ScriptError(origin, $"'{code}' is not a known block");
+    public int IdOf(string code, ScriptOrigin origin)
+    {
+        if (ids.TryGetValue(code, out var known)) return known;
+
+        var id = world.GetBlock(new AssetLocation(code))?.BlockId
+            ?? throw new ScriptError(origin, $"'{code}' is not a known block");
+
+        ids[code] = id;
+        return id;
+    }
 
     /// <summary>The code of whatever stands at a position, or nothing where there is air.</summary>
     public string? CodeAt(int x, int y, int z) =>
@@ -48,18 +65,20 @@ public sealed class WorldAccess(IWorldAccessor world)
         return queued;
     }
 
-    /// <summary>Drops an item into the world, as a block would when broken.</summary>
-    public void Drop(ItemStack stack, double x, double y, double z) =>
-        world.SpawnItemEntity(stack, new Vec3d(x, y, z));
-
-    /// <summary>A stack of something, by the code that names it.</summary>
-    public ItemStack Stack(string code, int quantity, ScriptOrigin origin)
+    /// <summary>
+    /// Drops a stack into the world, thrown if a velocity says so and marked as
+    /// somebody's if an owner does.
+    /// </summary>
+    /// <remarks>
+    /// An owner is what keeps a stack on the ground for the moment after it lands.
+    /// The game refuses to let whoever dropped something collect it for a second
+    /// afterwards, and refuses nobody when it came from nobody, so a stack dropped at
+    /// a player's feet with no owner is back in their hands before they see it fall.
+    /// </remarks>
+    public void Drop(ItemStack stack, Vec3d at, Vec3d? velocity, string? owner)
     {
-        var location = new AssetLocation(code);
+        var dropped = world.SpawnItemEntity(stack, at, velocity);
 
-        if (world.GetItem(location) is { } item) return new ItemStack(item, quantity);
-        if (world.GetBlock(location) is { } block) return new ItemStack(block, quantity);
-
-        throw new ScriptError(origin, $"'{code}' is neither a known item nor a known block");
+        if (owner is not null && dropped is EntityItem thing) thing.ByPlayerUid = owner;
     }
 }

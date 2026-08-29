@@ -43,8 +43,14 @@ events.didBreakBlock(function(e)
   local written = world.commit()
   players.say(e.player, ("Raised a tower: %d blocks in %d writes."):format(started, written))
 
-  -- Leave something behind for the trouble.
-  world.dropItem("game:rock-granite", 16, e.x, e.y + height, e.z)
+  -- Leave something behind for the trouble. Naming the player as the owner keeps
+  -- them from collecting it for a second, so it is seen landing rather than
+  -- vanishing into their hands the instant it appears.
+  world.dropItem {
+    stack = { code = "game:rock-granite", quantity = 16 },
+    x = e.x, y = e.y + height, z = e.z,
+    owner = e.player,
+  }
 end)
 
 -- Reading is cheap and needs no commit: this walks down from where a player is

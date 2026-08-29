@@ -368,20 +368,59 @@ and break the thing if you want to know for certain what it is called.
 
 ### What a script costs
 
-A call from a script into the mod costs roughly **600ns**, against about 3ns for
-the same method called from C#. Around 400ns of that is crossing the boundary and
-the rest is marshalling arguments; returning a table adds about 250ns more.
+A call from a script into the mod costs roughly **480ns**, against about 3ns for
+the same method called from C#. That figure settles at scale and only there: the
+same measurement over twenty thousand calls reads 850ns, which is the millisecond
+clock rounding rather than the calls.
+
+The interpreter costs about as much again. Placing a block through `queueBlock`
+takes around **2.6µs**, of which the crossing is a fifth; roughly **1µs** is the
+Lua loop that decided which block to place, and the rest is marshalling and the
+staging itself. That ratio is what makes a bulk call worth more than a faster
+binder: the way to place blocks faster is to place more of them per call.
 
 That fixes the scale of what a handler can sensibly do. A thousand calls cost
 under a millisecond, which is nothing; a hundred thousand cost a tenth of a
 second on the main thread, which players feel. Anything shaped like a loop over a
 region should ask how many calls it makes before it asks anything else.
 
-Block writes have their own cost on top, and it is not per block: `setBlock`
-relights and re-sends the chunk it touched before the next call runs, while
-`queueBlock` stages writes for a `commit` that pays that once per chunk. Filling
-a shape one block at a time is the expensive mistake, and it is expensive in the
-engine rather than in the interpreter.
+Block writes cost more than a bare call, and the difference is not where it
+looks. Staging a block costs around **2.6µs** and committing it under **0.5µs**,
+so a shape goes up at roughly **330,000 blocks a second**: nearly two million
+blocks in about six seconds. Most of that is the calls rather than the engine —
+staging is five times the commit. Staging costs the same per block whether the
+batch is eighty thousand or two million, so there is nothing to gain by keeping
+one small; the commit, by contrast, gets cheaper per block the more is queued
+into it.
+
+`setBlock` relights and re-sends the chunk it touched before the next call runs,
+where `queueBlock` stages writes for a `commit` that pays that once per chunk.
+The gap widens with the size of the job, because only the staged half improves
+with scale: around three times slower over a thousand blocks, **four and a half
+times** over fifty thousand. Those were measured with one player standing beside
+the work, and the resend is per player in range, so a populated server multiplies
+the slower half and not the other.
+
+**The ceiling is not throughput, it is the pause.** Scripts run on the main
+thread, so a handler holds the whole server for as long as it runs, and the game
+logs `Server overloaded` for any tick over 500ms. Two million blocks in one
+handler is a six-second freeze — nothing crashes, memory holds, players simply
+stop being served. That budget is the real limit: about **170,000 blocks**, or
+**800,000 calls**, before one command costs a visible stall.
+
+Past that, split the work across ticks with `moontweaks.server.every` rather than
+trying to make it faster. The same two million blocks spread over a tick budget
+finishes in about seven seconds with the server answering throughout, against six
+seconds of answering nothing. Budget the slice by **time rather than by count**:
+a count has to be guessed against hardware the script knows nothing about, where
+a deadline measures it as it goes. Twenty-five milliseconds of a thirty-three
+millisecond tick fills each one without ever running long.
+
+`examples/scripts/house-builder.lua` is where these numbers come from, and
+`/build bench` and `/build calls` measure them again on whatever the server is
+actually running on. Measure before optimising: the first run of anything in a
+session reads about three times slow while the code is still being compiled, so
+only a large run says anything true.
 
 ## Commands
 
@@ -404,11 +443,12 @@ reaches nobody, and rebuilding the packet would serialise assets already freed.
 Seeing a change still means restarting the server; `check` is what makes the
 attempts before that cheap.
 
-`config.json` decides who may run them:
+`config.json` decides who may run them, and which interpreter runs the scripts:
 
 ```json
 {
-  "commandPrivilege": "controlserver"
+  "commandPrivilege": "controlserver",
+  "scriptEngine": "moonsharp"
 }
 ```
 
@@ -417,8 +457,15 @@ these commands with its administrators until it says otherwise. Any privilege
 name the game knows may be used instead. One setting currently gates every
 command together; see `TODO.md` for the per-command version.
 
-A settings file that cannot be parsed is reported and the defaults are used, so
-bad JSON costs a server its settings rather than its startup.
+`scriptEngine` names the interpreter, and is `moonsharp` unless a server says
+otherwise. See [Script engines](#script-engines) for what the alternative is and
+what it costs. A name nothing answers to is reported with the names that are
+offered, and the default is used.
+
+Keys are matched without regard to case, so the casing above and the casing the
+file is written back in both bind. A settings file that cannot be parsed is
+reported and the defaults are used, so bad JSON costs a server its settings
+rather than its startup.
 
 ## Building
 
@@ -471,6 +518,51 @@ default `.testbed`), `MOONTWEAKS_CLIENT` (client data path, default
 `ClientSyncProbe` logs the grid recipe count the client received, so a test can
 compare it against what the server reported.
 
+## Script engines
+
+Scripts run on an interpreter chosen by `scriptEngine` in `config.json`. Both
+engines implement `IScriptHost` and nothing else, so what a script can do is the
+same either way and the difference between them is what it costs.
+
+| | `moonsharp` | `luacsharp` |
+| --- | --- | --- |
+| what it is | MoonSharp, vendored and compiled in | [Lua-CSharp](https://github.com/nuskey8/Lua-CSharp), shipped beside as `Lua.dll` |
+| status | the default | measured and checked, not yet the default |
+
+`./scripts/bench.sh` runs the same Lua on every engine and reports what each one
+costs, having first checked that they agree about what the Lua means. It needs no
+running server: the workload reaches an engine only through `IScriptHost`, and
+the game is not part of that.
+
+```sh
+./scripts/bench.sh                    # check parity, then measure
+./scripts/bench.sh --quick            # the same, at a twentieth of the counts
+./scripts/bench.sh --json             # for something other than a person to read
+./scripts/bench.sh --engine moonsharp # one engine, no comparison
+```
+
+It exits non-zero when two engines record different values for a check that does
+not already name a reason they would, which makes it a test rather than only a
+measurement. A difference that is understood is written into the check beside the
+Lua that finds it, so the reason lives where the next reader will look; a reason
+that stops applying is reported too.
+
+On the shapes MoonTweaks actually puts through an interpreter, `luacsharp` runs
+Lua itself several times faster, crosses into a binding about twice as fast, and
+allocates roughly half as much on every path. Allocation is the figure to watch:
+scripts run on the main thread, so what a handler allocates is collected there
+too. Measure on the hardware you care about rather than taking these numbers,
+which came from one machine.
+
+Seven differences are known and named in `tools/luabench/Workload.cs`. The ones
+that could reach a script: MoonSharp's hard sandbox withholds `pcall` and
+`error`, which `luacsharp` offers; MoonSharp does not reuse a frame across a tail
+call, so deep tail recursion overflows there and does not on `luacsharp`, and the
+line a failure names differs through one; and MoonSharp's `math.huge` is the
+largest finite double rather than infinity. `luacsharp` withholds `dofile`,
+`loadfile`, `load` and `loadstring` to keep the sandbox the same width as
+MoonSharp's rather than wider.
+
 ## MoonSharp
 
 MoonSharp is vendored as a submodule pinned to a reviewed commit and compiled
@@ -498,6 +590,7 @@ the interpreter, which is why it sits above the fix rather than beside it.
 ```
 src/            the mod
 tools/docgen/   reference generator
+tools/luabench/ script engine comparison, run by scripts/bench.sh
 scripts/        build, docs, install and testbed entry points
 examples/       one worked script per recipe kind, shipped with the mod
 third_party/    MoonSharp submodule

@@ -96,17 +96,23 @@ public static class SuggestionSets
 }
 
 /// <summary>
-/// Names the shape of the table a handler is given, on the argument the handler is
-/// passed as.
+/// Names the shape of the table a handler is given, on the argument or the table key
+/// the handler is passed as.
 /// </summary>
 /// <remarks>
 /// A handler reaches the binder as a bare function, which says nothing about what it
 /// will be called with. This names that shape, so an editor completes an event's keys
 /// and the reference documents them, from the same class the host fills in.
 /// </remarks>
-[AttributeUsage(AttributeTargets.Parameter, Inherited = false)]
+[AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Property, Inherited = false)]
 public sealed class LuaPayloadAttribute(Type shape) : Attribute
 {
     /// <summary>Class describing the table, which carries its own <see cref="LuaTableAttribute"/>.</summary>
     public Type Shape { get; } = shape;
+
+    /// <summary>
+    /// What the host does with whatever the handler hands back, written as the Lua
+    /// type it accepts. Omitted where nothing is read, which is what an event does.
+    /// </summary>
+    public string? Returns { get; init; }
 }

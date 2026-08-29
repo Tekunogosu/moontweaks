@@ -42,9 +42,19 @@ public class PlayerEventPayload(IServerPlayer player) : EventPayload
     [LuaField("player")]
     public string Player { get; } = player.PlayerUID;
 
-    /// <summary>Name the player is displayed under, which they may change.</summary>
+    /// <summary>
+    /// Name the player is displayed under, which they may change. Falls back to their
+    /// identifier where the game can no longer say the name, so this is always
+    /// something that can be printed.
+    /// </summary>
+    /// <remarks>
+    /// The game reads a player's name off the connection they are on, and answers
+    /// null once that connection has gone. A player quitting is the case that reaches
+    /// here: <c>playerLeave</c> is raised as the connection is being taken down, and
+    /// a handler saying who left would otherwise be handed nothing to say it with.
+    /// </remarks>
     [LuaField("playerName")]
-    public string PlayerName { get; } = player.PlayerName;
+    public string PlayerName { get; } = player.PlayerName ?? player.PlayerUID;
 }
 
 /// <summary>Something a player did to one block, and where it stood.</summary>

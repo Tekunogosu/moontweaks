@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -20,6 +21,12 @@ public sealed class MoonTweaksConfig
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        // A setting written in the casing the documentation uses has to be the
+        // setting that is read. Without this a key whose case does not match the
+        // property is not a mistake the reader is told about: it binds to nothing
+        // and the default stands, which reads to a server operator as the setting
+        // having been ignored on purpose.
+        PropertyNameCaseInsensitive = true,
     };
 
     /// <summary>
@@ -30,11 +37,36 @@ public sealed class MoonTweaksConfig
     public string CommandPrivilege { get; set; } = Privilege.controlserver;
 
     /// <summary>
+    /// Interpreter this server's scripts run on, named from
+    /// <see cref="ScriptEngine.Names"/>. What a script can do is the same on every
+    /// engine; what it costs is not, and <c>scripts/bench.sh</c> is what says so.
+    /// </summary>
+    public string ScriptEngine { get; set; } = Scripting.ScriptEngine.Default;
+
+    /// <summary>
     /// Reads the settings, writing the defaults first when a server has none. A file
     /// that cannot be read is reported and the defaults used, so bad JSON costs a
     /// server its settings rather than its startup.
     /// </summary>
     public static MoonTweaksConfig Load(string folder, ILogger logger)
+    {
+        var settings = Read(folder, logger);
+
+        // A name nothing answers to would otherwise take the server down at the
+        // moment the interpreter is built, which is well after this file was read.
+        if (!Scripting.ScriptEngine.Knows(settings.ScriptEngine))
+        {
+            logger.Warning("[moontweaks] no script engine named '{0}'; using '{1}'. Choose one of: {2}",
+                settings.ScriptEngine, Scripting.ScriptEngine.Default,
+                string.Join(", ", Scripting.ScriptEngine.Names));
+            settings.ScriptEngine = Scripting.ScriptEngine.Default;
+        }
+
+        return settings;
+    }
+
+    /// <summary>Reads the file, or writes and returns the defaults when there is none.</summary>
+    private static MoonTweaksConfig Read(string folder, ILogger logger)
     {
         var path = Path.Combine(folder, FileName);
 

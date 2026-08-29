@@ -69,23 +69,42 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     public const string ServerResume = "serverResume";
 
     private readonly Dictionary<string, List<Handler>> handlers = [];
+    private readonly List<Action> pending = [];
 
     /// <summary>One script function listening for one event.</summary>
     private sealed record Handler(ScriptOrigin Origin, ScriptValue.Func Call);
 
     /// <summary>
-    /// Adds a handler, subscribing to the game's event the first time one arrives so
-    /// a server whose scripts listen to nothing pays for nothing.
+    /// Adds a handler, and remembers to subscribe to the game's event the first time
+    /// one arrives so a server whose scripts listen to nothing pays for nothing.
     /// </summary>
+    /// <remarks>
+    /// Nothing is subscribed here. A run only records what it wants, the same way it
+    /// records the recipes it would register, and <see cref="Activate"/> is what
+    /// carries that out. A run that is thrown away — a check, or one that failed
+    /// partway — therefore leaves the game's own events exactly as it found them,
+    /// where subscribing as each handler arrived would have left every one of them
+    /// listening twice.
+    /// </remarks>
     public void On(string name, ScriptOrigin origin, ScriptValue.Func handler, Action subscribe)
     {
         if (!handlers.TryGetValue(name, out var listening))
         {
             handlers[name] = listening = [];
-            subscribe();
+            pending.Add(subscribe);
         }
 
         listening.Add(new Handler(origin, handler));
+    }
+
+    /// <summary>
+    /// Takes out the subscriptions this run asked for. Called once, by the run whose
+    /// handlers are meant to be live, and never by one whose results are discarded.
+    /// </summary>
+    public void Activate()
+    {
+        foreach (var subscribe in pending) subscribe();
+        pending.Clear();
     }
 
     /// <summary>

@@ -63,9 +63,20 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
     /// as any table at all.
     /// </summary>
     private string Written(ParameterInfo parameter) =>
-        parameter.GetCustomAttribute<LuaPayloadAttribute>() is { } payload
-            ? $"fun(event: {LuaNameOf(payload.Shape)})"
-            : Suggested(parameter.GetCustomAttribute<LuaSuggestsAttribute>(), parameter.ParameterType);
+        Handler(parameter.GetCustomAttribute<LuaPayloadAttribute>())
+        ?? Suggested(parameter.GetCustomAttribute<LuaSuggestsAttribute>(), parameter.ParameterType);
+
+    /// <summary>
+    /// A handler written as the call it will receive, when the member names the shape
+    /// it is given. Null where the member is not a handler at all.
+    /// </summary>
+    private string? Handler(LuaPayloadAttribute? payload)
+    {
+        if (payload is null) return null;
+
+        var answer = payload.Returns is null ? "" : $": {payload.Returns}";
+        return $"fun(event: {LuaNameOf(payload.Shape)}){answer}";
+    }
 
     /// <summary>
     /// What a function hands back. A binding that returns the neutral value tree
@@ -88,7 +99,8 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
                 var field = entry.Value.GetCustomAttribute<LuaFieldAttribute>()!;
                 return new FieldDoc(
                     field.Name,
-                    Suggested(entry.Value.GetCustomAttribute<LuaSuggestsAttribute>(), entry.Value.PropertyType),
+                    Handler(entry.Value.GetCustomAttribute<LuaPayloadAttribute>())
+                    ?? Suggested(entry.Value.GetCustomAttribute<LuaSuggestsAttribute>(), entry.Value.PropertyType),
                     attribute.Given ? AlwaysPresent(entry.Value) : field.Required,
                     attribute.Given ? null : field.Default,
                     docs.Summary(entry.Value));

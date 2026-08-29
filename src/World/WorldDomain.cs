@@ -1,5 +1,7 @@
 using MoonTweaks.Api;
+using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
+using Vintagestory.API.MathTools;
 
 namespace MoonTweaks.World;
 
@@ -11,7 +13,7 @@ namespace MoonTweaks.World;
 /// script's body: when scripts run, the recipes exist but the world does not.
 /// </remarks>
 [LuaModule("moontweaks.world")]
-public sealed class WorldDomain(WorldAccess world)
+public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
 {
     /// <summary>
     /// The code of the block standing at a position, or nil where nothing does.
@@ -59,17 +61,19 @@ public sealed class WorldDomain(WorldAccess world)
     [LuaFunction("commit")]
     public int Commit(ScriptOrigin origin) => world.Commit();
 
-    /// <summary>Drops a stack into the world, as a broken block would.</summary>
+    /// <summary>
+    /// Drops a stack into the world, as a broken block would. A <c>velocity</c>
+    /// throws it rather than letting it fall where it was put, and an <c>owner</c>
+    /// keeps that player from collecting it for a second, which together are what let
+    /// a script put something down without it going straight back where it came from.
+    /// </summary>
     /// <param name="origin">Script line dropping it.</param>
-    /// <param name="code">What to drop.</param>
-    /// <param name="quantity">How many.</param>
-    /// <param name="x">Where to drop it.</param>
-    /// <param name="y">Where to drop it.</param>
-    /// <param name="z">Where to drop it.</param>
+    /// <param name="drop">What to drop, where, and how hard.</param>
     [LuaFunction("dropItem")]
-    public void DropItem(
-        ScriptOrigin origin,
-        [LuaSuggests(SuggestionSets.AssetCode)] string code,
-        int quantity, double x, double y, double z) =>
-        world.Drop(world.Stack(code, quantity, origin), x, y, z);
+    public void DropItem(ScriptOrigin origin, DropSpec drop) =>
+        world.Drop(
+            stacks.Resolved(drop.Stack, origin, "stack"),
+            new Vec3d(drop.X, drop.Y, drop.Z),
+            drop.Velocity is { } thrown ? new Vec3d(thrown.X, thrown.Y, thrown.Z) : null,
+            drop.Owner);
 }

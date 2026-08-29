@@ -36,6 +36,24 @@ public sealed class AssetStacks(IWorldAccessor world)
     };
 
     /// <summary>
+    /// A named asset as the stack the game hands out, attributes and all. Sole owner
+    /// of turning what a script wrote into a stack something can be given: the code
+    /// is checked against the registries and the attributes are applied exactly as
+    /// the game applies its own, so a scripted pie is the pie a recipe would make.
+    /// </summary>
+    public ItemStack Resolved(StackSpec spec, ScriptOrigin origin, string path)
+    {
+        var stack = Stack(spec, origin, path);
+
+        if (!stack.Resolve(world, $"moontweaks {origin}") || stack.ResolvedItemstack is null)
+        {
+            throw new ScriptError(origin, $"{path} names '{spec.Code}', which resolved to nothing");
+        }
+
+        return stack.ResolvedItemstack;
+    }
+
+    /// <summary>
     /// How something changes once it stops being fresh, as the game holds it. Sole
     /// owner of that translation: a meal spoiling and an item spoiling are the same
     /// shape, and the game reads them through the same type.

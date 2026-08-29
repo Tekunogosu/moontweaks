@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Measures one script engine against another behind the same IScriptHost, so a
+       swap can be judged on numbers rather than on the claims of either. Runs
+       outside the game: no server, no world, no waiting. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>luabench</AssemblyName>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <VintageStoryDir Condition="'$(VINTAGE_STORY)' != ''">$(VINTAGE_STORY)</VintageStoryDir>
+    <VintageStoryDir Condition="'$(VintageStoryDir)' == ''">$(HOME)/.local/share/vintagestory</VintageStoryDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LuaCSharp" Version="0.5.6" />
+  </ItemGroup>
+
+  <!-- The mod is referenced as a built assembly rather than as a project, so the
+       benchmark measures exactly what a server would load. -->
+  <ItemGroup>
+    <Reference Include="moontweaks">
+      <HintPath>$(MSBuildThisFileDirectory)../../bin/Release/moontweaks.dll</HintPath>
+    </Reference>
+    <Reference Include="VintagestoryAPI"><HintPath>$(VintageStoryDir)/VintagestoryAPI.dll</HintPath></Reference>
+    <Reference Include="VintagestoryLib"><HintPath>$(VintageStoryDir)/VintagestoryLib.dll</HintPath></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(VintageStoryDir)/Lib/Newtonsoft.Json.dll</HintPath></Reference>
+  </ItemGroup>
+
+</Project>

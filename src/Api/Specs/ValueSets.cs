@@ -221,3 +221,25 @@ public enum EnumTransitionKind
     /// <summary>Sets hard, as hot glue does.</summary>
     Harden,
 }
+
+/// <summary>What kind of value a command reads from what was typed after its name.</summary>
+public enum ArgumentKind
+{
+    /// <summary>One word.</summary>
+    Word,
+
+    /// <summary>A whole number.</summary>
+    Int,
+
+    /// <summary>A number, whole or not.</summary>
+    Number,
+
+    /// <summary>On or off.</summary>
+    Bool,
+
+    /// <summary>Everything left on the line, spaces included.</summary>
+    Text,
+
+    /// <summary>A player who is online, which a handler is given the identifier of.</summary>
+    Player,
+}

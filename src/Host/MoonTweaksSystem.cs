@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Linq;
 using MoonTweaks.Api;
+using MoonTweaks.Commands;
 using MoonTweaks.Events;
 using MoonTweaks.Recipes;
 using MoonTweaks.Scripting;
@@ -27,6 +29,19 @@ public class MoonTweaksSystem : ModSystem
     /// <summary>What this server's scripts are listening for.</summary>
     private ScriptEvents? events;
 
+    /// <summary>
+    /// This server's settings, read once by whichever of the startup phases reaches
+    /// them first. <c>AssetsLoaded</c> runs before <c>StartServerSide</c>, but both
+    /// want them and neither is a safe place to assume the other has already been.
+    /// </summary>
+    private MoonTweaksConfig? settings;
+
+    /// <summary>
+    /// Commands the last successful run registered. A check re-declares them, and
+    /// needs to know they are this mod's own rather than a clash with something else.
+    /// </summary>
+    private IReadOnlyList<string> commandNames = [];
+
     /// <summary>The vanilla recipe loader runs at 1.0; scripts must observe its output.</summary>
     public override double ExecuteOrder() => 1.1;
 
@@ -40,7 +55,7 @@ public class MoonTweaksSystem : ModSystem
     public override void StartServerSide(ICoreServerAPI api)
     {
         var folder = ScriptLibrary.PathFor();
-        var config = MoonTweaksConfig.Load(folder, api.Logger);
+        var config = Settings(folder, api.Logger);
 
         api.ChatCommands.Create("moontweaks")
             .WithDescription("MoonTweaks scripting tools")
@@ -66,7 +81,10 @@ public class MoonTweaksSystem : ModSystem
                     // A check is a dry run, so its handlers are never called and its
                     // interpreter goes with it rather than joining the live one.
                     using var run = ScriptRun.Execute(
-                        api, ScriptLibrary.ScriptsPathFor(), new RecipeRegistry(api), new ScriptEvents(api));
+                        api, ScriptEngine.Create(config.ScriptEngine),
+                        ScriptLibrary.ScriptsPathFor(), new RecipeRegistry(api),
+                        new ScriptEvents(api), new ScriptCommands(api, commandNames),
+                        new ScriptTimers(api));
 
                     if (run.Failure is { } failure) return TextCommandResult.Error(failure.Message);
                     if (run.Scripts.Count == 0) return TextCommandResult.Success("no scripts to check");
@@ -101,6 +119,7 @@ public class MoonTweaksSystem : ModSystem
 
         var folder = ScriptLibrary.PathFor();
         var scriptsFolder = ScriptLibrary.ScriptsPathFor();
+        var config = Settings(folder, server.Logger);
         EditorSupport.Install(folder, server.Logger);
 
         // The registries are populated by now, so the codes an author may write are
@@ -119,7 +138,10 @@ public class MoonTweaksSystem : ModSystem
 
         var registry = new RecipeRegistry(server);
         events = new ScriptEvents(server);
-        var run = ScriptRun.Execute(server, scriptsFolder, registry, events);
+        var commands = new ScriptCommands(server);
+        var timers = new ScriptTimers(server);
+        var engine = ScriptEngine.Create(config.ScriptEngine);
+        var run = ScriptRun.Execute(server, engine, scriptsFolder, registry, events, commands, timers);
 
         if (run.Scripts.Count == 0)
         {
@@ -140,6 +162,15 @@ public class MoonTweaksSystem : ModSystem
 
         var affected = run.Log.Apply(server, server.Logger);
         applied = run.Log;
+        // The run succeeded and its handlers are the live ones, so this is where the
+        // game is actually subscribed to and the commands are registered. A check
+        // never reaches here, which is what keeps it from doing either twice.
+        events.Activate();
+        // Taken before activating, which empties the list it was recorded in, and
+        // kept so a later check knows which names this mod put there itself.
+        commandNames = commands.Names.ToList();
+        commands.Activate();
+        timers.Activate();
         // Kept rather than disposed: a script may have left a handler behind, and it
         // is only callable while the interpreter that made it is alive.
         host = run.Host;
@@ -162,19 +193,41 @@ public class MoonTweaksSystem : ModSystem
             .Prepend($"{server.World.GridRecipes.Count} grid");
 
         server.Logger.Notification(
-            "[moontweaks] {0} script(s), {1} change(s), {2} affected; {3} recipes now",
-            run.Scripts.Count, run.Log.Pending.Count, affected, string.Join(", ", held));
+            "[moontweaks] {0} script(s) on {1}, {2} change(s), {3} affected; {4} recipes now",
+            run.Scripts.Count, config.ScriptEngine, run.Log.Pending.Count, affected, string.Join(", ", held));
 
         if (events.Count > 0)
         {
             server.Logger.Notification("[moontweaks] {0} event handler(s) listening", events.Count);
         }
+
+        if (commandNames.Count > 0)
+        {
+            server.Logger.Notification("[moontweaks] command(s) added: {0}",
+                string.Join(", ", commandNames.Select(name => $"/{name}")));
+        }
+
+        if (timers.Count > 0)
+        {
+            server.Logger.Notification("[moontweaks] {0} timer(s) running", timers.Count);
+        }
     }
 
+    /// <summary>Reads the settings, or hands back the ones already read.</summary>
+    private MoonTweaksConfig Settings(string folder, ILogger logger) =>
+        settings ??= MoonTweaksConfig.Load(folder, logger);
+
     /// <inheritdoc/>
+    /// <remarks>
+    /// The interpreter is deliberately left alone. A mod is told to shut down before
+    /// the server has finished shutting down, and the game goes on raising events
+    /// afterwards — it saves the world after this returns, which is an event scripts
+    /// listen for. Handlers are only callable while the interpreter that made them is
+    /// alive, so disposing it here hands the game a handler it cannot call. The
+    /// process is ending regardless, and what a run of scripts holds goes with it.
+    /// </remarks>
     public override void Dispose()
     {
-        host?.Dispose();
         host = null;
         base.Dispose();
     }

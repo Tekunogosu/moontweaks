@@ -124,6 +124,23 @@ public sealed class OutputSpec : CountedStackSpec;
 public sealed class ReturnedStackSpec : CountedStackSpec;
 
 /// <summary>
+/// A stack of something to hand over or put in the world. A bare string names the
+/// asset, so <c>"game:stick"</c> stands in for one of them.
+/// </summary>
+[LuaTable("ItemStack", Shorthand = "code")]
+public sealed class ItemStackSpec : CountedStackSpec
+{
+    /// <summary>
+    /// Asset code of the stack, such as <c>game:stick</c>. Names one asset: nothing
+    /// here expands a family, so neither a wildcard nor a <c>{name}</c> placeholder
+    /// belongs in it.
+    /// </summary>
+    [LuaField("code", Required = true)]
+    [LuaSuggests(SuggestionSets.AssetCode)]
+    public override string? Code { get; set; }
+}
+
+/// <summary>
 /// A stack the game turns something into: what a meal cooks into, or what food
 /// becomes once it stops being fresh.
 /// </summary>

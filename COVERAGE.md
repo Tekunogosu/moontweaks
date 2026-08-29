@@ -12,11 +12,11 @@ though nobody had looked at it.
 | --- | --- | --- |
 | Recipes | every kind | Kinds other mods declare |
 | Item and block properties | 16 fields | Creative tabs, spoilage list, tool class, light |
-| Players | 19 functions | Inventory, privileges, listing who is online |
+| Players | 20 functions | Rest of inventory, privileges, listing who is online |
 | World | 5 functions | Calendar, entities, sound, area scans, block entities |
 | Events | 16 of 50 | See `TODO.md` for the classification |
 | Scheduling | nothing | A script cannot do anything on a timer |
-| Commands | nothing | A script cannot register a `/command` |
+| Commands | declaring one | Editing a command another mod declared |
 | World-scoped storage | nothing | Only per-player data has a home |
 | Server state and control | nothing | Uptime, player count, config, shutdown |
 | Permissions | nothing | Privileges cannot be declared or checked |
@@ -77,10 +77,10 @@ effect on what a script can be written to do.
 
 Also unbound:
 
-- **Inventory.** `IPlayerInventoryManager` gives a hotbar, the held slot, every
-  open inventory, and `TryGiveItemstack`. Without it a script cannot hand anything
-  over, which is what most of the event surface exists to make possible. Its own
-  domain, and `TODO.md` already carries it.
+- **Inventory.** `players.give` hands a stack over through `TryGiveItemstack` and
+  says whether it fitted, which is the one piece a command giving something out
+  needs. The rest of `IPlayerInventoryManager` — the hotbar, the held slot, reading
+  or taking from what a player carries — is unreached, and is its own domain.
 - **Privileges.** `HasPrivilege` and `Privileges` are reads and safe. `SetRole` is
   deliberately excluded, and a read is not the same thing: it lets a script gate
   its own behaviour without granting anything.
@@ -139,14 +139,20 @@ a listener when a script fails.
 
 ## Commands
 
-Nothing. `IChatCommandApi` lets a mod declare a command with parsed arguments,
-sub-commands and a required privilege, and `/moontweaks` is the only one this mod
-declares. A script cannot add one.
+`moontweaks.commands.add` declares a command with arguments, subcommands and a
+required privilege, and calls a script's handler when somebody runs it. Six kinds of
+argument are read — a word, a whole number, a number, on or off, the rest of the
+line, and an online player — each of which the game parses and offers completions
+for before a handler sees it.
 
-For a server operator this is probably the largest single absence on this page: a
-script can change the world at load and react to events, but cannot give anyone a
-way to ask it for anything. It also pairs with the `PlayerChat` event, which
-`TODO.md` files under the events whose handler must answer.
+A command a script declares needs nothing on a player's machine: the client sends
+the line as typed and the server reads it. Declaring one still happens as the server
+loads, so a new command wants a restart the way a new recipe does.
+
+What is not reached: a command another mod already declared cannot be added to or
+altered, since the game allows one owner per name and this refuses a name that is
+taken. Nesting stops nowhere in particular here but the game's own `BeginSubCommand`
+nests indefinitely, which this follows.
 
 ## World-scoped storage
 

@@ -10,6 +10,9 @@ namespace MoonTweaks.Scripting;
 /// </summary>
 public sealed class MoonSharpHost : IScriptHost
 {
+    /// <summary>Name this engine is selected by in the settings file.</summary>
+    public const string EngineName = "moonsharp";
+
     private readonly Script script = new(CoreModules.Preset_HardSandbox);
 
     /// <summary>Lua version string the embedded interpreter reports.</summary>
