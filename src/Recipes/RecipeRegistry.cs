@@ -37,6 +37,9 @@ public sealed class RecipeRegistry
     /// <summary>Every alloy currently registered.</summary>
     public List<AlloyRecipe> Alloy => system.MetalAlloys;
 
+    /// <summary>Every cooking recipe currently registered.</summary>
+    public List<CookingRecipe> Cooking => system.CookingRecipes;
+
     /// <summary>
     /// How many recipes each kind this registry reaches now holds, named as a report
     /// would name them. Kept beside the lists themselves, so a kind added here is
@@ -49,6 +52,7 @@ public sealed class RecipeRegistry
         new("smithing", Smithing.Count),
         new("barrel", Barrel.Count),
         new("alloy", Alloy.Count),
+        new("cooking", Cooking.Count),
     ];
 
     /// <summary>
@@ -66,6 +70,7 @@ public sealed class RecipeRegistry
             : typeof(TRecipe) == typeof(SmithingRecipe) ? Smithing
             : typeof(TRecipe) == typeof(BarrelRecipe) ? Barrel
             : typeof(TRecipe) == typeof(AlloyRecipe) ? Alloy
+            : typeof(TRecipe) == typeof(CookingRecipe) ? Cooking
             : throw new InvalidOperationException($"{typeof(TRecipe).Name} is not a registry this reaches"));
 
     /// <summary>
@@ -94,6 +99,11 @@ public sealed class RecipeRegistry
             // metals in it rather than by a number, so nothing can collide.
             case AlloyRecipe alloy:
                 system.RegisterMetalAlloy(alloy);
+                break;
+            // A cooking recipe is identified by the code it carries, which also names
+            // the meal, so it is never numbered either.
+            case CookingRecipe cooking:
+                system.RegisterCookingRecipe(cooking);
                 break;
             default:
                 throw new InvalidOperationException($"{recipe.GetType().Name} has no registry here");

@@ -35,6 +35,39 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// <summary>Name a script listens for a player respawning under.</summary>
     public const string PlayerRespawn = "playerRespawn";
 
+    /// <summary>Name a script listens for a player's first ever join under.</summary>
+    public const string PlayerCreate = "playerCreate";
+
+    /// <summary>Name a script listens for a player entering the world under.</summary>
+    public const string PlayerNowPlaying = "playerNowPlaying";
+
+    /// <summary>Name a script listens for a player's client finishing joining under.</summary>
+    public const string PlayerReady = "playerReady";
+
+    /// <summary>Name a script listens for a player quitting under.</summary>
+    public const string PlayerLeave = "playerLeave";
+
+    /// <summary>Name a script listens for a player being removed under.</summary>
+    public const string PlayerDisconnect = "playerDisconnect";
+
+    /// <summary>Name a script listens for a player changing game mode under.</summary>
+    public const string PlayerSwitchGameMode = "playerSwitchGameMode";
+
+    /// <summary>Name a script listens for the save game being loaded under.</summary>
+    public const string SaveGameLoaded = "saveGameLoaded";
+
+    /// <summary>Name a script listens for a world being created under.</summary>
+    public const string SaveGameCreated = "saveGameCreated";
+
+    /// <summary>Name a script listens for the world being saved under.</summary>
+    public const string GameWorldSave = "gameWorldSave";
+
+    /// <summary>Name a script listens for the world generators starting under.</summary>
+    public const string WorldgenStartup = "worldgenStartup";
+
+    /// <summary>Name a script listens for the server waking from standby under.</summary>
+    public const string ServerResume = "serverResume";
+
     private readonly Dictionary<string, List<Handler>> handlers = [];
 
     /// <summary>One script function listening for one event.</summary>
@@ -64,7 +97,7 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// inside the game's own event dispatch, where an exception would take down
     /// whatever raised it, and a handler that failed once will fail every time.
     /// </remarks>
-    public void Raise(string name, PlayerEventPayload about)
+    public void Raise(string name, EventPayload about)
     {
         if (!handlers.TryGetValue(name, out var listening) || listening.Count == 0) return;
 
@@ -114,6 +147,71 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// <summary>Subscribes to the game's own player-respawned event.</summary>
     public void SubscribePlayerRespawn() =>
         api.Event.PlayerRespawn += player => Raise(PlayerRespawn, new PlayerEventPayload(player));
+
+    /// <summary>Subscribes to the game's own first-ever-join event.</summary>
+    /// <remarks>
+    /// Raised only for a player the world has never seen, and before the welcome
+    /// message, so a starter kit handed out here arrives with them.
+    /// </remarks>
+    public void SubscribePlayerCreate() =>
+        api.Event.PlayerCreate += player => Raise(PlayerCreate, new PlayerEventPayload(player));
+
+    /// <summary>Subscribes to the game's own now-playing event.</summary>
+    /// <remarks>Raised once the player is in the world and has been welcomed.</remarks>
+    public void SubscribePlayerNowPlaying() =>
+        api.Event.PlayerNowPlaying += player => Raise(PlayerNowPlaying, new PlayerEventPayload(player));
+
+    /// <summary>Subscribes to the game's own player-ready event.</summary>
+    /// <remarks>
+    /// Raised when the player's client reports that it has finished joining, which
+    /// is the last of the three events a join raises.
+    /// </remarks>
+    public void SubscribePlayerReady() =>
+        api.Event.PlayerReady += player => Raise(PlayerReady, new PlayerEventPayload(player));
+
+    /// <summary>Subscribes to the game's own player-left event.</summary>
+    /// <remarks>
+    /// Raised for a player who quit of their own accord, before they are removed.
+    /// A player who was kicked or who dropped raises only <see cref="PlayerDisconnect"/>.
+    /// </remarks>
+    public void SubscribePlayerLeave() =>
+        api.Event.PlayerLeave += player => Raise(PlayerLeave, new PlayerEventPayload(player));
+
+    /// <summary>Subscribes to the game's own player-disconnected event.</summary>
+    /// <remarks>
+    /// Raised as the player is removed, however they went: a quit, a kick or a lost
+    /// connection all reach here, so this is the one that always runs.
+    /// </remarks>
+    public void SubscribePlayerDisconnect() =>
+        api.Event.PlayerDisconnect += player => Raise(PlayerDisconnect, new PlayerEventPayload(player));
+
+    /// <summary>Subscribes to the game's own game-mode-changed event.</summary>
+    /// <remarks>
+    /// Raised after the change, so asking the player their mode gives the new one.
+    /// </remarks>
+    public void SubscribePlayerSwitchGameMode() =>
+        api.Event.PlayerSwitchGameMode += player =>
+            Raise(PlayerSwitchGameMode, new PlayerEventPayload(player));
+
+    /// <summary>Subscribes to the game's own save-loaded event.</summary>
+    public void SubscribeSaveGameLoaded() =>
+        api.Event.SaveGameLoaded += () => Raise(SaveGameLoaded, ServerEventPayload.Instance);
+
+    /// <summary>Subscribes to the game's own save-created event.</summary>
+    public void SubscribeSaveGameCreated() =>
+        api.Event.SaveGameCreated += () => Raise(SaveGameCreated, ServerEventPayload.Instance);
+
+    /// <summary>Subscribes to the game's own world-being-saved event.</summary>
+    public void SubscribeGameWorldSave() =>
+        api.Event.GameWorldSave += () => Raise(GameWorldSave, ServerEventPayload.Instance);
+
+    /// <summary>Subscribes to the game's own worldgen-startup event.</summary>
+    public void SubscribeWorldgenStartup() =>
+        api.Event.WorldgenStartup += () => Raise(WorldgenStartup, ServerEventPayload.Instance);
+
+    /// <summary>Subscribes to the game's own server-resumed event.</summary>
+    public void SubscribeServerResume() =>
+        api.Event.ServerResume += () => Raise(ServerResume, ServerEventPayload.Instance);
 
     /// <summary>Whatever stands at a position, for the events that leave it standing.</summary>
     private Block? Standing(BlockPos? at) =>

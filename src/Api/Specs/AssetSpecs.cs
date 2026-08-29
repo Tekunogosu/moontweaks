@@ -124,6 +124,23 @@ public sealed class OutputSpec : CountedStackSpec;
 public sealed class ReturnedStackSpec : CountedStackSpec;
 
 /// <summary>
+/// A stack the game turns something into: what a meal cooks into, or what food
+/// becomes once it stops being fresh.
+/// </summary>
+[LuaTable("ResultStack", Shorthand = "code")]
+public sealed class ResultStackSpec : CountedStackSpec
+{
+    /// <summary>
+    /// Asset code of the stack, such as <c>game:rot</c>. Names one asset: nothing
+    /// here expands a family, so neither a wildcard nor a <c>{name}</c> placeholder
+    /// belongs in it.
+    /// </summary>
+    [LuaField("code", Required = true)]
+    [LuaSuggests(SuggestionSets.AssetCode)]
+    public override string? Code { get; set; }
+}
+
+/// <summary>
 /// One input a recipe consumes: a material, in a quantity, possibly as a tool.
 /// </summary>
 [LuaTable("Ingredient", Shorthand = "code")]

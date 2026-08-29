@@ -7,7 +7,8 @@
 #   VINTAGE_STORY_DATA   real client data path, read once for the login session
 #   MOONTWEAKS_TESTBED   server data path, whose Mods folder is shared (default <repo>/.testbed)
 #   MOONTWEAKS_CLIENT    throwaway client data path (default /tmp/moontweaks-client)
-#   MOONTWEAKS_ADDRESS   server to connect to (default 127.0.0.1:42420)
+#   MOONTWEAKS_PORT      testbed server port (default 42460, matching run-server.sh)
+#   MOONTWEAKS_ADDRESS   server to connect to (default 127.0.0.1:$MOONTWEAKS_PORT)
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -15,7 +16,8 @@ CLIENT=${VINTAGE_STORY:-$HOME/.local/share/vintagestory}
 REAL=${VINTAGE_STORY_DATA:-$HOME/.config/VintagestoryData}
 TESTBED=${MOONTWEAKS_TESTBED:-$ROOT/.testbed}
 DATA=${MOONTWEAKS_CLIENT:-/tmp/moontweaks-client}
-ADDRESS=${MOONTWEAKS_ADDRESS:-127.0.0.1:42420}
+PORT=${MOONTWEAKS_PORT:-42460}
+ADDRESS=${MOONTWEAKS_ADDRESS:-127.0.0.1:$PORT}
 
 # Mode 700: the copied settings carry the account's session key and signature.
 mkdir -p -m 700 "$DATA"

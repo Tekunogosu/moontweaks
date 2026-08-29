@@ -9,10 +9,31 @@ namespace MoonTweaks.Events;
 // is given: the table a script reads is written from these fields, and so is the
 // reference an editor completes against, so the two cannot describe different events.
 
+/// <summary>
+/// What one event says happened, as the handler is given it. Every shape below is
+/// one of these, so what may be raised is what has a shape describing it.
+/// </summary>
+public abstract class EventPayload;
+
+/// <summary>
+/// Something that happened to the server rather than to anything in it, which is
+/// the whole of what there is to say about it.
+/// </summary>
+[LuaTable("ServerEvent", Given = true)]
+public sealed class ServerEventPayload : EventPayload
+{
+    /// <summary>The one instance, since the shape holds nothing to tell apart.</summary>
+    public static readonly ServerEventPayload Instance = new();
+
+    private ServerEventPayload()
+    {
+    }
+}
+
 /// <summary>Something that happened to one player.</summary>
 /// <param name="player">Player it happened to.</param>
 [LuaTable("PlayerEvent", Given = true)]
-public class PlayerEventPayload(IServerPlayer player)
+public class PlayerEventPayload(IServerPlayer player) : EventPayload
 {
     /// <summary>
     /// Identifier of the player it happened to, which every <c>moontweaks.players</c>

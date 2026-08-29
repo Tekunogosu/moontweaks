@@ -190,3 +190,34 @@ public enum EnumPlayKind
     /// <summary>Watching without taking part.</summary>
     Spectator,
 }
+
+/// <summary>What becoming stale turns something into.</summary>
+public enum EnumTransitionKind
+{
+    /// <summary>Nothing in particular, which is what the game's own meal recipes say.</summary>
+    None,
+
+    /// <summary>Rots.</summary>
+    Perish,
+
+    /// <summary>Dries out.</summary>
+    Dry,
+
+    /// <summary>Burns away.</summary>
+    Burn,
+
+    /// <summary>Cures, as meat left in a barrel of brine does.</summary>
+    Cure,
+
+    /// <summary>Turns into something else outright.</summary>
+    Convert,
+
+    /// <summary>Ripens.</summary>
+    Ripen,
+
+    /// <summary>Melts.</summary>
+    Melt,
+
+    /// <summary>Sets hard, as hot glue does.</summary>
+    Harden,
+}

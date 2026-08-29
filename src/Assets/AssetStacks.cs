@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
+using Vintagestory.API.MathTools;
 
 namespace MoonTweaks.Assets;
 
@@ -33,6 +34,25 @@ public sealed class AssetStacks(IWorldAccessor world)
         StackSize = spec.StackSize,
         Attributes = Attributes(spec.Attributes),
     };
+
+    /// <summary>
+    /// How something changes once it stops being fresh, as the game holds it. Sole
+    /// owner of that translation: a meal spoiling and an item spoiling are the same
+    /// shape, and the game reads them through the same type.
+    /// </summary>
+    public TransitionableProperties Transitionable(
+        TransitionableSpec spec, ScriptOrigin origin, string path) => new()
+    {
+        Type = ValueSet.As<EnumTransitionType>(spec.Type),
+        FreshHours = Hours(spec.FreshHours),
+        TransitionHours = Hours(spec.TransitionHours),
+        TransitionedStack = Stack(spec.TransitionedStack, origin, $"{path}.transitionedStack"),
+        TransitionRatio = (float)spec.TransitionRatio,
+    };
+
+    /// <summary>A span of in-game hours, which the game holds as a range it draws from.</summary>
+    private static NatFloat Hours(SpreadSpec spread) =>
+        NatFloat.createUniform((float)spread.Average, (float)spread.Variance);
 
     /// <summary>
     /// Turns a list of tag names into the condition an ingredient matches against.

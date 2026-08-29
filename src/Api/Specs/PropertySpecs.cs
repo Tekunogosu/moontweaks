@@ -19,6 +19,37 @@ public sealed class SpreadSpec
 }
 
 /// <summary>
+/// How something changes once it stops being fresh: what it becomes, how long it
+/// keeps, and how long the change itself takes.
+/// </summary>
+[LuaTable("TransitionableProperties")]
+public sealed class TransitionableSpec
+{
+    /// <summary>
+    /// What kind of change it is. Left out, it is the same nothing-in-particular the
+    /// game's own meal recipes leave it as.
+    /// </summary>
+    [LuaField("type", Default = "\"none\"")]
+    public EnumTransitionKind Type { get; set; } = EnumTransitionKind.None;
+
+    /// <summary>How long it stays fresh, in in-game hours.</summary>
+    [LuaField("freshHours", Required = true)]
+    public SpreadSpec FreshHours { get; set; } = new();
+
+    /// <summary>How long the change itself takes once freshness runs out, in in-game hours.</summary>
+    [LuaField("transitionHours", Required = true)]
+    public SpreadSpec TransitionHours { get; set; } = new();
+
+    /// <summary>What it becomes.</summary>
+    [LuaField("transitionedStack", Required = true)]
+    public ResultStackSpec TransitionedStack { get; set; } = new();
+
+    /// <summary>How many of it one of these becomes. One for one when left alone.</summary>
+    [LuaField("transitionRatio", Default = "1")]
+    public double TransitionRatio { get; set; } = 1;
+}
+
+/// <summary>
 /// What burning or smelting this does. Only the keys a script writes change, so a
 /// script may raise a melting point without restating everything else about the fire.
 /// </summary>

@@ -213,3 +213,51 @@ public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeReg
     [LuaFunction("count")]
     public int Count(ScriptOrigin origin) => registry.Alloy.Count;
 }
+
+/// <summary>Meals a pot cooks over a fire.</summary>
+/// <remarks>
+/// The odd one out. A cooking recipe makes no single product: what comes out is a
+/// container of servings named after what went in, so a recipe is identified by the
+/// code it carries and that is what selects one. Nothing expands either — a wildcard
+/// among the stacks an ingredient accepts stays a wildcard, and the pot matches
+/// against it as it cooks.
+/// </remarks>
+[LuaModule("moontweaks.recipes.cooking")]
+public sealed class CookingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
+{
+    private const string Kind = "cooking";
+    private readonly CookingRecipeFactory factory = new(world);
+
+    /// <summary>
+    /// Registers a new meal. Its <c>code</c> names the recipe and the meal both, and
+    /// no two recipes should carry the same one: the game resolves a meal by taking
+    /// the first code that matches, so a second would never be reached.
+    /// </summary>
+    /// <param name="origin">Script line requesting the change.</param>
+    /// <param name="recipe">The meal to add.</param>
+    [LuaFunction("add")]
+    public void Add(ScriptOrigin origin, CookingRecipeSpec recipe) =>
+        log.Record(recipe, new AddRecipes<CookingRecipe>(
+            origin, Kind, recipe.Code, [factory.Build(recipe, origin)], registry));
+
+    /// <summary>
+    /// Removes every cooking recipe carrying the given code. The code may contain a
+    /// <c>*</c> wildcard, so <c>"*stew"</c> removes every stew. This is the recipe's
+    /// own code rather than an asset code, because a meal has no single output to
+    /// name it by.
+    /// </summary>
+    /// <param name="origin">Script line requesting the change.</param>
+    /// <param name="selector">Which recipes to remove, by the code they carry.</param>
+    [LuaFunction("remove")]
+    public void Remove(ScriptOrigin origin, CookingSelectorSpec selector) =>
+        log.Record(new RemoveCookingRecipes(origin, new CookingSelector(selector, origin), registry));
+
+    /// <summary>
+    /// Counts the cooking recipes currently registered. Reads the registry as it
+    /// stood before this run's changes, which are applied only once every script has
+    /// run.
+    /// </summary>
+    /// <param name="origin">Script line requesting the count.</param>
+    [LuaFunction("count")]
+    public int Count(ScriptOrigin origin) => registry.Cooking.Count;
+}

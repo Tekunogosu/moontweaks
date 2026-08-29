@@ -3,6 +3,10 @@
 Work that is decided but not yet done. Each entry says what it is and why it is
 worth doing, so it can be picked up without reconstructing the conversation.
 
+`COVERAGE.md` is the survey this is decided from: what the game offers a server-side
+mod and how much of it a script reaches. A gap listed there is not yet work; a gap
+listed here is.
+
 Ordered by how far each is from done: the ones at the top need one decision, the
 ones at the bottom need several.
 
@@ -16,14 +20,6 @@ worse than an absent one.
 `averageDurability` is bound on grid recipes alone for the same reason. It is
 read only as a product lands in a crafting output slot, and a knapping surface
 clones its resolved output stack directly rather than passing through there.
-
-## The recipe kind still unbound
-
-Every kind is bound but one. **Cooking** is not a `RecipeBase` at all:
-`CookingRecipeIngredient` holds a minimum and maximum quantity, a portion size in
-litres and a list of valid stacks, and the recipe itself carries `CooksInto`,
-`IsFood`, `PerishableProps` and a `Shape`. Nothing above it can be reused, so it
-wants its own spec tree.
 
 ## Codes a handler compares are unverifiable
 
@@ -72,11 +68,13 @@ unbuilt rather than unsupported — add it when a script wants it.
 to want. Three things the client is told are still unbound, each of them a shape
 with no obvious Lua spelling yet:
 
-`transitionableProps` decides how something spoils, dries or ripens, and is a
-list rather than one shape. `creativeInventoryStacks` and `creativeInventoryTabs`
-decide where it appears in creative. `combustible.smeltingType` is bound but the
-`crushing.quantity` spread only reaches its average and variance, not the
-distribution shape the game also allows.
+`transitionableProps` decides how something spoils, dries or ripens. The shape
+itself is built and bound — cooking recipes needed it, and `TransitionableProperties`
+is what they write — so what is left here is the list: an item carries several of
+them where a meal carries one. `creativeInventoryStacks` and
+`creativeInventoryTabs` decide where it appears in creative.
+`combustible.smeltingType` is bound but the `crushing.quantity` spread only reaches
+its average and variance, not the distribution shape the game also allows.
 
 ## Names and descriptions are out of reach
 
@@ -96,23 +94,45 @@ a server that already had it, where it can go on referencing an API that no long
 exists. Deliberately not done: it deletes files, and renames are rare enough that
 the cost of getting it wrong outweighs the tidiness.
 
-## Events the interpreter cannot yet be trusted with
+## The events still unbound
 
-Five of the game's events are bound, all of them raised on the main thread:
-`didUseBlock`, `didBreakBlock`, `playerJoin`, `playerDeath` and `playerRespawn`.
-`IServerEventAPI` offers 34.
+Sixteen are bound. `IServerEventAPI` declares 34 of its own and inherits 16 more
+from `IEventAPI`, so 34 are unbound. They fall into groups that want quite
+different things, listed here nearest to done first.
 
-The ones deliberately left out are those the game raises on another thread —
-`BeginChunkColumnLoadChunkThread`, `OnTrySpawnGroupNearOffthread` and
-`PhysicsThreadStart` among them. MoonSharp is not thread safe and nothing here
-serialises calls into it, so binding one would be a race rather than a feature.
-Offering them means one place that marshals a call onto the main thread, and that
-is the piece to build before the count goes past the main-thread events.
+**Notifications carrying something new** want a payload shape apiece:
+`DidPlaceBlock` (the block replaced and the stack placed, over `BlockEvent`),
+`AfterActiveSlotChanged`, `MountGaitReceived`, `ChunkColumnLoaded`,
+`ChunkColumnUnloaded`, and the entity events `IEventAPI` adds — `OnEntitySpawn`,
+`OnEntityLoaded`, `OnEntityDeath`, `OnEntityDespawn`, `EntityMounted`,
+`EntityUnmounted`. The entity ones want the entity domain deciding first how a
+script names an entity that is not a player.
 
-The rest of `IServerEventAPI` is main-thread and wants nothing new: a subscribe
-method on `ScriptEvents`, a function on `EventDomain` naming the shape it hands
-over, and a payload class for that shape when no bound event already carries what
-this one does.
+**Events whose handler must answer** are the ones needing a decision rather than
+work. `CanUseBlock` and `CanPlaceOrBreakBlock` return a bool, `BreakBlock`,
+`HandInteract` and `OnPlayerInteractEntity` take a `ref EnumHandling`, `PlayerChat`
+takes `ref string message` and a `BoolRef consumed`, `BeforeActiveSlotChanged`
+returns `EnumHandling`, and `ServerSuspend` returns `EnumSuspendState`.
+`ScriptValue.Func.Call` already hands back what a handler returned and `Raise`
+throws it away, so the machinery is half there. What is missing is a rule: several
+handlers may answer one event, and what a veto beside an approval means has to be
+decided before any of these is offered.
+
+**Events on a hot path** should stay unbound whatever else is. `OnGetClimate`,
+`OnGetWindSpeed`, `MatchesGridRecipe` and `MatchesRecipe` are raised per frame or
+per match attempt, and a script call costs roughly 600ns against 3ns for the same
+method in C#. Binding one puts the interpreter inside the game's inner loop.
+
+**Events raised off the main thread** cannot be bound at all as things stand:
+`BeginChunkColumnLoadChunkThread`, `OnTrySpawnGroupNearOffthread`,
+`PhysicsThreadStart`, and `OnTrySpawnEntity`, which `GenCreatures` raises from
+chunk column generation. MoonSharp is not thread safe and nothing here serialises
+calls into it, so binding one would be a race rather than a feature. Offering them
+means one place that marshals a call onto the main thread. `ChunkColumnLoaded` and
+`ChunkColumnUnloaded` were checked and are main-thread; the entity events have not
+been, and want checking before they are bound rather than after.
+
+`AssetsFinalizers` is obsolete and wants binding never.
 
 ## What a handler can do to the world
 
