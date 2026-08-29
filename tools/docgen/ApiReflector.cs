@@ -87,7 +87,16 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
     {
         if (method.ReturnType == typeof(void)) return "nil";
         if (method.ReturnType == typeof(MoonTweaks.Scripting.ScriptValue)) return "any";
-        return LuaNameOf(method.ReturnType);
+
+        var written = LuaNameOf(method.ReturnType);
+
+        // A function that may answer with nothing says so, the same way a key of a
+        // given shape does. Reading it off the declared nullability rather than off
+        // the type keeps the promise the same one the compiler is already enforcing.
+        return written.EndsWith('?')
+               || nullability.Create(method.ReturnParameter).ReadState != NullabilityState.Nullable
+            ? written
+            : written + "?";
     }
 
     private TableDoc ReadTable(Type type)
@@ -157,12 +166,23 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
             .Select(parameter => parameter.ParameterType)
             .Append(method.ReturnType));
 
+    /// <summary>What one element of a sequence holds, or null where the type is not one.</summary>
+    private static Type? Sequence(Type type) =>
+        type.IsGenericType
+        && type.GetGenericTypeDefinition() is var kind
+        && (kind == typeof(IReadOnlyList<>) || kind == typeof(IReadOnlyCollection<>)
+            || kind == typeof(IEnumerable<>) || kind == typeof(List<>))
+            ? type.GetGenericArguments()[0]
+            : null;
+
     /// <summary>The types a field reaches: itself, what it holds, and what it is keyed by.</summary>
     private static IEnumerable<Type> Within(Type type)
     {
         yield return type;
 
         if (type.IsArray && type.GetElementType() is { } element) yield return element;
+
+        if (Sequence(type) is { } item) yield return item;
 
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>))
         {
@@ -213,6 +233,10 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
             var arguments = type.GetGenericArguments();
             return $"table<{LuaNameOf(arguments[0])}, {LuaNameOf(arguments[1])}>";
         }
+
+        // A sequence reads as a list whichever collection type carries it, since what
+        // a script gets handed is a table it walks from 1 either way.
+        if (Sequence(type) is { } sequence) return $"{LuaNameOf(sequence)}[]";
 
         return type.Name;
     }

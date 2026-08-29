@@ -50,6 +50,9 @@ public sealed record ScriptRun(
     {
         var log = new MutationLog();
         var scripts = ScriptLibrary.Discover(scriptsFolder);
+        // One lookup shared by both domains that reach a player, so an identifier
+        // naming nobody is reported the same way whichever of them was asked.
+        var players = new PlayerAccess(server);
 
         host.Bind(DomainBinder.Bind(new GridDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new KnappingDomain(log, server.World, registry)));
@@ -64,8 +67,11 @@ public sealed record ScriptRun(
         host.Bind(DomainBinder.Bind(new ServerDomain(server, timers)));
         host.Bind(DomainBinder.Bind(new EventDomain(events)));
         host.Bind(DomainBinder.Bind(new CommandDomain(commands)));
-        host.Bind(DomainBinder.Bind(new PlayerDomain(new PlayerAccess(server), new AssetStacks(server.World))));
-        host.Bind(DomainBinder.Bind(new WorldDomain(new WorldAccess(server.World), new AssetStacks(server.World))));
+        host.Bind(DomainBinder.Bind(new ModDomain(server.ModLoader)));
+        host.Bind(DomainBinder.Bind(new CalendarDomain(server.World)));
+        host.Bind(DomainBinder.Bind(new PlayerDomain(players, new AssetStacks(server.World))));
+        host.Bind(DomainBinder.Bind(
+            new WorldDomain(new WorldAccess(server, players), new AssetStacks(server.World))));
 
         foreach (var script in scripts)
         {

@@ -125,19 +125,18 @@ public static class SpecBinder
         // path a single one would be.
         if (underlying.IsArray && underlying.GetElementType() is { IsEnum: true } choice)
         {
-            if (value is not ScriptValue.List chosen) throw Expected(origin, path, "a list", value);
-            var picked = Array.CreateInstance(choice, chosen.Items.Count);
-            for (var index = 0; index < chosen.Items.Count; index++)
+            var chosen = Items(value, origin, path, "a list");
+            var picked = Array.CreateInstance(choice, chosen.Count);
+            for (var index = 0; index < chosen.Count; index++)
             {
-                picked.SetValue(Convert(choice, chosen.Items[index], origin, $"{path}[{index + 1}]"), index);
+                picked.SetValue(Convert(choice, chosen[index], origin, $"{path}[{index + 1}]"), index);
             }
             return picked;
         }
 
         if (underlying == typeof(string[]))
         {
-            if (value is not ScriptValue.List list) throw Expected(origin, path, "a list of strings", value);
-            return list.Items
+            return Items(value, origin, path, "a list of strings")
                 .Select((item, index) => item is ScriptValue.Str s
                     ? s.Value
                     : throw Expected(origin, $"{path}[{index + 1}]", "a string", item))
@@ -146,16 +145,16 @@ public static class SpecBinder
 
         if (underlying == typeof(string[][]))
         {
-            if (value is not ScriptValue.List layers) throw Expected(origin, path, "a list of rows", value);
+            var layers = Items(value, origin, path, "a list of rows");
 
             // Rows are the spelling; a shape with one layer is written as its rows
             // directly, so a list that starts with a string is read as that layer.
-            if (layers.Items.Count > 0 && layers.Items[0] is ScriptValue.Str)
+            if (layers.Count > 0 && layers[0] is ScriptValue.Str)
             {
                 return new[] { (string[])Convert(typeof(string[]), value, origin, path)! };
             }
 
-            return layers.Items
+            return layers
                 .Select((layer, index) =>
                     (string[])Convert(typeof(string[]), layer, origin, $"{path}[{index + 1}]")!)
                 .ToArray();
@@ -167,11 +166,11 @@ public static class SpecBinder
             && underlying.GetElementType() is { } element
             && element.GetCustomAttribute<LuaTableAttribute>() is not null)
         {
-            if (value is not ScriptValue.List entries) throw Expected(origin, path, "a list", value);
-            var bound = Array.CreateInstance(element, entries.Items.Count);
-            for (var index = 0; index < entries.Items.Count; index++)
+            var entries = Items(value, origin, path, "a list");
+            var bound = Array.CreateInstance(element, entries.Count);
+            for (var index = 0; index < entries.Count; index++)
             {
-                bound.SetValue(Bind(element, entries.Items[index], origin, $"{path}[{index + 1}]"), index);
+                bound.SetValue(Bind(element, entries[index], origin, $"{path}[{index + 1}]"), index);
             }
             return bound;
         }
@@ -207,6 +206,26 @@ public static class SpecBinder
 
         throw new ScriptError(origin, $"{path} has unsupported type {underlying.Name}");
     }
+
+    /// <summary>
+    /// What a value holds when a list was asked for. Sole owner of that question, so
+    /// every list-shaped field answers it the same way.
+    /// </summary>
+    /// <remarks>
+    /// Lua has one table type and writes both a list and a keyed table as <c>{}</c>,
+    /// which leaves an empty one of each indistinguishable — the interpreter reads it
+    /// as a keyed table, having no array part to go on. Emptiness is a thing scripts
+    /// mean, though: no drops at all, no blocks left highlighted. So a target that
+    /// wants a list takes an empty table as the empty list, and a target that wants a
+    /// keyed table is unaffected, since it never reaches here.
+    /// </remarks>
+    private static IReadOnlyList<ScriptValue> Items(
+        ScriptValue value, ScriptOrigin origin, string path, string expected) => value switch
+    {
+        ScriptValue.List list => list.Items,
+        ScriptValue.Map { Entries.Count: 0 } => [],
+        _ => throw Expected(origin, path, expected, value),
+    };
 
     private static ScriptError Expected(ScriptOrigin origin, string path, string expected, ScriptValue got) =>
         new(origin, $"{path} expects {expected}, got {got.TypeName}");

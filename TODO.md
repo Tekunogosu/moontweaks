@@ -44,7 +44,9 @@ default for any command the file does not name.
 
 Deliberately held until more of the API is bound: what the commands are worth
 gating separately depends on what a script can do through them, and that is still
-growing.
+growing. `moontweaks.server.setRules` writes to the server's own configuration and
+`moontweaks.calendar.add` moves the world's clock, so the surface that wants
+gating is now wider than it was.
 
 ## Tag conditions beyond "must carry all of these"
 
@@ -62,19 +64,24 @@ either is the straightforward part; the junction is where a mistake is silent.
 Nothing in vanilla's recipes uses more than the simple form, so the rest is
 unbuilt rather than unsupported — add it when a script wants it.
 
-## Item and block properties still unbound
+## Asset properties still unbound
 
-`moontweaks.items.set` and `moontweaks.blocks.set` carry what a script is likely
-to want. Three things the client is told are still unbound, each of them a shape
-with no obvious Lua spelling yet:
+`moontweaks.items.set` and `moontweaks.blocks.set` carry what a server actually
+retunes. What is left is shapes with no obvious Lua spelling yet:
 
 `transitionableProps` decides how something spoils, dries or ripens. The shape
 itself is built and bound — cooking recipes needed it, and `TransitionableProperties`
 is what they write — so what is left here is the list: an item carries several of
 them where a meal carries one. `creativeInventoryStacks` and
-`creativeInventoryTabs` decide where it appears in creative.
-`combustible.smeltingType` is bound but the `crushing.quantity` spread only reaches
-its average and variance, not the distribution shape the game also allows.
+`creativeInventoryTabs` decide where it appears in creative. `crushing.quantity`
+reaches its average and variance but not the distribution shape the game also
+allows. A block's `sounds`, `collisionBoxes` and `cropProps` are each a shape of
+their own rather than a value.
+
+Tags are the one asymmetry worth naming: `tags` selects what to change and cannot
+be changed. `CollectibleObject.Tags` is a `TagSet` the registry hands out rather
+than a list an asset owns, so writing one means going through the tag registry,
+and nothing has asked yet.
 
 ## Names and descriptions are out of reach
 
@@ -87,12 +94,22 @@ its own strings against a code that reaches it unchanged.
 Changing them means shipping MoonTweaks to clients as well, which is a different
 mod: every player would have to install it, where today they need nothing.
 
-## Prune examples that a build no longer ships
+## Undoing what a script wrote to the world
 
-`examples/` mirrors the build, but a renamed example leaves its old copy behind on
-a server that already had it, where it can go on referencing an API that no longer
-exists. Deliberately not done: it deletes files, and renames are rare enough that
-the cost of getting it wrong outweighs the tidiness.
+`world.setBlock`, `queueBlock` and `breakBlock` all write through the plain
+accessor, so nothing a script builds can be taken back except by building the
+opposite. `IBlockAccessorRevertable` records what it wrote and can put it back.
+
+What stops this being mechanical is ownership: an undo needs a stack, the stack
+needs a lifetime, and neither belongs to a script that may fail halfway. Decide
+whether an undo is per command, per script or per server before binding anything.
+
+## Loading a chunk deliberately
+
+`world.isLoaded` says whether a position can be written to. Nothing brings a chunk
+in, so a script acting far from a player can only decline. `LoadChunkColumn` and
+`TestChunkExists` are the calls, and both answer through a callback rather than
+returning, so this wants the same shape a handler already has.
 
 ## The events still unbound
 
@@ -103,7 +120,8 @@ different things, listed here nearest to done first.
 **Notifications carrying something new** want a payload shape apiece:
 `DidPlaceBlock` (the block replaced and the stack placed, over `BlockEvent`),
 `AfterActiveSlotChanged`, `MountGaitReceived`, `ChunkColumnLoaded`,
-`ChunkColumnUnloaded`, and the entity events `IEventAPI` adds — `OnEntitySpawn`,
+`ChunkColumnUnloaded`, `PlayerDimensionChanged`, `ChunkDirty`, `MapRegionLoaded`,
+`MapRegionUnloaded`, and the entity events `IEventAPI` adds — `OnEntitySpawn`,
 `OnEntityLoaded`, `OnEntityDeath`, `OnEntityDespawn`, `EntityMounted`,
 `EntityUnmounted`. The entity ones want the entity domain deciding first how a
 script names an entity that is not a player.
@@ -112,38 +130,84 @@ script names an entity that is not a player.
 work. `CanUseBlock` and `CanPlaceOrBreakBlock` return a bool, `BreakBlock`,
 `HandInteract` and `OnPlayerInteractEntity` take a `ref EnumHandling`, `PlayerChat`
 takes `ref string message` and a `BoolRef consumed`, `BeforeActiveSlotChanged`
-returns `EnumHandling`, and `ServerSuspend` returns `EnumSuspendState`.
-`ScriptValue.Func.Call` already hands back what a handler returned and `Raise`
-throws it away, so the machinery is half there. What is missing is a rule: several
-handlers may answer one event, and what a veto beside an approval means has to be
-decided before any of these is offered.
+returns `EnumHandling`, `ServerSuspend` returns `EnumSuspendState`, and
+`OnTestBlockAccess` and `OnTestBlockAccessClaim` decide whether somebody may touch
+a place at all. `ScriptValue.Func.Call` already hands back what a handler returned
+and `Raise` throws it away, so the machinery is half there. What is missing is a
+rule: several handlers may answer one event, and what a veto beside an approval
+means has to be decided before any of these is offered. The two access ones are
+the sharpest case, since answering wrongly hands somebody else's build to a
+stranger.
 
 **Events on a hot path** should stay unbound whatever else is. `OnGetClimate`,
 `OnGetWindSpeed`, `MatchesGridRecipe` and `MatchesRecipe` are raised per frame or
 per match attempt, and a script call costs roughly 600ns against 3ns for the same
-method in C#. Binding one puts the interpreter inside the game's inner loop.
+method in C#. Binding one puts the interpreter inside the game's inner loop. The
+pull-based readings are bound instead: `world.climateAt` and `world.windAt` answer
+the same questions when a script asks rather than when the game does.
 
-**Events raised off the main thread** cannot be bound at all as things stand:
+**Events raised off the main thread** cannot be bound as things stand:
 `BeginChunkColumnLoadChunkThread`, `OnTrySpawnGroupNearOffthread`,
 `PhysicsThreadStart`, and `OnTrySpawnEntity`, which `GenCreatures` raises from
-chunk column generation. MoonSharp is not thread safe and nothing here serialises
-calls into it, so binding one would be a race rather than a feature. Offering them
-means one place that marshals a call onto the main thread. `ChunkColumnLoaded` and
-`ChunkColumnUnloaded` were checked and are main-thread; the entity events have not
-been, and want checking before they are bound rather than after.
+chunk column generation. The interpreter is not thread safe and nothing here
+serialises calls into it, so binding one would be a race rather than a feature.
+Offering them means one place that marshals a call onto the main thread, and
+`IEventAPI.EnqueueMainThreadTask` is what such a place would be built on.
+`ChunkColumnLoaded` and `ChunkColumnUnloaded` were checked and are main-thread;
+the entity events have not been, and want checking before they are bound rather
+than after.
 
 `AssetsFinalizers` is obsolete and wants binding never.
 
 ## What a handler can do to the world
 
-`moontweaks.players` reaches where a player is, their health, their hunger, their
-mode, their spawn, their chat, and whatever a script chose to remember about them.
-`moontweaks.world` reads and places blocks and drops item stacks. Nothing yet
-reaches a player's inventory, or touches an entity that is not a player. Each is a
-small domain of its own, and each wants the same treatment the recipe kinds had —
-one owner for reaching the thing, and a spec for what a script writes.
+`moontweaks.players` reaches a player's body, their standing and their memory.
+`moontweaks.world` reads and writes blocks, reads the weather and remembers things
+against the save game. Two domains are still missing entirely, and each wants the
+same treatment the recipe kinds had — one owner for reaching the thing, and a spec
+for what a script writes.
 
-Deliberately unbound: `Role`, `SetRole` and `Disconnect`. A script that can set
-roles can grant itself anything, and the privilege on the `/moontweaks` command
-gates who may run the command rather than what a script file may do. That wants
-deciding alongside per-command permissions rather than before it.
+**Entities.** Nothing touches an entity that is not a player: spawning, despawning,
+finding what is nearby, reading what one is. The first decision is how a script
+names one, since an entity has an id that does not survive a restart rather than a
+code that does.
+
+**Inventory.** `players.give` hands something over and says whether it fitted.
+Reading what a player carries, taking something from them, and reaching a chest
+through `GetBlockEntity` are all unreached, and all three are the same problem: a
+slot, and what a script may do to one.
+
+**Scanning an area.** `WalkBlocks` and `SearchBlocks` walk a region inside the
+engine. A script doing the same through `blockAt` pays a call per block, which is
+the expensive mistake the README already warns about, so this is a fix rather than
+a convenience.
+
+**Sound and particles.** `PlaySoundAt` and `SpawnParticles` reach a vanilla client
+the same way `world.highlight` does, and are how a scripted effect is noticed at
+all.
+
+**Land claims.** `ILandClaimAPI.TestAccess` asks whether somebody may build
+somewhere. Anything editing blocks on a populated server should be asking it, and
+`world.setBlock` currently does not.
+
+Deliberately unbound: `Role`, `SetRole` and `Disconnect`, along with the granting
+half of `IPermissionManager`. A script that can set roles or grant privileges can
+grant itself anything, and the privilege on the `/moontweaks` command gates who may
+run the command rather than what a script file may do. That wants deciding
+alongside per-command permissions rather than before it.
+
+## Reaching another mod
+
+`moontweaks.mods` says what is loaded and what version it is, which is what a script
+needs to guard a block of codes that only exist on some servers. It does not reach
+into what another mod declared.
+
+Two things would: `IWorldAccessor.GetRecipeRegistry(code)` resolves a recipe kind by
+its code rather than by its type, which is what a scripted edit to another mod's
+recipes needs. `IModLoader.GetModSystem` reaches a mod system outright — which is
+where the survival mod keeps weather (`WeatherSystemServer`), temporal stability
+(`SystemTemporalStability`) and block reinforcement (`ModSystemBlockReinforcement`).
+
+The recipe registry one is worth doing and is only a lookup. The mod system one
+couples this to another mod's internals across versions, and wants a decision about
+whether that coupling is acceptable before any of it is written.

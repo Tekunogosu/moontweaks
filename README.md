@@ -122,8 +122,9 @@ knap.add {
 square, ragged rows, a pattern that leaves no stone, and any character other than
 those two are all refused with the row named.
 
-`examples/scripts/` holds a worked script per recipe kind, checked by
-`lua-language-server` on every documentation build.
+`examples/scripts/` holds worked scripts grouped by what they are about —
+`recipes/`, `assets/`, `players/`, `world/`, `calendar/`, `server/`, `events/` and
+`commands/` — checked by `lua-language-server` on every documentation build.
 
 ## How it works
 
@@ -187,9 +188,10 @@ to the game's own.
 `ScriptRun` owns running the scripts. A server's startup and `/moontweaks check`
 both go through it, so what a check reports is what a start would do.
 
-MoonSharp appears in exactly one class, `Scripting/MoonSharpHost`. Lua values are
-reduced to a neutral `ScriptValue` tree at that boundary, so swapping interpreters
-means reimplementing `IScriptHost` and nothing else.
+The interpreter appears in exactly one class, `Scripting/LuaCSharpHost`. Lua values
+are reduced to a neutral `ScriptValue` tree at that boundary, so swapping
+interpreters means reimplementing `IScriptHost` and nothing else — which is how the
+engine under it was replaced without a binding changing.
 
 Tables cross that boundary in both directions and one annotation describes both.
 `SpecBinder` reads a table a script wrote into a spec; `PayloadWriter` writes an
@@ -253,7 +255,7 @@ Starting a server once is the whole setup. The mod scaffolds its own folder:
   config.json                 settings, written with their defaults
   library/moontweaks.lua      LuaCATS annotations for this build's bindings
   library/codes.lua           every asset code this server's registries hold
-  examples/                   a worked script per recipe kind, to copy and edit
+  examples/<topic>/           worked scripts grouped by topic, to copy and edit
   scripts/                    your scripts
 ```
 
@@ -311,9 +313,14 @@ and the nearest field it knows:
 
 **Copy an example into `scripts/` before changing it.** Nothing under `examples/`
 runs, and a server restores anything edited there, because that folder mirrors the
-build rather than belonging to the author. Every example ships from
-`examples/scripts/` in this repository, so each one is a script the documentation
-build type-checks rather than prose that can rot.
+build rather than belonging to the author — a build that no longer ships an example
+deletes the copy a server had, so a renamed one leaves nothing behind. Every example
+ships from `examples/scripts/` in this repository, so each one is a script the
+documentation build type-checks rather than prose that can rot.
+
+`scripts/` is walked to any depth and run in path order, so the same grouping works
+there: a folder gathers related scripts and one numeric prefix orders the folder as
+a whole.
 
 Open `<dataPath>/ModConfig/moontweaks/` as the project folder, not `scripts/`.
 Neovim resolves either, because `lua_ls` roots a workspace by walking up for
@@ -327,11 +334,12 @@ open and which is the same identifier on both the Marketplace and Open VSX. Any
 other editor driving `lua-language-server` reads the same `.luarc.json`, so
 nothing here is specific to those two.
 
-That configuration names the Lua version the interpreter reports and disables the
-standard libraries MoonSharp's hard sandbox withholds: `coroutine`, `debug`,
-`io`, `os`, `package` and `utf8`. `pcall`, `setmetatable` and `dofile` sit in a
-library the sandbox keeps only in part, so the server offers them although
-scripts cannot call them.
+That configuration names the Lua version the interpreter reports, 5.2, and disables
+the standard libraries it never opens: `coroutine`, `debug`, `io`, `os`, `package`
+and `utf8`. `dofile`, `loadfile`, `load` and `loadstring` come with the basic
+library and are taken back out, each being a way to reach code or files the bindings
+never offered; an editor still offers those four although a script cannot call them.
+`pcall`, `error` and `setmetatable` are available.
 
 `src/Host/Resources/` holds those files, embedded in the mod and written out
 verbatim. `./scripts/docs.sh` scaffolds `examples/` from the same resources and
@@ -416,7 +424,7 @@ a count has to be guessed against hardware the script knows nothing about, where
 a deadline measures it as it goes. Twenty-five milliseconds of a thirty-three
 millisecond tick fills each one without ever running long.
 
-`examples/scripts/house-builder.lua` is where these numbers come from, and
+`examples/scripts/world/house-builder.lua` is where these numbers come from, and
 `/build bench` and `/build calls` measure them again on whatever the server is
 actually running on. Measure before optimising: the first run of anything in a
 session reads about three times slow while the code is still being compiled, so
@@ -443,12 +451,11 @@ reaches nobody, and rebuilding the packet would serialise assets already freed.
 Seeing a change still means restarting the server; `check` is what makes the
 attempts before that cheap.
 
-`config.json` decides who may run them, and which interpreter runs the scripts:
+`config.json` decides who may run them:
 
 ```json
 {
-  "commandPrivilege": "controlserver",
-  "scriptEngine": "moonsharp"
+  "commandPrivilege": "controlserver"
 }
 ```
 
@@ -456,11 +463,6 @@ attempts before that cheap.
 these commands with its administrators until it says otherwise. Any privilege
 name the game knows may be used instead. One setting currently gates every
 command together; see `TODO.md` for the per-command version.
-
-`scriptEngine` names the interpreter, and is `moonsharp` unless a server says
-otherwise. See [Script engines](#script-engines) for what the alternative is and
-what it costs. A name nothing answers to is reported with the names that are
-offered, and the default is used.
 
 Keys are matched without regard to case, so the casing above and the casing the
 file is written back in both bind. A settings file that cannot be parsed is
@@ -472,7 +474,6 @@ rather than its startup.
 Requires the .NET 10 SDK and a Vintage Story install.
 
 ```sh
-./scripts/sync-moonsharp.sh   # fetch MoonSharp at the pinned commit and patch it
 ./scripts/package.sh          # build, emit bin/Release/moontweaks-<version>.zip
 ```
 
@@ -518,82 +519,58 @@ default `.testbed`), `MOONTWEAKS_CLIENT` (client data path, default
 `ClientSyncProbe` logs the grid recipe count the client received, so a test can
 compare it against what the server reported.
 
-## Script engines
+## The script engine
 
-Scripts run on an interpreter chosen by `scriptEngine` in `config.json`. Both
-engines implement `IScriptHost` and nothing else, so what a script can do is the
-same either way and the difference between them is what it costs.
+Scripts run on [Lua-CSharp](https://github.com/nuskey8/Lua-CSharp), shipped beside
+the mod as `Lua.dll`. It reaches the rest of the mod only through `IScriptHost`,
+which is the whole of what an engine implements, so replacing it means writing that
+one interface again and touching no binding.
 
-| | `moonsharp` | `luacsharp` |
-| --- | --- | --- |
-| what it is | MoonSharp, vendored and compiled in | [Lua-CSharp](https://github.com/nuskey8/Lua-CSharp), shipped beside as `Lua.dll` |
-| status | the default | measured and checked, not yet the default |
+That is not hypothetical: the mod ran on another interpreter until Lua-CSharp was
+measured against it and won on every shape that mattered — Lua itself several times
+faster, a crossing into a binding about twice as fast, a fifth of the allocation,
+and failures that name the operation as well as the line. Placing blocks, which is
+the heaviest thing a script does here, more than doubled.
 
-`./scripts/bench.sh` runs the same Lua on every engine and reports what each one
-costs, having first checked that they agree about what the Lua means. It needs no
-running server: the workload reaches an engine only through `IScriptHost`, and
-the game is not part of that.
+`./scripts/bench.sh` measures the interpreter and records what it makes of the Lua
+its checks put through it. It needs no running server: the workload reaches an
+engine only through `IScriptHost`, and the game is not part of that.
 
 ```sh
-./scripts/bench.sh                    # check parity, then measure
+./scripts/bench.sh                    # check, then measure
 ./scripts/bench.sh --quick            # the same, at a twentieth of the counts
 ./scripts/bench.sh --json             # for something other than a person to read
-./scripts/bench.sh --engine moonsharp # one engine, no comparison
+./scripts/bench.sh --engine luacsharp # name one engine
 ```
 
-It exits non-zero when two engines record different values for a check that does
-not already name a reason they would, which makes it a test rather than only a
-measurement. A difference that is understood is written into the check beside the
-Lua that finds it, so the reason lives where the next reader will look; a reason
-that stops applying is reported too.
+With one engine those recordings describe it. Register a candidate beside it and
+they become the test: the run exits non-zero when the two read the same Lua
+differently, which is a reason not to swap whatever the timings say.
 
-On the shapes MoonTweaks actually puts through an interpreter, `luacsharp` runs
-Lua itself several times faster, crosses into a binding about twice as fast, and
-allocates roughly half as much on every path. Allocation is the figure to watch:
-scripts run on the main thread, so what a handler allocates is collected there
-too. Measure on the hardware you care about rather than taking these numbers,
-which came from one machine.
+Adding a candidate is the same three steps every time: implement `IScriptHost`,
+register it in `Scripting/ScriptEngine`, and run `bench.sh`. Nothing else in the mod
+learns that a second engine exists.
 
-Seven differences are known and named in `tools/luabench/Workload.cs`. The ones
-that could reach a script: MoonSharp's hard sandbox withholds `pcall` and
-`error`, which `luacsharp` offers; MoonSharp does not reuse a frame across a tail
-call, so deep tail recursion overflows there and does not on `luacsharp`, and the
-line a failure names differs through one; and MoonSharp's `math.huge` is the
-largest finite double rather than infinity. `luacsharp` withholds `dofile`,
-`loadfile`, `load` and `loadstring` to keep the sandbox the same width as
-MoonSharp's rather than wider.
+### What a script may and may not do
 
-## MoonSharp
+The interpreter opens the basic library, `string`, `table`, `math` and `bit32`, and
+nothing else. `coroutine`, `debug`, `io`, `os`, `package` and `utf8` are absent
+rather than present and refusing, so a script has no clock of its own — which is
+what `moontweaks.server.elapsedMs` exists to answer — and no way to reach a file.
+`dofile`, `loadfile`, `load` and `loadstring` come with the basic library and are
+taken back out, each being a way to compile or load code the bindings never offered.
 
-MoonSharp is vendored as a submodule pinned to a reviewed commit and compiled
-into `moontweaks.dll`, so the mod ships as a single assembly. The published
-NuGet package is a prerelease that predates fixes this mod depends on, which is
-why the build works from source.
-
-The submodule points at a fork, whose `moontweaks` branch carries two commits on
-top of upstream. `scripts/sync-moonsharp.sh` checks that pin out by force, which
-is the whole of what it does and is what makes it idempotent. The submodule
-working tree reads as clean afterwards.
-
-The first commit qualifies `DataStructs.ReferenceEqualityComparer`, resolving an
-ambiguity with the one .NET 5 added to `System.Collections.Generic`. The conflict
-appears only when MoonSharp's `netstandard2.0` sources are compiled into a modern
-target, so it belongs upstream and is kept alone to stay cherry-pickable there.
-
-The second disables the nullable context per vendored file, which keeps
-MoonTweaks' own code under a strict nullable context without inheriting several
-hundred warnings. That one is consumer-side formatting rather than a change to
-the interpreter, which is why it sits above the fix rather than beside it.
+`pcall`, `error` and `setmetatable` are available. The reported version is Lua 5.2,
+so `//` is not integer division and `goto` is not a keyword.
 
 ## Layout
 
 ```
 src/            the mod
 tools/docgen/   reference generator
-tools/luabench/ script engine comparison, run by scripts/bench.sh
+tools/luabench/ script engine measurement, run by scripts/bench.sh
 scripts/        build, docs, install and testbed entry points
-examples/       one worked script per recipe kind, shipped with the mod
-third_party/    MoonSharp submodule
+examples/       worked scripts grouped by topic, shipped with the mod
 TODO.md         work that is decided but not yet done
 LICENSE         MIT, covering this project
 THIRD-PARTY-NOTICES.md   what the shipped assembly carries besides this project
@@ -607,11 +584,11 @@ an author's scripts would be, and ship from there into every install.
 
 MoonTweaks is MIT licensed; see `LICENSE`.
 
-The mod ships as one assembly with MoonSharp compiled into it, which makes every
-release a binary redistribution of MoonSharp's 3-clause BSD licensed code. Its
-notice therefore travels with the build: `scripts/package.sh` puts `LICENSE` and
+The mod ships `Lua.dll` beside its own assembly, which makes every release a
+binary redistribution of Lua-CSharp's MIT licensed code. Its notice therefore
+travels with the build: `scripts/package.sh` puts `LICENSE` and
 `THIRD-PARTY-NOTICES.md` in the zip beside `moontweaks.dll`, and the notice
-reproduces MoonSharp's licence in full. A release built any other way has to do
+reproduces Lua-CSharp's licence in full. A release built any other way has to do
 the same.
 
 Vintage Story's assemblies are referenced at build time and never redistributed.

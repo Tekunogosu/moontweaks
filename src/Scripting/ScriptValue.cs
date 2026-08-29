@@ -5,7 +5,7 @@ namespace MoonTweaks.Scripting;
 
 /// <summary>
 /// A Lua value in engine-neutral form. Everything above the scripting layer reads
-/// these instead of MoonSharp types, so the interpreter stays swappable.
+/// these instead of the interpreter's own types, so the interpreter stays swappable.
 /// </summary>
 public abstract record ScriptValue
 {

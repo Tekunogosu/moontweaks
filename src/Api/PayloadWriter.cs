@@ -43,6 +43,20 @@ public static class PayloadWriter
         // which is how a reading function returns a table rather than one number.
         ScriptValue built => built,
         System.Enum named => new ScriptValue.Str(named.ToString().ToLowerInvariant()),
+        // A shape of its own, written through the same field metadata as any other,
+        // so a table nested inside a payload reads like one handed over on its own.
+        _ when value.GetType().GetCustomAttribute<LuaTableAttribute>() is not null => Table(value),
+        // Anything a script would read with ipairs. Strings are caught above, which
+        // is what keeps one from arriving here as a list of its own characters.
+        System.Collections.IEnumerable many => List(many),
         _ => ScriptValue.Nil.Instance,
     };
+
+    /// <summary>A sequence as the table a script walks from 1.</summary>
+    private static ScriptValue.List List(System.Collections.IEnumerable many)
+    {
+        var items = new List<ScriptValue>();
+        foreach (var item in many) items.Add(Value(item));
+        return new ScriptValue.List(items);
+    }
 }

@@ -54,8 +54,26 @@ public static class EditorSupport
 
         foreach (var resource in Resources(ExamplePrefix))
         {
-            yield return new(resource, $"{ExamplesFolder}/{resource[ExamplePrefix.Length..]}", Upkeep.Mirrored);
+            yield return new(resource, LocationOf(resource), Upkeep.Mirrored);
         }
+    }
+
+    /// <summary>
+    /// Where one embedded example goes, read back out of its resource name. A resource
+    /// name has only dots to spell a path with, so the folders an example sits in are
+    /// dot segments and the last two are always its own name and its extension.
+    /// </summary>
+    /// <remarks>
+    /// This and the <c>LogicalName</c> in the project file are two halves of one
+    /// format. Neither a folder nor an example may carry a dot of its own, since a
+    /// name is all either side has to go on.
+    /// </remarks>
+    private static string LocationOf(string resource)
+    {
+        var parts = resource[ExamplePrefix.Length..].Split('.');
+        var file = string.Join('.', parts[^2..]);
+
+        return string.Join('/', parts[..^2].Prepend(ExamplesFolder).Append(file));
     }
 
     /// <summary>Writes every scaffolded file the folder does not already have current.</summary>
@@ -83,13 +101,67 @@ public static class EditorSupport
             written.Add(file.Location);
         }
 
-        if (written.Count == 0)
+        var removed = Prune(folder, [.. Scaffolds().Select(file => file.Location)]);
+
+        if (written.Count == 0 && removed.Count == 0)
         {
             logger.Notification("[moontweaks] editor support in {0} is up to date", folder);
             return;
         }
 
-        logger.Notification("[moontweaks] editor support in {0}: wrote {1}", folder, string.Join(", ", written));
+        if (written.Count > 0)
+        {
+            logger.Notification("[moontweaks] editor support in {0}: wrote {1}",
+                folder, string.Join(", ", written));
+        }
+
+        if (removed.Count > 0)
+        {
+            logger.Notification("[moontweaks] editor support in {0}: removed {1}",
+                folder, string.Join(", ", removed));
+        }
+    }
+
+    /// <summary>
+    /// Deletes examples this build no longer ships, and any folder left empty by
+    /// doing so.
+    /// </summary>
+    /// <remarks>
+    /// The examples folder is this mod's rather than the author's: every file in it is
+    /// rewritten whenever its contents differ from what the build carries, so an edit
+    /// made there does not survive a restart anyway. Left alone, a renamed or
+    /// regrouped example would leave its old copy behind for good, going on
+    /// demonstrating an API that may no longer exist. Nothing outside
+    /// <see cref="ExamplesFolder"/> is touched, and neither is anything that is not a
+    /// script.
+    /// </remarks>
+    private static IReadOnlyList<string> Prune(string folder, HashSet<string> shipped)
+    {
+        var examples = Path.Combine(folder, ExamplesFolder);
+        if (!Directory.Exists(examples)) return [];
+
+        var removed = new List<string>();
+
+        foreach (var path in Directory.EnumerateFiles(examples, "*.lua", SearchOption.AllDirectories))
+        {
+            var location = Path.GetRelativePath(folder, path).Replace(Path.DirectorySeparatorChar, '/');
+            if (shipped.Contains(location)) continue;
+
+            File.Delete(path);
+            removed.Add(location);
+        }
+
+        // Deepest first, so a folder emptied by clearing the one inside it goes too.
+        foreach (var directory in Directory
+                     .EnumerateDirectories(examples, "*", SearchOption.AllDirectories)
+                     .OrderByDescending(path => path.Length))
+        {
+            if (Directory.EnumerateFileSystemEntries(directory).Any()) continue;
+            Directory.Delete(directory);
+        }
+
+        removed.Sort(System.StringComparer.Ordinal);
+        return removed;
     }
 
     /// <summary>Whether the file already on disk is the one this build would write.</summary>

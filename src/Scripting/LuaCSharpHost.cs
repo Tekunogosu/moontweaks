@@ -9,9 +9,8 @@ using Lua.Standard;
 namespace MoonTweaks.Scripting;
 
 /// <summary>
-/// Lua-CSharp-backed script host, offered beside <see cref="MoonSharpHost"/> so the
-/// two can be measured against each other on the same bindings. Scripts reach
-/// neither the filesystem nor the CLR except through bound modules.
+/// Lua-CSharp-backed script host, and the only place an interpreter appears. Scripts
+/// reach neither the filesystem nor the CLR except through bound modules.
 /// </summary>
 /// <remarks>
 /// Lua-CSharp expresses every call as a <see cref="ValueTask{T}"/>, where
@@ -29,20 +28,21 @@ public sealed class LuaCSharpHost : IScriptHost
 
     /// <summary>
     /// Globals the basic library defines that this host takes back out. Withheld for
-    /// what they reach rather than for what they are called: a facility MoonSharp
-    /// merely lacks, such as <c>pcall</c>, is not on this list, because matching an
-    /// engine's shortcomings is not the same as matching its sandbox.
+    /// what they reach rather than for what they are called: each of these compiles
+    /// or loads code the bindings never offered. A facility that merely lets a script
+    /// misbehave on its own, such as <c>pcall</c>, is not on this list.
     /// </summary>
     private static readonly string[] Ungranted = ["dofile", "loadfile", "load", "loadstring"];
 
     private readonly LuaState state = LuaState.Create();
 
     /// <summary>
-    /// Builds the interpreter with the same libraries MoonSharp's hard sandbox
-    /// leaves standing: the basic library, <c>string</c>, <c>table</c>, <c>math</c>
-    /// and <c>bit32</c>. The rest are never opened, so <c>io</c>, <c>os</c>,
-    /// <c>package</c>, <c>coroutine</c>, <c>debug</c> and <c>utf8</c> are absent
-    /// rather than present and refusing.
+    /// Builds the interpreter with the libraries a script is allowed: the basic
+    /// library, <c>string</c>, <c>table</c>, <c>math</c> and <c>bit32</c>. The rest
+    /// are never opened, so <c>io</c>, <c>os</c>, <c>package</c>, <c>coroutine</c>,
+    /// <c>debug</c> and <c>utf8</c> are absent rather than present and refusing.
+    /// A script therefore has no clock of its own, which is what
+    /// <c>moontweaks.server.elapsedMs</c> exists to answer.
     /// </summary>
     public LuaCSharpHost()
     {
@@ -55,8 +55,6 @@ public sealed class LuaCSharpHost : IScriptHost
         // The basic library brings these, and each is a way to reach code or files
         // the bindings never offered: the first two read the disk through the
         // platform, and the rest compile a string a script built at runtime.
-        // MoonSharp's hard sandbox withholds all of them, and an engine swap must
-        // not widen what a script can reach.
         foreach (var reachable in Ungranted) state.Environment[reachable] = LuaValue.Nil;
     }
 
@@ -190,8 +188,8 @@ public sealed class LuaCSharpHost : IScriptHost
 
     /// <summary>
     /// A table with anything in its array part is a list; anything else is a map.
-    /// The same rule <see cref="MoonSharpHost"/> applies, so a shape a script writes
-    /// reads back as the same neutral value whichever engine is running it.
+    /// The rule belongs to the neutral model rather than to this engine, so a shape a
+    /// script writes reads back the same whichever interpreter is running it.
     /// </summary>
     private ScriptValue ToScriptValue(LuaTable table)
     {

@@ -69,15 +69,10 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <param name="origin">Script line asking.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
     [LuaFunction("position")]
-    public ScriptValue Position(ScriptOrigin origin, string player)
+    public VectorPayload Position(ScriptOrigin origin, string player)
     {
         var at = players.Find(player, origin).Entity.Pos;
-        return new ScriptValue.Map(new Dictionary<string, ScriptValue>
-        {
-            ["x"] = new ScriptValue.Num(at.X),
-            ["y"] = new ScriptValue.Num(at.Y),
-            ["z"] = new ScriptValue.Num(at.Z),
-        });
+        return new VectorPayload(at.X, at.Y, at.Z);
     }
 
     /// <summary>
@@ -88,15 +83,10 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <param name="origin">Script line asking.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
     [LuaFunction("facing")]
-    public ScriptValue Facing(ScriptOrigin origin, string player)
+    public VectorPayload Facing(ScriptOrigin origin, string player)
     {
         var view = players.Find(player, origin).Entity.Pos.GetViewVector();
-        return new ScriptValue.Map(new Dictionary<string, ScriptValue>
-        {
-            ["x"] = new ScriptValue.Num(view.X),
-            ["y"] = new ScriptValue.Num(view.Y),
-            ["z"] = new ScriptValue.Num(view.Z),
-        });
+        return new VectorPayload(view.X, view.Y, view.Z);
     }
 
     /// <summary>Moves a player somewhere else.</summary>
@@ -240,4 +230,129 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
             ["dairy"] = new ScriptValue.Num(hunger.DairyLevel),
         });
     }
+
+    /// <summary>
+    /// Every player on the server right now, as the identifiers everything else here
+    /// takes. The only source of one that is not an event, so this is what anything
+    /// addressed to everybody is written from.
+    /// </summary>
+    /// <param name="origin">Script line asking.</param>
+    [LuaFunction("all")]
+    public IReadOnlyList<string> All(ScriptOrigin origin) => players.Online();
+
+    /// <summary>
+    /// Whether an identifier names somebody who is here. Worth asking before anything
+    /// that reaches a player's body, since a script may have remembered an identifier
+    /// long before it came to use it.
+    /// </summary>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player.</param>
+    [LuaFunction("isOnline")]
+    public bool IsOnline(ScriptOrigin origin, string player) => players.IsOnline(player);
+
+    /// <summary>What a player is called, for putting into a message somebody will read.</summary>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    [LuaFunction("name")]
+    public string Name(ScriptOrigin origin, string player) => players.Find(player, origin).PlayerName;
+
+    /// <summary>
+    /// The identifier of whoever last went by a name, or nil where the server has
+    /// never seen it. This is how a name somebody typed becomes something the rest of
+    /// this module accepts.
+    /// </summary>
+    /// <remarks>
+    /// Answers for players who are not here, unlike everything else in this module.
+    /// What is stored against them can still be read and written; nothing that
+    /// reaches their body can, and will say so.
+    /// </remarks>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="name">Name as it is spelled in game.</param>
+    [LuaFunction("uidOf")]
+    public string? UidOf(ScriptOrigin origin, string name) => players.UidOf(name);
+
+    /// <summary>
+    /// Sends one message to everybody on the server. Needs no list of players and no
+    /// event to have happened, which is what makes it the way to announce anything.
+    /// </summary>
+    /// <param name="origin">Script line announcing it.</param>
+    /// <param name="message">Text to send.</param>
+    [LuaFunction("announce")]
+    public void Announce(ScriptOrigin origin, string message) => players.Announce(message);
+
+    /// <summary>
+    /// Sends one player a message in the style the game uses for things that went
+    /// wrong, so it reads as a refusal rather than as news.
+    /// </summary>
+    /// <param name="origin">Script line sending it.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    /// <param name="message">Text to send.</param>
+    [LuaFunction("warn")]
+    public void Warn(ScriptOrigin origin, string player, string message) =>
+        players.Find(player, origin)
+            .SendMessage(GlobalConstants.GeneralChatGroup, message, EnumChatType.CommandError);
+
+    /// <summary>
+    /// Whether a player holds a privilege, such as <c>build</c> or <c>controlserver</c>.
+    /// Reading one grants nothing; it is how a script gates its own behaviour on what
+    /// the server has already decided about somebody.
+    /// </summary>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    /// <param name="privilege">Name of the privilege.</param>
+    [LuaFunction("hasPrivilege")]
+    public bool HasPrivilege(ScriptOrigin origin, string player, string privilege) =>
+        players.Find(player, origin).HasPrivilege(privilege);
+
+    /// <summary>Every privilege a player holds.</summary>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    [LuaFunction("privileges")]
+    public IReadOnlyList<string> Privileges(ScriptOrigin origin, string player) =>
+        players.Find(player, origin).Privileges;
+
+    /// <summary>
+    /// What one of a player's abilities currently comes to, with everything affecting
+    /// it added up. An ability nothing has touched reads 1, so the answer is always a
+    /// multiplier of the ordinary.
+    /// </summary>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    /// <param name="stat">Which ability, such as <c>walkspeed</c>.</param>
+    [LuaFunction("stat")]
+    public float Stat(ScriptOrigin origin, string player, string stat) =>
+        players.Stat(player, stat, origin);
+
+    /// <summary>
+    /// Changes one of a player's abilities, under a name the same script uses to
+    /// change or remove it later. This is how a temporary effect is given: a name
+    /// nobody else uses, set when it starts and cleared when it ends.
+    /// </summary>
+    /// <param name="origin">Script line setting it.</param>
+    /// <param name="stat">Whose ability, which one, by how much, and for how long.</param>
+    [LuaFunction("setStat")]
+    public void SetStat(ScriptOrigin origin, StatSpec stat) => players.SetStat(stat, origin);
+
+    /// <summary>
+    /// Takes back a change made under a name, leaving every other contribution to the
+    /// same ability alone.
+    /// </summary>
+    /// <param name="origin">Script line taking it back.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    /// <param name="stat">Which ability it was set on.</param>
+    /// <param name="name">Name it was set under.</param>
+    [LuaFunction("clearStat")]
+    public void ClearStat(ScriptOrigin origin, string player, string stat, string name) =>
+        players.ClearStat(player, stat, name, origin);
+
+    /// <summary>
+    /// The block a player has their cursor on, or nil where they are pointing at
+    /// nothing. Answers without waiting for them to do anything to it, which is what
+    /// a command about "the block in front of me" needs.
+    /// </summary>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    [LuaFunction("looking")]
+    public LookingPayload? Looking(ScriptOrigin origin, string player) =>
+        players.Looking(player, origin);
 }

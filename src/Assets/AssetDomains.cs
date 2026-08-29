@@ -47,7 +47,7 @@ public sealed class BlockDomain(MutationLog log, IWorldAccessor world)
     /// <param name="origin">Script line requesting the change.</param>
     /// <param name="properties">What to change, and on what.</param>
     [LuaFunction("set")]
-    public void Set(ScriptOrigin origin, AssetPropertiesSpec properties) =>
+    public void Set(ScriptOrigin origin, BlockPropertiesSpec properties) =>
         log.Record(AssetSearch.Change(
             origin, "block", properties, stacks,
             code => world.SearchBlocks(code).Cast<CollectibleObject>(), world.Blocks));

@@ -20,10 +20,13 @@ public sealed record Case(string Name, string Unit, int Iterations, string Sourc
 /// <param name="Name">How the check is named in the report.</param>
 /// <param name="Source">Lua source, which must call <c>bench.record</c> exactly once.</param>
 /// <param name="Known">
-/// Why the engines are already understood to differ here, or null where they must
-/// agree. A difference with a reason beside it is reported and does not fail the run;
-/// one without is what this is looking for. A reason that no longer applies is
-/// reported too, because a note nothing holds up is worse than no note.
+/// Why two engines are already understood to differ here, or null where they must
+/// agree. Nothing carries one: the reasons the last swap needed went with the engine
+/// they described, and a candidate's own differences are found when it is registered
+/// rather than guessed at now. A difference with a reason beside it is reported and
+/// does not fail the run; one without is what this is looking for, and a reason that
+/// no longer applies is reported too, because a note nothing holds up is worse than
+/// no note.
 /// </param>
 public sealed record Check(string Name, string Source, string? Known = null)
 {
@@ -81,10 +84,10 @@ public static class Workload
     ];
 
     /// <summary>
-    /// Checks in the report's order. Each records one value, and an engine that
-    /// records something different from the others is what this is looking for:
-    /// two engines that disagree about what a script means cannot be swapped, whatever
-    /// the timings say.
+    /// Checks in the report's order. Each records one value: what the engine running
+    /// them makes of a corner of Lua that a script could reach. With one engine that
+    /// is a description of it; with two it is the test, because engines that disagree
+    /// about what a script means cannot be swapped, whatever the timings say.
     /// </summary>
     public static IReadOnlyList<Check> Checks { get; } =
     [
@@ -99,18 +102,14 @@ public static class Workload
         // the one the chain started at rather than the one it was written on. Real
         // Lua does this; an engine that does not will report the inner line instead.
         new("tail call: origin through one",
-            "local function deep()\n  return bench.where()\nend\nbench.record(deep())",
-            Known: "MoonSharp keeps the caller's frame across a tail call, so it names the "
-                   + "line the binding sits on where an engine that reuses the frame names "
-                   + "the line the chain started at"),
+            "local function deep()\n  return bench.where()\nend\nbench.record(deep())"),
         // Whether tail calls actually reuse the frame, rather than only looking as
         // though they do. An engine that grows the stack here fails on a script the
         // other runs, which is a difference no timing can make up for.
         new("tail call: deep recursion",
             "local function count(n)\n  if n == 0 then return 'reached' end\n  return count(n - 1)\nend\n"
             + "local ok, answer = pcall(count, 100000)\n"
-            + "bench.record(ok and answer or 'overflowed')",
-            Known: "reaching this needs pcall, which MoonSharp's hard sandbox withholds"),
+            + "bench.record(ok and answer or 'overflowed')"),
         new("integer division", "bench.record(7 // 2)"),
         new("modulo of a negative", "bench.record(-7 % 3)"),
         new("float division", "bench.record(1 / 3)"),
@@ -135,21 +134,15 @@ public static class Workload
         new("empty table", "bench.record({})"),
         new("boolean and nil", "bench.record({ t = true, f = false })"),
         new("math.floor", "bench.record(math.floor(7.9))"),
-        new("math.huge", "bench.record(tostring(math.huge))",
-            Known: "MoonSharp's math.huge is the largest finite double rather than infinity, "
-                   + "so the two do not render the same because they are not the same number"),
+        new("math.huge", "bench.record(tostring(math.huge))"),
         // Whether the two mean the same number, which the rendering above cannot say.
         // Doubling an infinity leaves it; doubling the largest finite double does not.
-        new("math.huge is infinite", "bench.record(math.huge > 1e308 and math.huge * 2 == math.huge)",
-            Known: "MoonSharp's math.huge is finite, so arithmetic that should saturate overflows "
-                   + "past it instead; a script comparing against it still behaves the same"),
-        new("pcall of a failure", "local ok = pcall(function() error('x') end) bench.record(ok)",
-            Known: "MoonSharp's hard sandbox withholds pcall and error"),
+        new("math.huge is infinite", "bench.record(math.huge > 1e308 and math.huge * 2 == math.huge)"),
+        new("pcall of a failure", "local ok = pcall(function() error('x') end) bench.record(ok)"),
         new("varargs count", "local function f(...) return select('#', ...) end bench.record(f(1, nil, 3))"),
         new("sandbox: io withheld", "bench.record(io == nil)"),
         new("sandbox: os withheld", "bench.record(os == nil)"),
-        new("sandbox: package withheld", "bench.record(package == nil)",
-            Known: "MoonSharp leaves the package table standing; the next check says what is in it"),
+        new("sandbox: package withheld", "bench.record(package == nil)"),
         // An engine that leaves the table standing is asked what is in it: a
         // sandbox is what a script can reach, not what a preset is named.
         new("sandbox: what package holds",
@@ -158,9 +151,7 @@ public static class Workload
             + "  for k, v in pairs(package) do names[#names + 1] = tostring(k) .. ':' .. type(v) end\n"
             + "  table.sort(names)\n"
             + "  bench.record(table.concat(names, ','))\n"
-            + "end",
-            Known: "MoonSharp leaves package.loaded, a registry of modules, and nothing that "
-                   + "reaches a file or a CLR type"),
+            + "end"),
         new("sandbox: load withheld", "bench.record(load == nil)"),
         new("sandbox: dofile withheld", "bench.record(dofile == nil)"),
         new("sandbox: loadfile withheld", "bench.record(loadfile == nil)"),

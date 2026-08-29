@@ -5,24 +5,28 @@ using System.Linq;
 namespace MoonTweaks.Scripting;
 
 /// <summary>
-/// The interpreters a server can run its scripts on, and the only place one is
-/// chosen by name. Every engine implements <see cref="IScriptHost"/> and nothing
-/// else, so what a script can do is the same whichever is running it and the
-/// difference between them is only what it costs.
+/// The interpreters this mod can run scripts on, and the only place one is built.
+/// Every engine implements <see cref="IScriptHost"/> and nothing else, so what a
+/// script can do is the same whichever is running it and the difference between them
+/// is only what it costs.
 /// </summary>
+/// <remarks>
+/// One engine is registered. The shape is kept because it is what made replacing the
+/// last one cheap: <c>scripts/bench.sh</c> measures whatever is registered here, and
+/// a candidate is added beside the current engine and compared before it replaces it.
+/// </remarks>
 public static class ScriptEngine
 {
     /// <summary>
-    /// Engine a server runs on when its settings name none. MoonSharp holds this
-    /// until another engine has been measured and checked against it on the
-    /// bindings a server actually uses.
+    /// Engine a server runs on. A candidate replaces this only once it has been
+    /// measured against it on the bindings a server actually uses, which is what
+    /// <c>scripts/bench.sh</c> is for.
     /// </summary>
-    public const string Default = MoonSharpHost.EngineName;
+    public const string Default = LuaCSharpHost.EngineName;
 
     private static readonly Dictionary<string, Func<IScriptHost>> Engines =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            [MoonSharpHost.EngineName] = () => new MoonSharpHost(),
             [LuaCSharpHost.EngineName] = () => new LuaCSharpHost(),
         };
 

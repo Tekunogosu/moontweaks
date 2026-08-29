@@ -31,6 +31,7 @@ public static class CollectibleProperties
         if (spec.AttackPower is { } power) asset.AttackPower = (float)power;
         if (spec.AttackRange is { } range) asset.AttackRange = (float)range;
         if (spec.ToolTier is { } tier) asset.ToolTier = tier;
+        if (spec.Tool is { } tool) asset.Tool = ValueSet.As<EnumTool>(tool);
         if (spec.MaterialDensity is { } density) asset.MaterialDensity = density;
         if (spec.MiningSpeed is { } speeds) asset.MiningSpeed = Speeds(speeds);
         if (spec.Attributes is not null) asset.Attributes = AssetStacks.Attributes(spec.Attributes);
@@ -123,15 +124,27 @@ public static class CollectibleProperties
         return stack;
     }
 
-    /// <summary>Whether a script named anything at all to change.</summary>
+    /// <summary>
+    /// The keys that say what to change rather than what to change it to. Everything
+    /// else on a spec is a property, which is what lets the question below be asked
+    /// of the shape itself rather than of a list kept by hand.
+    /// </summary>
+    private static readonly string[] Selectors = ["code", "tags"];
+
+    /// <summary>
+    /// Whether a script named anything at all to change, asked of whichever shape it
+    /// wrote — the block shape carries every item key and its own besides.
+    /// </summary>
+    /// <remarks>
+    /// Read off the spec rather than listed here, so a property added above cannot be
+    /// forgotten below. A forgotten one fails quietly and in the worst direction: the
+    /// script is told it asked for nothing, on a line where it plainly asked for
+    /// something.
+    /// </remarks>
     public static bool ChangesAnything(AssetPropertiesSpec spec) =>
-        spec.Durability is not null || spec.MaxStackSize is not null
-        || spec.AttackPower is not null || spec.AttackRange is not null
-        || spec.ToolTier is not null || spec.MaterialDensity is not null
-        || spec.MiningSpeed is not null || spec.StorageFlags is not null
-        || spec.DamagedBy is not null || spec.Attributes is not null
-        || spec.Combustible is not null || spec.Nutrition is not null
-        || spec.Grinding is not null || spec.Crushing is not null;
+        SpecBinder.FieldsOf(spec.GetType())
+            .Where(field => !Selectors.Contains(field.Key))
+            .Any(field => field.Value.GetValue(spec) is not null);
 
     /// <summary>Which inventories something may be put in, as the flags the game holds.</summary>
     private static EnumItemStorageFlags Flags(EnumStorageKind[] kinds) =>

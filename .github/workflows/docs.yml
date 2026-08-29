@@ -43,12 +43,11 @@ jobs:
         env:
           LUA_LS_VERSION: 3.19.1
 
-      - run: ./scripts/sync-moonsharp.sh
       - run: ./scripts/package.sh
 
-      # Fails on two engines recording different values for the same Lua where
-      # nothing already says why they would. Timings are reported and never fail.
-      - name: Check the script engines agree
+      # Fails on an engine recording a value the checks do not already account for.
+      # Timings are reported and never fail.
+      - name: Check the script engine
         run: ./scripts/bench.sh --quick
 
       - run: ./scripts/docs.sh --check

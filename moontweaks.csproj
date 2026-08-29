@@ -12,21 +12,15 @@
     <!-- A library does not copy its package assemblies out by default, and Lua.dll
          has to be beside moontweaks.dll for the zip to pick it up. -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <!-- Vendored MoonSharp doc comments are incomplete and malformed in places.
-         Documentation of our own bindings is enforced by the docs script in check mode. -->
-    <NoWarn>$(NoWarn);CS1570;CS1571;CS1572;CS1573;CS1574;CS1591;CS0419</NoWarn>
+    <!-- Every binding carries a doc comment, which the docs script enforces in check
+         mode rather than the compiler; CS1591 would otherwise repeat that as noise. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <!-- Vintage Story install; override with the VINTAGE_STORY environment variable. -->
   <PropertyGroup>
     <VintageStoryDir Condition="'$(VINTAGE_STORY)' != ''">$(VINTAGE_STORY)</VintageStoryDir>
     <VintageStoryDir Condition="'$(VintageStoryDir)' == ''">$(HOME)/.local/share/vintagestory</VintageStoryDir>
-  </PropertyGroup>
-
-  <!-- MoonSharp is compiled into moontweaks.dll rather than shipped beside it. -->
-  <PropertyGroup>
-    <DefineConstants>$(DefineConstants);DOTNET_CORE;HASDYNAMIC</DefineConstants>
-    <MoonSharpDir>$(MSBuildThisFileDirectory)third_party/moonsharp/src/MoonSharp.Interpreter</MoonSharpDir>
   </PropertyGroup>
 
   <!-- The library is produced by ./scripts/docs.sh from a prior build, so a plain
@@ -36,20 +30,24 @@
     <EmbeddedResource Include="src/Host/Resources/vscode-extensions.json" LogicalName="MoonTweaks.vscode.extensions.json" />
     <EmbeddedResource Include="docs/library/moontweaks.lua" LogicalName="MoonTweaks.library.moontweaks.lua"
                       Condition="Exists('$(MSBuildThisFileDirectory)docs/library/moontweaks.lua')" />
-    <!-- Shipped for authors to copy from, so every example is one the build checks. -->
-    <EmbeddedResource Include="examples/scripts/*.lua" LogicalName="MoonTweaks.examples.%(Filename)%(Extension)" />
+    <!-- Shipped for authors to copy from, so every example is one the build checks.
+         Examples are grouped into folders by what they are about, and a resource name
+         has only dots to spell that with: the folders become dot segments here and
+         EditorSupport reads them back, which is why neither a folder nor a file may
+         carry a dot of its own. RecursiveDir is separated by the platform's own
+         slash, so both are replaced and a build produces the same names either way. -->
+    <EmbeddedResource Include="examples/scripts/**/*.lua"
+                      LogicalName="MoonTweaks.examples.$([System.String]::Copy('%(RecursiveDir)').Replace('\','.').Replace('/','.'))%(Filename)%(Extension)" />
   </ItemGroup>
 
-  <!-- Lua-CSharp is a second interpreter, selectable from config.json and measured
-       against MoonSharp by scripts/bench.sh. Unlike MoonSharp it is a package rather
-       than vendored sources, so Lua.dll travels beside the mod in the zip. -->
+  <!-- The interpreter scripts run on, as a package rather than vendored sources, so
+       Lua.dll travels beside the mod in the zip. scripts/bench.sh measures it. -->
   <ItemGroup>
     <PackageReference Include="LuaCSharp" Version="0.5.6" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="src/**/*.cs" />
-    <Compile Include="$(MoonSharpDir)/**/*.cs" Link="third_party/MoonSharp/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

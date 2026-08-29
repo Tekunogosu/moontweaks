@@ -9,7 +9,9 @@ namespace MoonTweaks.LuaBench;
 
 /// <summary>
 /// Runs the same Lua against every engine this mod offers and reports what each one
-/// costs, having first checked that they agree about what the Lua means.
+/// costs, having first recorded what it makes of the Lua the checks put through it.
+/// With more than one registered, those recordings become a comparison and a
+/// disagreement fails the run.
 /// </summary>
 /// <remarks>
 /// The workload reaches an engine only through <see cref="IScriptHost"/>, which is
@@ -19,10 +21,13 @@ namespace MoonTweaks.LuaBench;
 /// </remarks>
 public static class Program
 {
-    /// <summary>Exit code for a run where every engine agreed.</summary>
+    /// <summary>Exit code for a run with nothing to report against it.</summary>
     private const int Agreed = 0;
 
-    /// <summary>Exit code for a run where at least one engine disagreed.</summary>
+    /// <summary>
+    /// Exit code for a run where two engines read the same Lua differently, or where
+    /// an engine was named that does not exist.
+    /// </summary>
     private const int Disagreed = 1;
 
     /// <summary>
@@ -61,7 +66,7 @@ public static class Program
     }
 
     private const string Usage = """
-        luabench - compare the script engines MoonTweaks can run on
+        luabench - measure the interpreter MoonTweaks runs scripts on
 
         usage: luabench [--engine NAME]... [--quick] [--json]
 
@@ -69,8 +74,10 @@ public static class Program
           --quick        divide every iteration count by 20, for a fast check
           --json         emit the results as JSON instead of a table
 
-        Exits 1 when two engines record different values for a check that does not
-        already name a reason they would, and 0 otherwise. A timing is never a
+        One engine is registered, so the checks are recorded rather than compared.
+        Register a candidate beside it and this becomes the comparison that decides
+        whether to swap: it exits 1 when two engines record different values for a
+        check that does not already name a reason they would. A timing is never a
         reason to fail: an engine that is fast and wrong is not a candidate.
         """;
 

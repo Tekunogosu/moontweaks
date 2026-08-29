@@ -81,7 +81,7 @@ public class MoonTweaksSystem : ModSystem
                     // A check is a dry run, so its handlers are never called and its
                     // interpreter goes with it rather than joining the live one.
                     using var run = ScriptRun.Execute(
-                        api, ScriptEngine.Create(config.ScriptEngine),
+                        api, ScriptEngine.Create(ScriptEngine.Default),
                         ScriptLibrary.ScriptsPathFor(), new RecipeRegistry(api),
                         new ScriptEvents(api), new ScriptCommands(api, commandNames),
                         new ScriptTimers(api));
@@ -140,7 +140,7 @@ public class MoonTweaksSystem : ModSystem
         events = new ScriptEvents(server);
         var commands = new ScriptCommands(server);
         var timers = new ScriptTimers(server);
-        var engine = ScriptEngine.Create(config.ScriptEngine);
+        var engine = ScriptEngine.Create(ScriptEngine.Default);
         var run = ScriptRun.Execute(server, engine, scriptsFolder, registry, events, commands, timers);
 
         if (run.Scripts.Count == 0)
@@ -194,7 +194,7 @@ public class MoonTweaksSystem : ModSystem
 
         server.Logger.Notification(
             "[moontweaks] {0} script(s) on {1}, {2} change(s), {3} affected; {4} recipes now",
-            run.Scripts.Count, config.ScriptEngine, run.Log.Pending.Count, affected, string.Join(", ", held));
+            run.Scripts.Count, ScriptEngine.Default, run.Log.Pending.Count, affected, string.Join(", ", held));
 
         if (events.Count > 0)
         {

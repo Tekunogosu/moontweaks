@@ -1,7 +1,11 @@
 using System.Collections.Generic;
+using System.Linq;
+using MoonTweaks.Api;
+using MoonTweaks.Players;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
+using Vintagestory.API.Server;
 
 namespace MoonTweaks.World;
 
@@ -15,14 +19,22 @@ namespace MoonTweaks.World;
 /// made then would be written into nothing. These are for handlers, which run while
 /// people are playing.
 /// </remarks>
-public sealed class WorldAccess(IWorldAccessor world)
+/// <param name="api">The running server.</param>
+/// <param name="players">
+/// How an identifier becomes a player. Borrowed rather than repeated: a highlight is
+/// drawn for somebody, and there should be one answer to what an unknown identifier
+/// means however a script arrives at asking it.
+/// </param>
+public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
 {
+    private readonly IWorldAccessor world = api.World;
+
     /// <summary>
     /// Writes queued here rather than one at a time. Each single write relights and
     /// re-sends the chunk it touched, so a script filling a shape one block at a time
     /// pays that cost per block; queued writes pay it once at the commit.
     /// </summary>
-    private readonly IBulkBlockAccessor bulk = world.GetBlockAccessorBulkUpdate(true, true);
+    private readonly IBulkBlockAccessor bulk = api.World.GetBlockAccessorBulkUpdate(true, true);
 
     /// <summary>
     /// What a code names, kept so the same one is looked up once however often it is
@@ -81,4 +93,125 @@ public sealed class WorldAccess(IWorldAccessor world)
 
         if (owner is not null && dropped is EntityItem thing) thing.ByPlayerUid = owner;
     }
+
+    /// <summary>
+    /// Breaks a block the way breaking it does: its drops land, its sound plays, and
+    /// whatever depended on it is told. Distinct from writing air over it, which does
+    /// none of those things.
+    /// </summary>
+    public void Break(int x, int y, int z, string? player, double dropMultiplier, ScriptOrigin origin) =>
+        world.BlockAccessor.BreakBlock(
+            new BlockPos(x, y, z),
+            player is null ? null : players.Find(player, origin),
+            (float)dropMultiplier);
+
+    /// <summary>
+    /// Swaps one block for another without disturbing what stands in it. A chest
+    /// exchanged for another chest keeps what was inside; the same chest set outright
+    /// is a new empty one.
+    /// </summary>
+    public void Exchange(int blockId, int x, int y, int z) =>
+        world.BlockAccessor.ExchangeBlock(blockId, new BlockPos(x, y, z));
+
+    /// <summary>Whether the chunk holding a position is loaded, and so whether writing there does anything.</summary>
+    public bool IsLoaded(int x, int y, int z) =>
+        world.BlockAccessor.GetChunkAtBlockPos(new BlockPos(x, y, z)) is not null;
+
+    /// <summary>How much light of one kind reaches a position.</summary>
+    public int Light(int x, int y, int z, EnumLightKind kind) =>
+        world.BlockAccessor.GetLightLevel(new BlockPos(x, y, z), ValueSet.As<EnumLightLevelType>(kind));
+
+    /// <summary>
+    /// The height of the ground in one column, or nothing where that column is not
+    /// loaded. Read from the map rather than by looking down block by block, which is
+    /// what makes it worth having: the same answer for one call instead of hundreds.
+    /// </summary>
+    public int? Surface(int x, int z) => api.WorldManager.GetSurfacePosY(x, z);
+
+    /// <summary>What the weather and the ground are like at a position, as it stands now.</summary>
+    public ClimatePayload Climate(int x, int y, int z)
+    {
+        var at = world.BlockAccessor.GetClimateAt(new BlockPos(x, y, z));
+
+        return new ClimatePayload
+        {
+            Temperature = at.Temperature,
+            Rainfall = at.Rainfall,
+            WorldgenTemperature = at.WorldGenTemperature,
+            WorldgenRainfall = at.WorldgenRainfall,
+            Fertility = at.Fertility,
+            ForestDensity = at.ForestDensity,
+            ShrubDensity = at.ShrubDensity,
+            GeologicActivity = at.GeologicActivity,
+        };
+    }
+
+    /// <summary>Which way the wind is blowing at a position, and how hard.</summary>
+    public VectorPayload Wind(int x, int y, int z)
+    {
+        var wind = world.BlockAccessor.GetWindSpeedAt(new BlockPos(x, y, z));
+        return new VectorPayload(wind.X, wind.Y, wind.Z);
+    }
+
+    /// <summary>Draws a set of blocks on one player's screen, replacing whatever that slot held.</summary>
+    public void Highlight(HighlightSpec spec, ScriptOrigin origin)
+    {
+        var blocks = spec.Blocks.Select(at => new BlockPos(at.X, at.Y, at.Z)).ToList();
+        var player = players.Find(spec.Player, origin);
+
+        if (spec.Colour is not { } colour)
+        {
+            world.HighlightBlocks(player, spec.Slot, blocks);
+            return;
+        }
+
+        var packed = Enumerable.Repeat(Packed(colour, origin), blocks.Count).ToList();
+        world.HighlightBlocks(player, spec.Slot, blocks, packed);
+    }
+
+    /// <summary>
+    /// A colour as the single number the game draws with. Checked rather than
+    /// truncated, so a part written past 255 names itself instead of silently
+    /// wrapping round into a different colour.
+    /// </summary>
+    private static int Packed(ColourSpec colour, ScriptOrigin origin) =>
+        Byte(colour.Alpha, origin, "colour.alpha") << 24
+        | Byte(colour.Blue, origin, "colour.blue") << 16
+        | Byte(colour.Green, origin, "colour.green") << 8
+        | Byte(colour.Red, origin, "colour.red");
+
+    /// <inheritdoc cref="Packed"/>
+    private static int Byte(int value, ScriptOrigin origin, string path) =>
+        value is >= 0 and <= 255
+            ? value
+            : throw new ScriptError(origin, $"{path} must be between 0 and 255, got {value}");
+
+    /// <summary>
+    /// What the world itself remembers, saved with the save game rather than with any
+    /// player. The counterpart of what a script remembers about a player, and the only
+    /// home for anything counted or tracked across everybody.
+    /// </summary>
+    public void Remember(string key, ScriptValue value, ScriptOrigin origin) =>
+        Save(origin).StoreData(Scoped(key), ScriptJson.Write(value));
+
+    /// <summary>What the world remembered under a name, or nil where nothing was.</summary>
+    public ScriptValue Recall(string key, ScriptOrigin origin) =>
+        ScriptJson.Parse(Save(origin).GetData<string?>(Scoped(key), null));
+
+    /// <summary>
+    /// The save game, which only exists once there is a world. Named in the failure
+    /// rather than thrown through, because a script reaching this from its body rather
+    /// than from a handler has made the one mistake this whole domain warns about.
+    /// </summary>
+    private ISaveGame Save(ScriptOrigin origin) =>
+        api.WorldManager?.SaveGame
+        ?? throw new ScriptError(origin,
+            "there is no world yet, so nothing can be remembered against it; "
+            + "this belongs in an event handler rather than in a script's body");
+
+    /// <summary>
+    /// Keys are stored under this mod's own prefix, so a script cannot read or
+    /// overwrite what another mod saved against the same world.
+    /// </summary>
+    private static string Scoped(string key) => $"moontweaks:{key}";
 }

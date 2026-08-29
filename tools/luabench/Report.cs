@@ -24,7 +24,7 @@ public static class Report
     public static void Text(
         IReadOnlyList<EngineResult> engines, IReadOnlyList<Disagreement> disagreements, bool quick)
     {
-        Console.WriteLine($"MoonTweaks script engines on .NET {Environment.Version}"
+        Console.WriteLine($"MoonTweaks scripting on .NET {Environment.Version}"
                           + (quick ? "  (--quick: counts divided by 20)" : ""));
         Console.WriteLine();
 

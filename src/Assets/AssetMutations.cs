@@ -29,9 +29,24 @@ public sealed class SetAssetProperties(
     public string Describe() => $"set {kind} properties on {AssetSearch.Named(spec)}";
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Two owners rather than one, because a block is two things at once: an item
+    /// while it is carried, and a block once it is placed. The shared half is applied
+    /// to everything matched, and the block half only to what a script wrote the block
+    /// shape for.
+    /// </remarks>
     public int Apply(ICoreServerAPI api)
     {
-        foreach (var asset in matched) CollectibleProperties.ApplyTo(asset, spec, stacks, Origin);
+        foreach (var asset in matched)
+        {
+            CollectibleProperties.ApplyTo(asset, spec, stacks, Origin);
+
+            if (spec is BlockPropertiesSpec blocks && asset is Block block)
+            {
+                BlockProperties.ApplyTo(block, blocks, stacks, Origin);
+            }
+        }
+
         return matched.Count;
     }
 }

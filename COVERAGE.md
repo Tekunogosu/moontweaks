@@ -11,15 +11,18 @@ though nobody had looked at it.
 | Area | Reached | Missing in one line |
 | --- | --- | --- |
 | Recipes | every kind | Kinds other mods declare |
-| Item and block properties | 16 fields | Creative tabs, spoilage list, tool class, light |
-| Players | 20 functions | Rest of inventory, privileges, listing who is online |
-| World | 5 functions | Calendar, entities, sound, area scans, block entities |
+| Item properties | 15 fields | Creative tabs, spoilage list, particles |
+| Block properties | 12 further fields | Sounds, collision boxes, crop behaviour, decor |
+| Players | 33 functions | Inventory past `give`, groups, connection facts |
+| World | 15 functions | Entities, block entities, area scans, sound, explosions |
+| Calendar | 8 functions | Nothing worth naming |
 | Events | 16 of 50 | See `TODO.md` for the classification |
-| Scheduling | nothing | A script cannot do anything on a timer |
+| Scheduling | 2 functions | Nothing worth naming |
 | Commands | declaring one | Editing a command another mod declared |
-| World-scoped storage | nothing | Only per-player data has a home |
-| Server state and control | nothing | Uptime, player count, config, shutdown |
-| Permissions | nothing | Privileges cannot be declared or checked |
+| Storage | per player and per world | Nothing worth naming |
+| Server state | facts and three rules | Shutdown, run phase, most of the config |
+| Permissions | reading them | Declaring, granting and revoking |
+| Other mods | naming and versions | Reaching into what one declared |
 
 ## Recipes
 
@@ -33,16 +36,26 @@ kind takes an output.
 
 Beyond the vanilla kinds, `RegisterRecipeRegistry` lets any mod declare a recipe
 kind of its own, and `RecipeRegistry` reaches only the seven the survival mod
-declares. A script therefore cannot touch a recipe kind another mod added. Doing
-so means resolving a registry by its code rather than by its type, which is a
-different lookup from the one that exists.
+declares. A script therefore cannot touch a recipe kind another mod added.
+`IWorldAccessor.GetRecipeRegistry(code)` is the lookup that would answer for one,
+and it is a different lookup from the by-type one that exists.
 
 ## Item and block properties
 
-`moontweaks.items.set` and `moontweaks.blocks.set` reach sixteen fields, which is
-most of what a server actually retunes: durability, stack size, tool tier, mining
-speed, attack power and range, material density, storage flags, tags, arbitrary
-attributes, and the combustible, grinding, crushing and nutrition property groups.
+`moontweaks.items.set` reaches the fifteen fields anything carried has: durability,
+stack size, tool class and tool tier, mining speed, attack power and range, material
+density, storage flags, what damages it, arbitrary attributes, and the combustible,
+grinding, crushing and nutrition property groups.
+
+`moontweaks.blocks.set` takes all of those and twelve more that only something
+standing in the world has: breaking resistance, required mining tier, block
+material, drops, light colour, light absorption, replaceability, fertility, walk
+speed, drag, climbability and rain permeability.
+
+Selecting is by `code`, which accepts a `*` wildcard, or by `tags`, or by both.
+Tags select on what an asset is rather than what it is called, so one entry reaches
+a modded axe as readily as a vanilla one. **Tags are read and never written**: a
+script cannot give an asset a tag it does not carry.
 
 Unbound, in the order they are likely to be wanted:
 
@@ -51,10 +64,12 @@ Unbound, in the order they are likely to be wanted:
 - `TransitionableProps` decides how something spoils, dries or ripens. The shape is
   bound already, since a cooking recipe writes one; an item carries a list of them
   where a meal carries one, and it is the list that is unreached.
-- `Tool` names which tool class an item counts as, which is separate from the
-  `toolTier` that is bound.
-- `LightHsv` makes a block glow.
-- `HeldSounds`, `LiquidSelectable`, `HeldPriorityInteract`, `ParticleProperties`.
+- `BlockSounds`, which decides what a block sounds like to walk on, break and place.
+- `CollisionBoxes` and `SelectionBoxes`, which are its shape as far as anything
+  bumping into it is concerned.
+- `CropProps`, which is a domain of its own rather than a field.
+- `AllowSpawnCreatureGroups`, `Dimensions`, `ParticleProperties`,
+  `LiquidSelectable`, `HeldPriorityInteract`, `HeldSounds`.
 - The model transforms, which decide how something is held and dropped. These are
   client-rendered and so are out of reach for the same reason names are.
 
@@ -64,16 +79,21 @@ which is the different mod that `TODO.md` describes under names and descriptions
 
 ## Players
 
-Nineteen functions reach where a player is, their health, hunger and tiredness,
-their mode, their spawn, whether they sleep, what they have eaten, their chat, and
-whatever a script chose to remember about them.
+Thirty-three functions reach where a player is and which way they face, their
+health, hunger and tiredness, their mode, their spawn, whether they sleep, what
+they have eaten, what they are looking at, what they may do, what their abilities
+come to, their chat, and whatever a script chose to remember about them.
 
-**Nothing lists players.** Every function takes an identifier, and the only source
-of one is an event handler. A script cannot ask who is online, so anything
-addressed to everybody — an announcement, a sweep over players, a count for a
-message — cannot be written. `IServerAPI.Players` and `world.AllOnlinePlayers`
-both answer it, and this is the smallest change on this page with the largest
-effect on what a script can be written to do.
+`players.all` lists who is online, which is the only source of a player identifier
+that is not an event, and `players.uidOf` turns a name somebody typed into one —
+answering for a player who is not here, which nothing else in the module does.
+`players.announce` reaches everybody without needing either.
+
+Stats — `stat`, `setStat`, `clearStat` — are how walk speed, healing and hunger
+rate are retuned per player. The game holds each ability as a set of named
+contributions added to a base of 1, so a script names its own and can take exactly
+that one back; contributions this mod writes carry its own prefix, so a script
+cannot clear one the game or another mod is holding.
 
 Also unbound:
 
@@ -81,61 +101,86 @@ Also unbound:
   says whether it fitted, which is the one piece a command giving something out
   needs. The rest of `IPlayerInventoryManager` — the hotbar, the held slot, reading
   or taking from what a player carries — is unreached, and is its own domain.
-- **Privileges.** `HasPrivilege` and `Privileges` are reads and safe. `SetRole` is
-  deliberately excluded, and a read is not the same thing: it lets a script gate
-  its own behaviour without granting anything.
-- **Richer messages.** `SendIngameError` and `SendIngameDiscovery` render
-  differently from ordinary chat, and `SendLocalisedMessage` renders in the
-  player's own language. `say` is the plain form of all three.
+- **Granting privileges.** Reading them is bound; `IPermissionManager` also declares,
+  grants, denies and revokes them, and none of that is. `SetRole` is deliberately
+  excluded: a script that can set roles can grant itself anything.
+- **Richer messages.** `SendIngameError` and `SendIngameDiscovery` render against
+  the client's own language files, and `SendLocalisedMessage` renders in the
+  player's own language. `players.warn` gets the error styling without the lookup,
+  which is as far as a server with no client half can go.
 - **Groups.** `Groups` and `GetGroup` name the chat groups a player belongs to,
-  which is what messaging anything other than general chat needs.
-- **What they are looking at.** `CurrentBlockSelection` and
-  `CurrentEntitySelection`.
+  which is what messaging anything other than general chat needs. `IGroupManager`
+  creates and removes them.
+- **What entity they are looking at.** `CurrentBlockSelection` is bound as
+  `players.looking`; `CurrentEntitySelection` waits on the entity domain.
 - **Connection facts.** `Ping`, `IpAddress`, `LanguageCode`, `ConnectionState`.
+- **Offline players past a name.** `IPlayerDataManager` answers for somebody who is
+  not here; `uidOf` uses it, and the rest of what it holds is unreached.
 
 ## World
 
-Five functions read a block, place one, queue a batch, commit it, and drop an item
-stack. Everything else the world offers is unreached.
+Fifteen functions read a block, place one, queue a batch, commit it, break a block
+properly, exchange one, drop a stack, ask whether a chunk is loaded, find the
+surface of a column, read light, climate and wind, outline blocks on a player's
+screen, and remember something against the save game.
 
-- **The calendar.** `IGameCalendar` gives hour of day, day of year, month, season,
-  year, moon phase and total elapsed time. Every one is a read of a value the game
-  already holds, so this is the cheapest useful domain left, and it is what any
-  script about seasons or time of day needs first.
+Still unreached:
+
 - **Entities.** `GetEntitiesAround`, `GetEntityById`, `SpawnEntity`,
-  `SpawnItemEntity`, `DespawnEntity`, `GetNearestEntity`. Nothing reaches an
-  entity that is not a player. Wants deciding first how a script names one.
+  `SpawnItemEntity`, `DespawnEntity`, `GetNearestEntity`,
+  `GetEntitiesInsideCuboid`. Nothing reaches an entity that is not a player. Wants
+  deciding first how a script names one.
 - **Players near a place.** `GetPlayersAround` and `NearestPlayer` answer for
-  players what the entity calls answer generally, and would work with the listing
-  gap above.
-- **Breaking a block properly.** `setBlock` replaces a block; `BlockAccessor.BreakBlock`
-  breaks it as a player would, with its drops and its sound. The two are not the
-  same operation and only one is offered.
+  players what the entity calls answer generally.
 - **Block entities.** `GetBlockEntity` reaches what a chest holds or what a firepit
-  is burning. Nothing reaches it.
+  is burning. `SpawnBlockEntity` and `RemoveBlockEntity` place and clear them.
+  Nothing reaches any of it.
 - **Area scans.** `WalkBlocks` and `SearchBlocks` walk a region inside the engine.
   A script doing the same through `blockAt` pays a call per block, which the README
   already warns is the expensive mistake — so the engine's own scan is the fix, not
-  just a convenience.
+  just a convenience. `WalkStructures` does the same for generated structures.
 - **Sound and particles.** `PlaySoundAt` and `SpawnParticles` are how a scripted
-  effect is noticed at all.
+  effect is noticed at all. Both are server-callable and reach a vanilla client, in
+  the same way `world.highlight` does.
+- **Undoing block edits.** `IBlockAccessorRevertable` records what it wrote so it
+  can be put back. Everything here writes through the plain accessor, so nothing a
+  script builds can be undone except by building the opposite.
+- **Loading chunks deliberately.** `world.isLoaded` says whether a chunk is there;
+  `IWorldManagerAPI.LoadChunkColumn` and `TestChunkExists` are how one is brought
+  in, and are unbound.
+- **Damaging a block short of breaking it.** `DamageBlock`.
+- **Decor.** `SetDecor`, `GetDecors` and `BreakDecor` reach the layer a block
+  carries on its faces.
 - **Explosions.** `CreateExplosion`.
 - **Land claims.** `ILandClaimAPI` decides who may build where, which anything
-  editing blocks on a populated server has to respect.
-- **World facts.** Seed, sea level, map size, default spawn, light levels, and the
-  world configuration that `classExclusiveRecipes` is read from.
+  editing blocks on a populated server has to respect. `TestAccess` asks, and `Add`
+  and `Remove` change them.
+- **Ray casting.** `RayTraceForSelection` answers what is along a line, which is
+  what a reach test or a line-of-sight check needs.
+- **World facts a script cannot change.** Light level tables, sun brightness, sea
+  level as a setting rather than a reading, and the world configuration that
+  `classExclusiveRecipes` is read from.
+
+## Calendar
+
+`moontweaks.calendar` reads the clock — hour, day, month, year, moon phase, elapsed
+hours and days, and the game's own pretty date — as one table, and reads season and
+hemisphere at a position, since the two halves of the world are half a year apart.
+
+It also writes: `add` moves time itself, so everything ageing by the clock ages
+with it; `setSpeed` and `clearSpeed` change how fast it passes, under a name so two
+scripts do not undo each other; `setSeason` and `clearSeason` hold the world at a
+point in the year.
 
 ## Scheduling
 
-Nothing. `RegisterGameTickListener`, `RegisterCallback` and `Event.Timer` are all
-unbound, so a script can react to something the game raises and can do nothing on
-its own schedule.
+`moontweaks.server.every` and `after` register a repeating and a one-shot callback,
+and a handler answering `false` stops a repeating one. A timer asked for while
+scripts load starts only once the run has succeeded, so `/moontweaks check` starts
+nothing; one asked for inside a handler starts at once.
 
-This is structural rather than a missing convenience: a whole shape of server
-script — every so often, check something and act — cannot be written at all. The
-interpreter already outlives the run that made it, which is the hard part, so what
-is left is a domain that registers a callback and a decision about what happens to
-a listener when a script fails.
+`Event.Timer` and the position-keyed listener overloads are unbound and want a
+reason before they are added.
 
 ## Commands
 
@@ -150,46 +195,78 @@ the line as typed and the server reads it. Declaring one still happens as the se
 loads, so a new command wants a restart the way a new recipe does.
 
 What is not reached: a command another mod already declared cannot be added to or
-altered, since the game allows one owner per name and this refuses a name that is
-taken. Nesting stops nowhere in particular here but the game's own `BeginSubCommand`
-nests indefinitely, which this follows.
+altered. That is this mod's own rule rather than the game's —
+`IChatCommandApi.GetOrCreate` hands back a command that already exists and
+`BeginSubCommand` nests onto it — and it is held because two mods extending one
+command have no way to agree on what its arguments mean.
 
-## World-scoped storage
+`IChatCommandApi.Execute` runs a command a script did not declare, which nothing
+here offers.
+
+## Storage
 
 `players.setData` and `players.getData` store against a player and are saved with
-them. There is no equivalent for the world: `ISaveGame.StoreData` holds data
-against the save game itself, and `StoreModConfig` and `LoadModConfig` hold it in a
-file beside the scripts.
+them. `world.setData` and `world.getData` store against the save game, which is the
+home for anything counted across everybody rather than for each of them. Both take
+any value a script can write, a table included, and both scope their keys under this
+mod so a script cannot read or overwrite what another mod stored.
 
-So a script can remember something about each player and nothing about the world.
-Anything counted, accumulated or tracked globally has nowhere to live.
+`StoreModConfig` and `LoadModConfig` hold data in a file beside the scripts rather
+than in the save, and are unbound: a script wanting a file wants it for a reason
+that has not come up.
 
 ## Server state and control
 
-`IServerAPI` gives uptime, total play time, the current run phase, whether the
-server is shutting down, the player list, and `ShutDown`. `IServerConfig` gives the
-server name, the welcome message, the maximum client count, and the flags for PvP,
-fire spread and falling blocks — several of them settable.
+`moontweaks.server.info` reads the server's name, its welcome message, how many
+players it allows and how many are here, its uptime, total play time, world name,
+seed, sea level and map size. `rules` and `setRules` read and change PvP, fire
+spread and falling blocks, written back to the server's configuration so they
+survive a restart.
 
-None of it is bound. A script cannot say how long the server has been up, cannot
-read the rules it is running under, and cannot change them.
+Unbound: `ShutDown`, `CurrentRunPhase`, `IsShuttingDown`, and the rest of
+`IServerConfig` — the password, the whitelist mode, the tick rate, the chunk radius
+and the roles. Several are settable and none are things a script should change
+casually, which is why they wait on the per-command permissions entry in `TODO.md`.
 
 ## Permissions
 
-`IPermissionManager` declares privileges and grants, denies and revokes them, per
-player or per group. Nothing is bound, and the per-command permissions entry in
-`TODO.md` is held pending more of the API precisely so that what is worth gating is
-known before the gates are built. `RegisterPrivilege` is what a script would need
-to gate anything of its own.
+`players.hasPrivilege` and `players.privileges` read what a server has already
+decided. `IPermissionManager` also declares privileges and grants, denies and
+revokes them, per player or per group; none of that is bound, and the per-command
+permissions entry in `TODO.md` is held pending it, precisely so that what is worth
+gating is known before the gates are built.
+
+## Other mods
+
+`moontweaks.mods` says whether a mod is loaded, what version it declares and what
+it calls itself, and lists them all. This is what lets one script serve two servers:
+every other binding refuses a code the server does not have, so naming another mod's
+items is only safe inside a guard that has asked first.
+
+What it does not do is reach into what another mod declared — its recipe registries,
+its mod systems, its own settings. `IModLoader.GetModSystem` is how that would be
+done, and it couples this mod to another's internals in a way the vanilla API does
+not, which is a decision rather than an oversight.
+
+The survival and essentials mods are where a good deal of a server's behaviour
+actually lives: `WeatherSystemServer` overrides precipitation and spawns lightning,
+`SystemTemporalStability` answers how stable somewhere is, and
+`ModSystemBlockReinforcement` decides what may be broken. All three are reachable
+only through `GetModSystem`, and all three would tie this to their versions.
 
 ## Deliberately out of scope
 
 - **Anything client-side.** Rendering, GUI, sounds a client picks, model
   transforms, and item names and descriptions all live on the client and are
   unreachable without shipping this mod to every player. `TODO.md` records the
-  reasoning under names and descriptions.
+  reasoning under names and descriptions. `world.highlight` is the exception that
+  proves it: the game already ships that drawing, so a server may point it at
+  whatever it likes without the client knowing what a mod is.
 - **Networking.** `INetworkAPI` sends packets between a mod's own server and client
   halves. There is no client half.
+- **The mod event bus.** `Event.PushEvent` and `RegisterEventBusListener` carry
+  signals between mods. Same coupling question as `GetModSystem`, and no script has
+  wanted one yet.
 - **Worldgen.** `MapChunkGeneration`, `ChunkColumnGeneration` and the tree
   generators all run on the generation thread, so they sit behind the same
   main-thread marshalling that `TODO.md` describes for off-thread events.

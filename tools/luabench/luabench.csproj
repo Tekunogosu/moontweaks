@@ -1,15 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Measures one script engine against another behind the same IScriptHost, so a
-       swap can be judged on numbers rather than on the claims of either. Runs
-       outside the game: no server, no world, no waiting. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
+    <AssemblyName>moontweaks-luabench</AssemblyName>
+    <RootNamespace>MoonTweaks.LuaBench</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <AssemblyName>luabench</AssemblyName>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <Nullable>enable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Server GC changes what an allocation costs, and the game's server does not
+         use it, so the figures are taken under the collector the mod runs under. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -18,18 +20,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="LuaCSharp" Version="0.5.6" />
+    <ProjectReference Include="../../moontweaks.csproj" />
   </ItemGroup>
 
-  <!-- The mod is referenced as a built assembly rather than as a project, so the
-       benchmark measures exactly what a server would load. -->
+  <!-- The scripting layer needs none of these, but the assembly it lives in is
+       compiled against them, so they have to be here to load it. -->
   <ItemGroup>
-    <Reference Include="moontweaks">
-      <HintPath>$(MSBuildThisFileDirectory)../../bin/Release/moontweaks.dll</HintPath>
-    </Reference>
-    <Reference Include="VintagestoryAPI"><HintPath>$(VintageStoryDir)/VintagestoryAPI.dll</HintPath></Reference>
-    <Reference Include="VintagestoryLib"><HintPath>$(VintageStoryDir)/VintagestoryLib.dll</HintPath></Reference>
-    <Reference Include="Newtonsoft.Json"><HintPath>$(VintageStoryDir)/Lib/Newtonsoft.Json.dll</HintPath></Reference>
+    <Reference Include="VintagestoryAPI"><HintPath>$(VintageStoryDir)/VintagestoryAPI.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="VintagestoryLib"><HintPath>$(VintageStoryDir)/VintagestoryLib.dll</HintPath><Private>true</Private></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(VintageStoryDir)/Lib/Newtonsoft.Json.dll</HintPath><Private>true</Private></Reference>
   </ItemGroup>
 
 </Project>
