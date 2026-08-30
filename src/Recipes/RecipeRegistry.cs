@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Common;
-using Vintagestory.API.Util;
 using Vintagestory.GameContent;
 
 namespace MoonTweaks.Recipes;
@@ -139,16 +138,8 @@ public sealed class RecipeRegistry
     /// Removes every recipe of one kind whose output the selector names, and says how
     /// many went.
     /// </summary>
-    public int Remove<TRecipe>(RecipeSelector selector) where TRecipe : class
-    {
-        var registered = ListOf<TRecipe>();
-        var doomed = registered
-            .Where(recipe => selector.Matches(ProductOf(recipe)))
-            .ToList();
-
-        foreach (var recipe in doomed) registered.Remove(recipe);
-        return doomed.Count;
-    }
+    public int Remove<TRecipe>(RecipeSelector selector) where TRecipe : class =>
+        ListOf<TRecipe>().RemoveAll(recipe => selector.Matches(ProductOf(recipe)));
 
     /// <summary>
     /// What one recipe produces: the code it names, and the stack that code resolved
@@ -158,14 +149,14 @@ public sealed class RecipeRegistry
     private static RecipeProduct ProductOf(object recipe) => recipe switch
     {
         AlloyRecipe alloy => new(alloy.Output?.Code, alloy.Output?.ResolvedItemstack),
-        RecipeBase basic => new(OutputCodeOf(basic), basic.RecipeOutput?.ResolvedItemStack),
+        RecipeBase basic => new(OutputCodeOf(basic), basic.RecipeOutput.ResolvedItemStack),
         _ => new(null, null),
     };
 
     /// <summary>The code a recipe's output names, for the kinds built on the game's base.</summary>
     private static AssetLocation? OutputCodeOf(RecipeBase recipe) => recipe switch
     {
-        LayeredVoxelRecipe voxel => voxel.Output?.Code,
+        LayeredVoxelRecipe voxel => voxel.Output.Code,
         BarrelRecipe barrel => barrel.Output?.Code,
         _ => null,
     };

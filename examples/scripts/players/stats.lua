@@ -39,8 +39,8 @@ end)
 -- A curse that outlives the session. `persistent` writes it with the player, so it
 -- is still there after a restart and has to be cleared deliberately.
 events.playerDeath(function(e)
-  local deaths = (players.getData(e.player, "deaths") or 0) + 1
-  players.setData(e.player, "deaths", deaths)
+  local deaths = (players.getWorldData(e.player, "deaths") or 0) + 1
+  players.setWorldData(e.player, "deaths", deaths)
 
   if deaths >= 5 then
     players.setStat {
@@ -63,7 +63,7 @@ moontweaks.commands.add {
   args = { { name = "who", type = "player" } },
   handler = function(e)
     players.clearStat(e.args.who, "healingeffectivness", "scarred")
-    players.setData(e.args.who, "deaths", 0)
+    players.setWorldData(e.args.who, "deaths", 0)
     return ("%s heals normally again."):format(players.name(e.args.who))
   end,
 }

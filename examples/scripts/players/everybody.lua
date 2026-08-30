@@ -57,7 +57,7 @@ commands.add {
 
     -- What was stored against them is still readable while they are away; their
     -- position is not, because they have none.
-    local left = players.getData(who, "leftAt")
+    local left = players.getWorldData(who, "leftAt")
     if not left then return ("%s has been here, but not lately."):format(e.args.name) end
 
     return ("%s was last at %d %d %d."):format(e.args.name, left.x, left.y, left.z)

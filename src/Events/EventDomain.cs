@@ -22,7 +22,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("didUseBlock")]
     public void DidUseBlock(
         ScriptOrigin origin, [LuaPayload(typeof(BlockEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.DidUseBlock, origin, handler, events.SubscribeDidUseBlock);
+        events.OnDidUseBlock(origin, handler);
 
     /// <summary>
     /// Called after a player breaks a block. The block is the one that stood there:
@@ -33,7 +33,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("didBreakBlock")]
     public void DidBreakBlock(
         ScriptOrigin origin, [LuaPayload(typeof(BlockEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.DidBreakBlock, origin, handler, events.SubscribeDidBreakBlock);
+        events.OnDidBreakBlock(origin, handler);
 
     /// <summary>Called when a player joins.</summary>
     /// <param name="origin">Script line adding the handler.</param>
@@ -41,7 +41,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("playerJoin")]
     public void PlayerJoin(
         ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.PlayerJoin, origin, handler, events.SubscribePlayerJoin);
+        events.OnPlayerJoin(origin, handler);
 
     /// <summary>Called when a player dies.</summary>
     /// <param name="origin">Script line adding the handler.</param>
@@ -49,7 +49,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("playerDeath")]
     public void PlayerDeath(
         ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.PlayerDeath, origin, handler, events.SubscribePlayerDeath);
+        events.OnPlayerDeath(origin, handler);
 
     /// <summary>Called when a player respawns.</summary>
     /// <param name="origin">Script line adding the handler.</param>
@@ -57,7 +57,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("playerRespawn")]
     public void PlayerRespawn(
         ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.PlayerRespawn, origin, handler, events.SubscribePlayerRespawn);
+        events.OnPlayerRespawn(origin, handler);
 
     /// <summary>
     /// Called the first time a player ever joins this world, before they are welcomed.
@@ -69,7 +69,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("playerCreate")]
     public void PlayerCreate(
         ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.PlayerCreate, origin, handler, events.SubscribePlayerCreate);
+        events.OnPlayerCreate(origin, handler);
 
     /// <summary>Called once a joining player is in the world and has been welcomed.</summary>
     /// <param name="origin">Script line adding the handler.</param>
@@ -77,7 +77,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("playerNowPlaying")]
     public void PlayerNowPlaying(
         ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.PlayerNowPlaying, origin, handler, events.SubscribePlayerNowPlaying);
+        events.OnPlayerNowPlaying(origin, handler);
 
     /// <summary>
     /// Called when a joining player's client reports that it has finished. The last
@@ -89,7 +89,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("playerReady")]
     public void PlayerReady(
         ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.PlayerReady, origin, handler, events.SubscribePlayerReady);
+        events.OnPlayerReady(origin, handler);
 
     /// <summary>
     /// Called when a player quits of their own accord, before they are removed. One
@@ -100,7 +100,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("playerLeave")]
     public void PlayerLeave(
         ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.PlayerLeave, origin, handler, events.SubscribePlayerLeave);
+        events.OnPlayerLeave(origin, handler);
 
     /// <summary>
     /// Called as a player is removed, however they went: a quit, a kick and a lost
@@ -111,7 +111,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("playerDisconnect")]
     public void PlayerDisconnect(
         ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.PlayerDisconnect, origin, handler, events.SubscribePlayerDisconnect);
+        events.OnPlayerDisconnect(origin, handler);
 
     /// <summary>
     /// Called after a player changes game mode, so asking them their mode gives the
@@ -122,7 +122,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("playerSwitchGameMode")]
     public void PlayerSwitchGameMode(
         ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.PlayerSwitchGameMode, origin, handler, events.SubscribePlayerSwitchGameMode);
+        events.OnPlayerSwitchGameMode(origin, handler);
 
     /// <summary>
     /// Called once the save game has been read, which is after every script has run.
@@ -132,7 +132,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("saveGameLoaded")]
     public void SaveGameLoaded(
         ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.SaveGameLoaded, origin, handler, events.SubscribeSaveGameLoaded);
+        events.OnSaveGameLoaded(origin, handler);
 
     /// <summary>
     /// Called on the one start where the world is brand new, immediately before
@@ -143,7 +143,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("saveGameCreated")]
     public void SaveGameCreated(
         ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.SaveGameCreated, origin, handler, events.SubscribeSaveGameCreated);
+        events.OnSaveGameCreated(origin, handler);
 
     /// <summary>
     /// Called as the world is written to disk, which a server does periodically and
@@ -155,7 +155,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("gameWorldSave")]
     public void GameWorldSave(
         ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.GameWorldSave, origin, handler, events.SubscribeGameWorldSave);
+        events.OnGameWorldSave(origin, handler);
 
     /// <summary>
     /// Called once the world generators are starting, which is the last thing a
@@ -166,7 +166,7 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("worldgenStartup")]
     public void WorldgenStartup(
         ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.WorldgenStartup, origin, handler, events.SubscribeWorldgenStartup);
+        events.OnWorldgenStartup(origin, handler);
 
     /// <summary>
     /// Called when a server that had suspended itself for want of players wakes up
@@ -177,5 +177,5 @@ public sealed class EventDomain(ScriptEvents events)
     [LuaFunction("serverResume")]
     public void ServerResume(
         ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
-        events.On(ScriptEvents.ServerResume, origin, handler, events.SubscribeServerResume);
+        events.OnServerResume(origin, handler);
 }

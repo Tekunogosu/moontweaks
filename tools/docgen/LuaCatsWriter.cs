@@ -22,7 +22,7 @@ public static class LuaCatsWriter
         output.AppendLine("--- Generated from the mod's bindings; do not edit.");
         // Everything the header does not itself contain, so a reader of one line
         // can tell whether a file on disk is the one this build would write.
-        output.AppendLine($"{LibraryHeader.BuildMarker}{LibraryHeader.Fingerprint(api.Version + body)}");
+        output.AppendLine($"{LibraryHeader.BUILD_MARKER}{LibraryHeader.Fingerprint(api.Version + body)}");
         output.AppendLine();
         output.Append(body);
         return output.ToString();

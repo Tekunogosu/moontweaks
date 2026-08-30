@@ -12,25 +12,63 @@ namespace MoonTweaks.LuaBench;
 public static class Report
 {
     /// <summary>Width of the case-name column, wide enough for the longest case.</summary>
-    private const int NameWidth = 34;
+    private const int NAME_WIDTH = 34;
 
     /// <summary>Width of one engine's column.</summary>
-    private const int EngineWidth = 20;
+    private const int ENGINE_WIDTH = 20;
 
     /// <summary>Width of the column comparing two engines.</summary>
-    private const int RatioWidth = 12;
+    private const int RATIO_WIDTH = 12;
 
     /// <summary>Writes the table a person reads.</summary>
     public static void Text(
-        IReadOnlyList<EngineResult> engines, IReadOnlyList<Disagreement> disagreements, bool quick)
+        IReadOnlyList<EngineResult> engines,
+        IReadOnlyList<Timing> binder,
+        IReadOnlyList<Disagreement> disagreements,
+        bool quick)
     {
         Console.WriteLine($"MoonTweaks scripting on .NET {Environment.Version}"
                           + (quick ? "  (--quick: counts divided by 20)" : ""));
+
+        if (quick)
+        {
+            // Learned the hard way: a quick row can read five times slow, which is
+            // enough to invent a regression that is not there or hide one that is.
+            Console.WriteLine();
+            Console.WriteLine("Quick counts are too low for the runtime to finish optimising, so every");
+            Console.WriteLine("figure below reads slow. Compare a quick run against another quick run;");
+            Console.WriteLine("never against a full one.");
+        }
+
         Console.WriteLine();
 
         WriteParity(engines, disagreements);
         Console.WriteLine();
         WriteCost(engines);
+        Console.WriteLine();
+        WriteBinder(binder);
+    }
+
+    /// <summary>
+    /// Writes what the layer above the engine costs. One column rather than one per
+    /// engine, because every engine reaches it through the same neutral values and
+    /// none of them can make it cost anything different.
+    /// </summary>
+    private static void WriteBinder(IReadOnlyList<Timing> binder)
+    {
+        Console.Write($"Binder{new string(' ', NAME_WIDTH - 6)}");
+        Console.WriteLine(Centre("all engines", ENGINE_WIDTH));
+        Console.WriteLine(new string('-', NAME_WIDTH + ENGINE_WIDTH));
+
+        foreach (var subject in binder)
+        {
+            Console.Write(Truncate(subject.Case, NAME_WIDTH).PadRight(NAME_WIDTH));
+            Console.WriteLine($"{subject.Nanoseconds,10:F1} ns {subject.Bytes,6:F0} B".PadLeft(ENGINE_WIDTH));
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("A bind is one crossing from a script into a binding; a write is one table");
+        Console.WriteLine("handed to a handler, which a server does once per event and once per timer tick.");
     }
 
     /// <summary>Writes what the engines agreed and disagreed about.</summary>
@@ -84,32 +122,32 @@ public static class Report
         // figures are what compares them, and a single column could only pick a pair.
         var pair = engines.Count == 2;
 
-        Console.Write($"Cost{new string(' ', NameWidth - 4)}");
-        foreach (var engine in engines) Console.Write(Centre(engine.Engine, EngineWidth));
-        if (pair) Console.Write(Centre("speedup", RatioWidth));
+        Console.Write($"Cost{new string(' ', NAME_WIDTH - 4)}");
+        foreach (var engine in engines) Console.Write(Centre(engine.Engine, ENGINE_WIDTH));
+        if (pair) Console.Write(Centre("speedup", RATIO_WIDTH));
         Console.WriteLine();
 
         Console.WriteLine(new string('-',
-            NameWidth + EngineWidth * engines.Count + (pair ? RatioWidth : 0)));
+            NAME_WIDTH + ENGINE_WIDTH * engines.Count + (pair ? RATIO_WIDTH : 0)));
 
         foreach (var subject in baseline.Timings)
         {
-            Console.Write(Truncate(subject.Case, NameWidth).PadRight(NameWidth));
+            Console.Write(Truncate(subject.Case, NAME_WIDTH).PadRight(NAME_WIDTH));
 
             foreach (var engine in engines)
             {
                 var timing = engine.Timings.FirstOrDefault(other => other.Case == subject.Case);
                 Console.Write(timing is null
-                    ? "-".PadLeft(EngineWidth)
-                    : $"{timing.Nanoseconds,10:F1} ns {timing.Bytes,6:F0} B".PadLeft(EngineWidth));
+                    ? "-".PadLeft(ENGINE_WIDTH)
+                    : $"{timing.Nanoseconds,10:F1} ns {timing.Bytes,6:F0} B".PadLeft(ENGINE_WIDTH));
             }
 
             if (pair)
             {
                 var other = engines[1].Timings.FirstOrDefault(entry => entry.Case == subject.Case);
                 Console.Write(other is null || other.Nanoseconds <= 0
-                    ? "".PadLeft(RatioWidth)
-                    : $"{subject.Nanoseconds / other.Nanoseconds,8:F1}x".PadLeft(RatioWidth));
+                    ? "".PadLeft(RATIO_WIDTH)
+                    : $"{subject.Nanoseconds / other.Nanoseconds,8:F1}x".PadLeft(RATIO_WIDTH));
             }
 
             Console.WriteLine();
@@ -128,12 +166,16 @@ public static class Report
     }
 
     /// <summary>Writes the same results for something other than a person to read.</summary>
-    public static void Json(IReadOnlyList<EngineResult> engines, IReadOnlyList<Disagreement> disagreements)
+    public static void Json(
+        IReadOnlyList<EngineResult> engines,
+        IReadOnlyList<Timing> binder,
+        IReadOnlyList<Disagreement> disagreements)
     {
         var document = new
         {
             runtime = Environment.Version.ToString(),
             agreed = !disagreements.Any(entry => entry.Unexplained),
+            binder = binder.Select(Written),
             disagreements = disagreements.Select(entry => new
             {
                 check = entry.Check,
@@ -147,19 +189,26 @@ public static class Report
             {
                 name = engine.Engine,
                 checks = engine.Checks,
-                timings = engine.Timings.Select(timing => new
-                {
-                    @case = timing.Case,
-                    unit = timing.Unit,
-                    iterations = timing.Iterations,
-                    nanoseconds = Math.Round(timing.Nanoseconds, 2),
-                    bytes = Math.Round(timing.Bytes, 1),
-                }),
+                timings = engine.Timings.Select(Written),
             }),
         };
 
         Console.WriteLine(JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = true }));
     }
+
+    /// <summary>One timing as something other than a person reads it.</summary>
+    /// <remarks>
+    /// Sole owner of that shape, so a row measuring an engine and a row measuring the
+    /// binder are written out the same way and read by the same code.
+    /// </remarks>
+    private static object Written(Timing timing) => new
+    {
+        @case = timing.Case,
+        unit = timing.Unit,
+        iterations = timing.Iterations,
+        nanoseconds = Math.Round(timing.Nanoseconds, 2),
+        bytes = Math.Round(timing.Bytes, 1),
+    };
 
     /// <summary>A heading centred in its column.</summary>
     private static string Centre(string text, int width)

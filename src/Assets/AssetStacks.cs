@@ -1,9 +1,6 @@
-using System;
 using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Scripting;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
@@ -36,22 +33,29 @@ public sealed class AssetStacks(IWorldAccessor world)
     };
 
     /// <summary>
+    /// Resolves a stack against the registries, failing loudly. Sole owner of that
+    /// step: the game's own resolve reports a failure only to the log and leaves the
+    /// stack behind holding nothing, which reaches a player as an item that silently
+    /// never arrives. Named here instead, against the field the script wrote.
+    /// </summary>
+    public JsonItemStack Resolve(JsonItemStack stack, ScriptOrigin origin, string path)
+    {
+        if (!stack.Resolve(world, $"moontweaks {origin}") || stack.ResolvedItemstack is null)
+        {
+            throw new ScriptError(origin, $"{path} names '{stack.Code}', which resolved to nothing");
+        }
+
+        return stack;
+    }
+
+    /// <summary>
     /// A named asset as the stack the game hands out, attributes and all. Sole owner
     /// of turning what a script wrote into a stack something can be given: the code
     /// is checked against the registries and the attributes are applied exactly as
     /// the game applies its own, so a scripted pie is the pie a recipe would make.
     /// </summary>
-    public ItemStack Resolved(StackSpec spec, ScriptOrigin origin, string path)
-    {
-        var stack = Stack(spec, origin, path);
-
-        if (!stack.Resolve(world, $"moontweaks {origin}") || stack.ResolvedItemstack is null)
-        {
-            throw new ScriptError(origin, $"{path} names '{spec.Code}', which resolved to nothing");
-        }
-
-        return stack.ResolvedItemstack;
-    }
+    public ItemStack Resolved(StackSpec spec, ScriptOrigin origin, string path) =>
+        Resolve(Stack(spec, origin, path), origin, path).ResolvedItemstack!;
 
     /// <summary>
     /// How something changes once it stops being fresh, as the game holds it. Sole
@@ -93,13 +97,15 @@ public sealed class AssetStacks(IWorldAccessor world)
     /// </param>
     public ComplexTagCondition<TagSet> Condition(string[]? tags, ScriptOrigin origin, string path)
     {
-        if (tags is null || tags.Length == 0) return default;
+        if (tags is null or { Length: 0 }) return default;
 
         var registry = world.Api.CollectibleTagRegistry;
 
         // The registry reports which names it did not know rather than guessing, so
         // a misspelled tag names itself instead of silently matching nothing.
-        if (registry.TryCreateTagSet(out var required, tags) is var error && error != TagRegistryError.None)
+        var error = registry.TryCreateTagSet(out var required, tags);
+
+        if (error != TagRegistryError.None)
         {
             var unknown = tags.Where(tag =>
                 registry.TryCreateTagSet(out _, [tag]) != TagRegistryError.None).ToList();

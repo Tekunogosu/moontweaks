@@ -14,13 +14,13 @@ namespace MoonTweaks.Host;
 public static class EditorSupport
 {
     /// <summary>Folder the library is written to, beside the scripts folder.</summary>
-    public const string LibraryFolder = "library";
+    public const string LIBRARY_FOLDER = "library";
 
     /// <summary>Folder the shipped examples are written to, for copying into scripts.</summary>
-    public const string ExamplesFolder = "examples";
+    public const string EXAMPLES_FOLDER = "examples";
 
-    private const string LibraryResource = "MoonTweaks.library.moontweaks.lua";
-    private const string ExamplePrefix = "MoonTweaks.examples.";
+    private const string LIBRARY_RESOURCE = "MoonTweaks.library.moontweaks.lua";
+    private const string EXAMPLE_PREFIX = "MoonTweaks.examples.";
 
     /// <summary>How a scaffolded file is kept current.</summary>
     private enum Upkeep
@@ -48,11 +48,11 @@ public static class EditorSupport
     /// </summary>
     private static IEnumerable<Scaffold> Scaffolds()
     {
-        yield return new(LibraryResource, $"{LibraryFolder}/moontweaks.lua", Upkeep.Stamped);
+        yield return new(LIBRARY_RESOURCE, $"{LIBRARY_FOLDER}/moontweaks.lua", Upkeep.Stamped);
         yield return new("MoonTweaks.luarc.json", ".luarc.json", Upkeep.Seeded);
         yield return new("MoonTweaks.vscode.extensions.json", ".vscode/extensions.json", Upkeep.Seeded);
 
-        foreach (var resource in Resources(ExamplePrefix))
+        foreach (var resource in Resources(EXAMPLE_PREFIX))
         {
             yield return new(resource, LocationOf(resource), Upkeep.Mirrored);
         }
@@ -70,16 +70,16 @@ public static class EditorSupport
     /// </remarks>
     private static string LocationOf(string resource)
     {
-        var parts = resource[ExamplePrefix.Length..].Split('.');
+        var parts = resource[EXAMPLE_PREFIX.Length..].Split('.');
         var file = string.Join('.', parts[^2..]);
 
-        return string.Join('/', parts[..^2].Prepend(ExamplesFolder).Append(file));
+        return string.Join('/', parts[..^2].Prepend(EXAMPLES_FOLDER).Append(file));
     }
 
     /// <summary>Writes every scaffolded file the folder does not already have current.</summary>
     public static void Install(string folder, ILogger logger)
     {
-        if (Read(LibraryResource) is null)
+        if (Read(LIBRARY_RESOURCE) is null)
         {
             // A build that skipped the reference generator still runs scripts; it
             // just cannot describe itself to an editor.
@@ -132,12 +132,12 @@ public static class EditorSupport
     /// made there does not survive a restart anyway. Left alone, a renamed or
     /// regrouped example would leave its old copy behind for good, going on
     /// demonstrating an API that may no longer exist. Nothing outside
-    /// <see cref="ExamplesFolder"/> is touched, and neither is anything that is not a
+    /// <see cref="EXAMPLES_FOLDER"/> is touched, and neither is anything that is not a
     /// script.
     /// </remarks>
     private static IReadOnlyList<string> Prune(string folder, HashSet<string> shipped)
     {
-        var examples = Path.Combine(folder, ExamplesFolder);
+        var examples = Path.Combine(folder, EXAMPLES_FOLDER);
         if (!Directory.Exists(examples)) return [];
 
         var removed = new List<string>();

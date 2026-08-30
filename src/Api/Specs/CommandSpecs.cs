@@ -4,6 +4,28 @@ namespace MoonTweaks.Api;
 
 // What a script writes to give players something to type.
 
+/// <summary>What kind of value a command reads from what was typed after its name.</summary>
+public enum ArgumentKind
+{
+    /// <summary>One word.</summary>
+    Word,
+
+    /// <summary>A whole number.</summary>
+    Int,
+
+    /// <summary>A number, whole or not.</summary>
+    Number,
+
+    /// <summary>On or off.</summary>
+    Bool,
+
+    /// <summary>Everything left on the line, spaces included.</summary>
+    Text,
+
+    /// <summary>A player who is online, which a handler is given the identifier of.</summary>
+    Player,
+}
+
 /// <summary>One value a command takes after its name.</summary>
 [LuaTable("CommandArgument")]
 public sealed class CommandArgumentSpec

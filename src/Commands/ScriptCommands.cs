@@ -32,9 +32,6 @@ public sealed class ScriptCommands(ICoreServerAPI api, IReadOnlyCollection<strin
     private readonly HashSet<string> already =
         new(ours ?? [], StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>How many commands were declared, for the startup report.</summary>
-    public int Count => declared.Count;
-
     /// <summary>The names declared, in the order scripts asked for them.</summary>
     public IEnumerable<string> Names => declared.Select(command => command.Name);
 
@@ -55,7 +52,7 @@ public sealed class ScriptCommands(ICoreServerAPI api, IReadOnlyCollection<strin
         if (!already.Contains(spec.Name) && api.ChatCommands.Get(spec.Name.ToLowerInvariant()) is not null)
         {
             throw new ScriptError(origin,
-                $"'{spec.Name}' is already a command on this server, and the game allows only one of each name");
+                $"'{spec.Name}' is already a command on this server.");
         }
 
         declared.Add(spec);
@@ -96,7 +93,7 @@ public sealed class ScriptCommands(ICoreServerAPI api, IReadOnlyCollection<strin
                     $"{path} argument '{argument.Name}' lists values, which only a 'word' accepts");
             }
 
-            if (argument.Optional && argument.Type == ArgumentKind.Player)
+            if (argument is { Optional: true, Type: ArgumentKind.Player })
             {
                 throw new ScriptError(origin,
                     $"{path} argument '{argument.Name}' is a player and cannot be optional, "
@@ -258,6 +255,6 @@ public sealed class ScriptCommands(ICoreServerAPI api, IReadOnlyCollection<strin
         ScriptValue.Str message => TextCommandResult.Success(message.Value),
         ScriptValue.Map map when map.Entries.TryGetValue("error", out var problem) =>
             TextCommandResult.Error(problem is ScriptValue.Str said ? said.Value : "the command failed"),
-        _ => TextCommandResult.Success(""),
+        _ => TextCommandResult.Success(),
     };
 }

@@ -44,7 +44,7 @@ Write(Path.Combine(outputDir, "library", "moontweaks.lua"), LuaCatsWriter.Write(
 
 // A server writes the real one from its own registries. This empty one defines the
 // alias so a checkout type-checks without a game to read codes out of.
-Write(Path.Combine(outputDir, "library", MoonTweaks.Host.AssetCodeLibrary.FileName),
+Write(Path.Combine(outputDir, "library", MoonTweaks.Host.AssetCodeLibrary.FILE_NAME),
     MoonTweaks.Host.AssetCodeLibrary.Render(MoonTweaks.Host.AssetCodeLibrary.SetsOf(null)));
 Write(Path.Combine(outputDir, "index.html"), HtmlWriter.Write(api));
 

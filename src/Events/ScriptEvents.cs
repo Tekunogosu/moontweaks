@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
@@ -13,66 +14,129 @@ namespace MoonTweaks.Events;
 /// function is called back. Sole owner of what happens when one of them fails.
 /// </summary>
 /// <remarks>
-/// Subscriptions are taken out once, when the first handler for an event arrives,
-/// and the handlers are held here. Only events the game raises on its main thread
-/// are offered: the interpreter is not thread safe, and nothing here serialises
-/// calls into it.
+/// One method per event, each naming that event and subscribing to the game's own in
+/// the same breath. Written that way on purpose: a name and a subscription declared
+/// apart have to be paired by hand at every call, and a pair that is wrong, is wrong
+/// silently — handlers for one event would be called when another happened.
+///
+/// Subscriptions are taken out once, when the first handler for an event arrives, and
+/// the handlers are held here. Only events the game raises on its main thread are
+/// offered: the interpreter is not thread safe, and nothing here serialises calls
+/// into it.
 /// </remarks>
 public sealed class ScriptEvents(ICoreServerAPI api)
 {
-    /// <summary>Name a script listens for a block being used under.</summary>
-    public const string DidUseBlock = "didUseBlock";
-
-    /// <summary>Name a script listens for a block being broken under.</summary>
-    public const string DidBreakBlock = "didBreakBlock";
-
-    /// <summary>Name a script listens for a player joining under.</summary>
-    public const string PlayerJoin = "playerJoin";
-
-    /// <summary>Name a script listens for a player dying under.</summary>
-    public const string PlayerDeath = "playerDeath";
-
-    /// <summary>Name a script listens for a player respawning under.</summary>
-    public const string PlayerRespawn = "playerRespawn";
-
-    /// <summary>Name a script listens for a player's first ever join under.</summary>
-    public const string PlayerCreate = "playerCreate";
-
-    /// <summary>Name a script listens for a player entering the world under.</summary>
-    public const string PlayerNowPlaying = "playerNowPlaying";
-
-    /// <summary>Name a script listens for a player's client finishing joining under.</summary>
-    public const string PlayerReady = "playerReady";
-
-    /// <summary>Name a script listens for a player quitting under.</summary>
-    public const string PlayerLeave = "playerLeave";
-
-    /// <summary>Name a script listens for a player being removed under.</summary>
-    public const string PlayerDisconnect = "playerDisconnect";
-
-    /// <summary>Name a script listens for a player changing game mode under.</summary>
-    public const string PlayerSwitchGameMode = "playerSwitchGameMode";
-
-    /// <summary>Name a script listens for the save game being loaded under.</summary>
-    public const string SaveGameLoaded = "saveGameLoaded";
-
-    /// <summary>Name a script listens for a world being created under.</summary>
-    public const string SaveGameCreated = "saveGameCreated";
-
-    /// <summary>Name a script listens for the world being saved under.</summary>
-    public const string GameWorldSave = "gameWorldSave";
-
-    /// <summary>Name a script listens for the world generators starting under.</summary>
-    public const string WorldgenStartup = "worldgenStartup";
-
-    /// <summary>Name a script listens for the server waking from standby under.</summary>
-    public const string ServerResume = "serverResume";
-
     private readonly Dictionary<string, List<Handler>> handlers = [];
     private readonly List<Action> pending = [];
 
     /// <summary>One script function listening for one event.</summary>
     private sealed record Handler(ScriptOrigin Origin, ScriptValue.Func Call);
+
+    /// <summary>Hands one occurrence of an event to whoever is listening for it.</summary>
+    private delegate void Occurred(EventPayload about);
+
+    /// <summary>How many handlers are listening, for the startup report.</summary>
+    public int Count => handlers.Values.Sum(listening => listening.Count);
+
+    /// <summary>Called after a player uses a block, which is left standing.</summary>
+    /// <remarks>Using a block leaves it standing, so what stands there is what was used.</remarks>
+    public void OnDidUseBlock(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("didUseBlock", origin, handler, occurred =>
+            api.Event.DidUseBlock += (player, selection) => occurred(
+                new BlockEventPayload(player, selection?.Position, Standing(selection?.Position))));
+
+    /// <summary>Called after a player breaks a block.</summary>
+    /// <remarks>
+    /// Breaking a block removes it before this runs, so the position now holds air.
+    /// The game hands over what stood there, and that is what a handler is told.
+    /// </remarks>
+    public void OnDidBreakBlock(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("didBreakBlock", origin, handler, occurred =>
+            api.Event.DidBreakBlock += (player, brokenId, selection) => occurred(
+                new BlockEventPayload(player, selection?.Position, api.World.GetBlock(brokenId))));
+
+    /// <summary>Called when a player joins.</summary>
+    public void OnPlayerJoin(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerJoin", origin, handler, occurred =>
+            api.Event.PlayerJoin += player => occurred(new PlayerEventPayload(player)));
+
+    /// <summary>Called when a player dies.</summary>
+    public void OnPlayerDeath(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerDeath", origin, handler, occurred =>
+            api.Event.PlayerDeath += (player, _) => occurred(new PlayerEventPayload(player)));
+
+    /// <summary>Called when a player respawns.</summary>
+    public void OnPlayerRespawn(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerRespawn", origin, handler, occurred =>
+            api.Event.PlayerRespawn += player => occurred(new PlayerEventPayload(player)));
+
+    /// <summary>Called the first time a player ever joins this world.</summary>
+    /// <remarks>
+    /// Raised only for a player the world has never seen, and before the welcome
+    /// message, so a starter kit handed out here arrives with them.
+    /// </remarks>
+    public void OnPlayerCreate(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerCreate", origin, handler, occurred =>
+            api.Event.PlayerCreate += player => occurred(new PlayerEventPayload(player)));
+
+    /// <summary>Called once the player is in the world and has been welcomed.</summary>
+    public void OnPlayerNowPlaying(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerNowPlaying", origin, handler, occurred =>
+            api.Event.PlayerNowPlaying += player => occurred(new PlayerEventPayload(player)));
+
+    /// <summary>Called when a joining player's client reports that it has finished.</summary>
+    /// <remarks>The last of the three events a join raises.</remarks>
+    public void OnPlayerReady(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerReady", origin, handler, occurred =>
+            api.Event.PlayerReady += player => occurred(new PlayerEventPayload(player)));
+
+    /// <summary>Called when a player quits of their own accord, before they are removed.</summary>
+    /// <remarks>
+    /// A player who was kicked or who dropped raises only <see cref="OnPlayerDisconnect"/>.
+    /// </remarks>
+    public void OnPlayerLeave(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerLeave", origin, handler, occurred =>
+            api.Event.PlayerLeave += player => occurred(new PlayerEventPayload(player)));
+
+    /// <summary>Called as a player is removed, however they went.</summary>
+    /// <remarks>
+    /// A quit, a kick and a lost connection all reach here, so this is the one that
+    /// always runs.
+    /// </remarks>
+    public void OnPlayerDisconnect(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerDisconnect", origin, handler, occurred =>
+            api.Event.PlayerDisconnect += player => occurred(new PlayerEventPayload(player)));
+
+    /// <summary>Called after a player changes game mode.</summary>
+    /// <remarks>Raised after the change, so asking the player their mode gives the new one.</remarks>
+    public void OnPlayerSwitchGameMode(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerSwitchGameMode", origin, handler, occurred =>
+            api.Event.PlayerSwitchGameMode += player => occurred(new PlayerEventPayload(player)));
+
+    /// <summary>Called once the save game has been read, which is after every script has run.</summary>
+    public void OnSaveGameLoaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("saveGameLoaded", origin, handler, occurred =>
+            api.Event.SaveGameLoaded += () => occurred(ServerEventPayload.Instance));
+
+    /// <summary>Called on the one start where the world is brand new.</summary>
+    public void OnSaveGameCreated(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("saveGameCreated", origin, handler, occurred =>
+            api.Event.SaveGameCreated += () => occurred(ServerEventPayload.Instance));
+
+    /// <summary>Called as the world is written to disk.</summary>
+    public void OnGameWorldSave(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("gameWorldSave", origin, handler, occurred =>
+            api.Event.GameWorldSave += () => occurred(ServerEventPayload.Instance));
+
+    /// <summary>Called once the world generators are starting.</summary>
+    public void OnWorldgenStartup(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("worldgenStartup", origin, handler, occurred =>
+            api.Event.WorldgenStartup += () => occurred(ServerEventPayload.Instance));
+
+    /// <summary>Called when a server that had suspended itself wakes up again.</summary>
+    public void OnServerResume(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("serverResume", origin, handler, occurred =>
+            api.Event.ServerResume += () => occurred(ServerEventPayload.Instance));
 
     /// <summary>
     /// Adds a handler, and remembers to subscribe to the game's event the first time
@@ -86,12 +150,12 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// where subscribing as each handler arrived would have left every one of them
     /// listening twice.
     /// </remarks>
-    public void On(string name, ScriptOrigin origin, ScriptValue.Func handler, Action subscribe)
+    private void On(string name, ScriptOrigin origin, ScriptValue.Func handler, Action<Occurred> subscribe)
     {
         if (!handlers.TryGetValue(name, out var listening))
         {
             handlers[name] = listening = [];
-            pending.Add(subscribe);
+            pending.Add(() => subscribe(about => Raise(name, about)));
         }
 
         listening.Add(new Handler(origin, handler));
@@ -116,9 +180,9 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// inside the game's own event dispatch, where an exception would take down
     /// whatever raised it, and a handler that failed once will fail every time.
     /// </remarks>
-    public void Raise(string name, EventPayload about)
+    private void Raise(string name, EventPayload about)
     {
-        if (!handlers.TryGetValue(name, out var listening) || listening.Count == 0) return;
+        if (handlers.GetValueOrDefault(name) is not { Count: > 0 } listening) return;
 
         var payload = PayloadWriter.Table(about);
 
@@ -138,112 +202,7 @@ public sealed class ScriptEvents(ICoreServerAPI api)
         }
     }
 
-    /// <summary>Subscribes to the game's own block-used event.</summary>
-    /// <remarks>
-    /// Using a block leaves it standing, so what stands there is what was used.
-    /// </remarks>
-    public void SubscribeDidUseBlock() =>
-        api.Event.DidUseBlock += (player, selection) => Raise(DidUseBlock,
-            new BlockEventPayload(player, selection?.Position, Standing(selection?.Position)));
-
-    /// <summary>Subscribes to the game's own block-broken event.</summary>
-    /// <remarks>
-    /// Breaking a block removes it before this runs, so the position now holds air.
-    /// The game hands over what stood there, and that is what a handler is told.
-    /// </remarks>
-    public void SubscribeDidBreakBlock() =>
-        api.Event.DidBreakBlock += (player, brokenId, selection) => Raise(DidBreakBlock,
-            new BlockEventPayload(player, selection?.Position, api.World.GetBlock(brokenId)));
-
-    /// <summary>Subscribes to the game's own player-joined event.</summary>
-    public void SubscribePlayerJoin() =>
-        api.Event.PlayerJoin += player => Raise(PlayerJoin, new PlayerEventPayload(player));
-
-    /// <summary>Subscribes to the game's own player-died event.</summary>
-    public void SubscribePlayerDeath() =>
-        api.Event.PlayerDeath += (player, _) => Raise(PlayerDeath, new PlayerEventPayload(player));
-
-    /// <summary>Subscribes to the game's own player-respawned event.</summary>
-    public void SubscribePlayerRespawn() =>
-        api.Event.PlayerRespawn += player => Raise(PlayerRespawn, new PlayerEventPayload(player));
-
-    /// <summary>Subscribes to the game's own first-ever-join event.</summary>
-    /// <remarks>
-    /// Raised only for a player the world has never seen, and before the welcome
-    /// message, so a starter kit handed out here arrives with them.
-    /// </remarks>
-    public void SubscribePlayerCreate() =>
-        api.Event.PlayerCreate += player => Raise(PlayerCreate, new PlayerEventPayload(player));
-
-    /// <summary>Subscribes to the game's own now-playing event.</summary>
-    /// <remarks>Raised once the player is in the world and has been welcomed.</remarks>
-    public void SubscribePlayerNowPlaying() =>
-        api.Event.PlayerNowPlaying += player => Raise(PlayerNowPlaying, new PlayerEventPayload(player));
-
-    /// <summary>Subscribes to the game's own player-ready event.</summary>
-    /// <remarks>
-    /// Raised when the player's client reports that it has finished joining, which
-    /// is the last of the three events a join raises.
-    /// </remarks>
-    public void SubscribePlayerReady() =>
-        api.Event.PlayerReady += player => Raise(PlayerReady, new PlayerEventPayload(player));
-
-    /// <summary>Subscribes to the game's own player-left event.</summary>
-    /// <remarks>
-    /// Raised for a player who quit of their own accord, before they are removed.
-    /// A player who was kicked or who dropped raises only <see cref="PlayerDisconnect"/>.
-    /// </remarks>
-    public void SubscribePlayerLeave() =>
-        api.Event.PlayerLeave += player => Raise(PlayerLeave, new PlayerEventPayload(player));
-
-    /// <summary>Subscribes to the game's own player-disconnected event.</summary>
-    /// <remarks>
-    /// Raised as the player is removed, however they went: a quit, a kick or a lost
-    /// connection all reach here, so this is the one that always runs.
-    /// </remarks>
-    public void SubscribePlayerDisconnect() =>
-        api.Event.PlayerDisconnect += player => Raise(PlayerDisconnect, new PlayerEventPayload(player));
-
-    /// <summary>Subscribes to the game's own game-mode-changed event.</summary>
-    /// <remarks>
-    /// Raised after the change, so asking the player their mode gives the new one.
-    /// </remarks>
-    public void SubscribePlayerSwitchGameMode() =>
-        api.Event.PlayerSwitchGameMode += player =>
-            Raise(PlayerSwitchGameMode, new PlayerEventPayload(player));
-
-    /// <summary>Subscribes to the game's own save-loaded event.</summary>
-    public void SubscribeSaveGameLoaded() =>
-        api.Event.SaveGameLoaded += () => Raise(SaveGameLoaded, ServerEventPayload.Instance);
-
-    /// <summary>Subscribes to the game's own save-created event.</summary>
-    public void SubscribeSaveGameCreated() =>
-        api.Event.SaveGameCreated += () => Raise(SaveGameCreated, ServerEventPayload.Instance);
-
-    /// <summary>Subscribes to the game's own world-being-saved event.</summary>
-    public void SubscribeGameWorldSave() =>
-        api.Event.GameWorldSave += () => Raise(GameWorldSave, ServerEventPayload.Instance);
-
-    /// <summary>Subscribes to the game's own worldgen-startup event.</summary>
-    public void SubscribeWorldgenStartup() =>
-        api.Event.WorldgenStartup += () => Raise(WorldgenStartup, ServerEventPayload.Instance);
-
-    /// <summary>Subscribes to the game's own server-resumed event.</summary>
-    public void SubscribeServerResume() =>
-        api.Event.ServerResume += () => Raise(ServerResume, ServerEventPayload.Instance);
-
     /// <summary>Whatever stands at a position, for the events that leave it standing.</summary>
     private Block? Standing(BlockPos? at) =>
         at is null ? null : api.World.BlockAccessor.GetBlock(at);
-
-    /// <summary>How many handlers are listening, for the startup report.</summary>
-    public int Count
-    {
-        get
-        {
-            var total = 0;
-            foreach (var listening in handlers.Values) total += listening.Count;
-            return total;
-        }
-    }
 }

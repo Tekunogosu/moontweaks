@@ -22,12 +22,12 @@ public static class ScriptEngine
     /// measured against it on the bindings a server actually uses, which is what
     /// <c>scripts/bench.sh</c> is for.
     /// </summary>
-    public const string Default = LuaCSharpHost.EngineName;
+    public const string DEFAULT = LuaCSharpHost.ENGINE_NAME;
 
     private static readonly Dictionary<string, Func<IScriptHost>> Engines =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            [LuaCSharpHost.EngineName] = () => new LuaCSharpHost(),
+            [LuaCSharpHost.ENGINE_NAME] = () => new LuaCSharpHost(),
         };
 
     /// <summary>
@@ -36,7 +36,7 @@ public static class ScriptEngine
     /// is the one another is measured relative to.
     /// </summary>
     public static IReadOnlyList<string> Names { get; } =
-        [Default, .. Engines.Keys.Where(name => name != Default).OrderBy(name => name)];
+        [DEFAULT, .. Engines.Keys.Where(name => name != DEFAULT).OrderBy(name => name)];
 
     /// <summary>Whether an engine of this name exists, for validating a settings file.</summary>
     public static bool Knows(string name) => Engines.ContainsKey(name);

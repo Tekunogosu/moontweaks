@@ -1,11 +1,9 @@
-using System;
 using System.Collections.Generic;
 using MoonTweaks.Api;
 using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
-using Vintagestory.API.Server;
 
 namespace MoonTweaks.Players;
 
@@ -160,34 +158,83 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     public void SetGameMode(ScriptOrigin origin, string player, EnumPlayKind mode) =>
         players.Find(player, origin).WorldData.CurrentGameMode = ValueSet.As<EnumGameMode>(mode);
 
+    // A script may remember something about a player in either of two places, and
+    // which one it means is written into the name of every function below. They are
+    // different stores kept in different files, not two ways of reaching one.
+
     /// <summary>
-    /// Remembers something about a player, saved with them rather than with the world
-    /// and so still there after a restart. Any value a script can write is kept,
-    /// including a table.
+    /// Remembers something about a player in this world, saved with the save game and
+    /// so still there after a restart. Any value a script can write is kept, a table
+    /// included.
     /// </summary>
+    /// <remarks>
+    /// What is written here belongs to the world it was written in. Another world on
+    /// the same server keeps its own, and deleting a world takes its data with it —
+    /// which is what makes this the one to reach for unless the other is deliberately
+    /// wanted.
+    ///
+    /// Needs the player to be on the server. What is stored lives on the player the
+    /// game has loaded, and nothing is loaded for somebody who is away;
+    /// <c>setAccountData</c> is the pair that answers for them.
+    /// </remarks>
     /// <param name="origin">Script line storing it.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
     /// <param name="key">Name to store it under.</param>
     /// <param name="value">What to store.</param>
-    [LuaFunction("setData")]
-    public void SetData(ScriptOrigin origin, string player, string key, ScriptValue value) =>
-        players.Find(player, origin).SetModData(Scoped(key), ScriptJson.Write(value));
+    [LuaFunction("setWorldData")]
+    public void SetWorldData(ScriptOrigin origin, string player, string key, ScriptValue value) =>
+        players.Find(player, origin).SetModData(ModKey.For(key), ScriptJson.Write(value));
 
     /// <summary>
-    /// What was remembered about a player under a name, or nil when nothing was.
+    /// What was remembered about a player in this world under a name, or nil when
+    /// nothing was.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
     /// <param name="key">Name it was stored under.</param>
-    [LuaFunction("getData")]
-    public ScriptValue GetData(ScriptOrigin origin, string player, string key) =>
-        ScriptJson.Parse(players.Find(player, origin).GetModData<string?>(Scoped(key), null));
+    [LuaFunction("getWorldData")]
+    public ScriptValue GetWorldData(ScriptOrigin origin, string player, string key) =>
+        ScriptJson.Parse(players.Find(player, origin).GetModData<string?>(ModKey.For(key)));
 
     /// <summary>
-    /// Keys are stored under this mod's own prefix, so a script cannot read or
-    /// overwrite what another mod saved on the same player.
+    /// Remembers something about a player across every world this server runs, saved
+    /// beside the ban and whitelist rolls rather than with any save game.
     /// </summary>
-    private static string Scoped(string key) => $"moontweaks:{key}";
+    /// <remarks>
+    /// The place for what is true of the person rather than of their game: a
+    /// preference they have set, an introduction they have already been shown,
+    /// something they are owed. Two things follow from where it is kept, and both are
+    /// the reason to use it rather than side effects of it.
+    ///
+    /// It answers for a player who is not on the server, which <c>setWorldData</c>
+    /// cannot — the file outlives both the session and the world. And every world this
+    /// server runs reads the same entry: a host running two worlds sees one value
+    /// across both, and a world deleted and made afresh keeps whatever was written
+    /// against its players. Anything that should not survive its world belongs in
+    /// <c>setWorldData</c> instead.
+    ///
+    /// Written to disk when the world is next saved rather than at once. What is read
+    /// back is always what was last set, whether or not a save has happened since.
+    /// </remarks>
+    /// <param name="origin">Script line storing it.</param>
+    /// <param name="player">Identifier of the player, which need not be one who is here.</param>
+    /// <param name="key">Name to store it under.</param>
+    /// <param name="value">What to store.</param>
+    [LuaFunction("setAccountData")]
+    public void SetAccountData(ScriptOrigin origin, string player, string key, ScriptValue value) =>
+        players.Account(player, origin).CustomPlayerData[ModKey.For(key)] = ScriptJson.Write(value);
+
+    /// <summary>
+    /// What was remembered about a player across every world under a name, or nil when
+    /// nothing was. Answers for a player who is not on the server.
+    /// </summary>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player, which need not be one who is here.</param>
+    /// <param name="key">Name it was stored under.</param>
+    [LuaFunction("getAccountData")]
+    public ScriptValue GetAccountData(ScriptOrigin origin, string player, string key) =>
+        ScriptJson.Parse(
+            players.Account(player, origin).CustomPlayerData.GetValueOrDefault(ModKey.For(key)));
 
     /// <summary>How tired a player is, from nothing to needing sleep.</summary>
     /// <param name="origin">Script line asking.</param>
@@ -250,11 +297,23 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     [LuaFunction("isOnline")]
     public bool IsOnline(ScriptOrigin origin, string player) => players.IsOnline(player);
 
-    /// <summary>What a player is called, for putting into a message somebody will read.</summary>
+    /// <summary>
+    /// What a player is called, for putting into a message somebody will read. Falls
+    /// back to their identifier where the game can no longer say the name, so this is
+    /// always something that can be printed.
+    /// </summary>
+    /// <remarks>
+    /// The game reads a name off the connection the player is on and answers nothing
+    /// once that connection has gone, which a handler running as somebody leaves is
+    /// close enough to reach.
+    /// </remarks>
     /// <param name="origin">Script line asking.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
     [LuaFunction("name")]
-    public string Name(ScriptOrigin origin, string player) => players.Find(player, origin).PlayerName;
+    public string Name(ScriptOrigin origin, string player) =>
+        // PlayerName is declared non-nullable and returns null once the connection has
+        // gone, which a handler running as somebody leaves is close enough to reach.
+        players.Find(player, origin).PlayerName ?? player;
 
     /// <summary>
     /// The identifier of whoever last went by a name, or nil where the server has
@@ -262,9 +321,11 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// this module accepts.
     /// </summary>
     /// <remarks>
-    /// Answers for players who are not here, unlike everything else in this module.
-    /// What is stored against them can still be read and written; nothing that
-    /// reaches their body can, and will say so.
+    /// One of the three functions here that answer for a player who is not on the
+    /// server, the others being <c>setAccountData</c> and <c>getAccountData</c>.
+    /// Everything else in this module reaches the player the game has loaded and says
+    /// so when there is none — <c>setWorldData</c> and <c>getWorldData</c> included,
+    /// since what they store lives on that player.
     /// </remarks>
     /// <param name="origin">Script line asking.</param>
     /// <param name="name">Name as it is spelled in game.</param>
@@ -355,4 +416,16 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     [LuaFunction("looking")]
     public LookingPayload? Looking(ScriptOrigin origin, string player) =>
         players.Looking(player, origin);
+
+    /// <summary>
+    /// The identifier of whatever living thing a player has their cursor on, or nil
+    /// where they are pointing at none. Hands over what every
+    /// <c>moontweaks.entities</c> function takes, so "the animal in front of me" is
+    /// reachable without searching for it.
+    /// </summary>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    [LuaFunction("lookingAtEntity")]
+    public double? LookingAtEntity(ScriptOrigin origin, string player) =>
+        players.Find(player, origin).CurrentEntitySelection?.Entity?.EntityId;
 }

@@ -23,7 +23,7 @@ public sealed class AlloyRecipeFactory(IWorldAccessor world)
     /// lands a hair either side of it. The tolerance covers that and nothing wider:
     /// the game rounds shares to four places before comparing them.
     /// </remarks>
-    private const double Rounding = 1e-6;
+    private const double ROUNDING = 1e-6;
 
     private readonly RecipeAssets assets = new(world);
 
@@ -37,10 +37,10 @@ public sealed class AlloyRecipeFactory(IWorldAccessor world)
 
         foreach (var (ingredient, index) in built.Ingredients.Select((value, index) => (value, index)))
         {
-            Resolve(ingredient, origin, $"ingredients[{index + 1}]");
+            assets.Resolve(ingredient, origin, $"ingredients[{index + 1}]");
         }
 
-        Resolve(built.Output, origin, "output");
+        assets.Resolve(built.Output, origin, "output");
         return built;
     }
 
@@ -77,7 +77,7 @@ public sealed class AlloyRecipeFactory(IWorldAccessor world)
     {
         Concrete(ingredient.Code!, origin, $"{at}.code");
 
-        if (ingredient.MinRatio < 0 || ingredient.MaxRatio > 1)
+        if (ingredient is { MinRatio: < 0 } or { MaxRatio: > 1 })
         {
             throw new ScriptError(origin,
                 $"{at} asks for a share outside 0 to 1, which no part of a mix can be");
@@ -115,14 +115,14 @@ public sealed class AlloyRecipeFactory(IWorldAccessor world)
         }
 
         var least = ingredients.Sum(ingredient => ingredient.MinRatio);
-        if (least > 1 + Rounding)
+        if (least > 1 + ROUNDING)
         {
             throw new ScriptError(origin,
                 $"the smallest shares add up to {least:0.###}, so the mix is always short of a metal");
         }
 
         var greatest = ingredients.Sum(ingredient => ingredient.MaxRatio);
-        if (greatest < 1 - Rounding)
+        if (greatest < 1 - ROUNDING)
         {
             throw new ScriptError(origin,
                 $"the largest shares add up to {greatest:0.###}, so the mix always has a metal to spare");
@@ -143,16 +143,4 @@ public sealed class AlloyRecipeFactory(IWorldAccessor world)
         }
     }
 
-    /// <summary>
-    /// Resolves one stack against the registries, failing loudly. The game's own
-    /// resolve reports nothing back, so each stack is resolved here instead and the
-    /// one that failed is named.
-    /// </summary>
-    private void Resolve(JsonItemStack stack, ScriptOrigin origin, string at)
-    {
-        if (!stack.Resolve(world, $"moontweaks {origin}") || stack.ResolvedItemstack is null)
-        {
-            throw new ScriptError(origin, $"{at} names '{stack.Code}', which resolved to nothing");
-        }
-    }
 }

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using MoonTweaks.Scripting;
 
 namespace MoonTweaks.Api;
@@ -16,7 +15,7 @@ public abstract class AssetSpec
     /// Required unless <c>tags</c> names what to match instead.
     /// </summary>
     [LuaField("code")]
-    [LuaSuggests(SuggestionSets.AssetCode)]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
     public virtual string? Code { get; set; }
 
     /// <summary>Registry the code names. Inferred by looking the code up when omitted.</summary>
@@ -53,7 +52,7 @@ public class MaterialSpec : AssetSpec
     /// a wildcard further.
     /// </summary>
     [LuaField("tags")]
-    [LuaSuggests(SuggestionSets.AssetTag)]
+    [LuaSuggests(SuggestionSets.ASSET_TAG)]
     public string[]? Tags { get; set; }
 
     /// <summary>
@@ -76,7 +75,7 @@ public abstract class StackSpec : AssetSpec
     /// wildcard ingredient, which expands into one recipe per matched variant.
     /// </summary>
     [LuaField("code", Required = true)]
-    [LuaSuggests(SuggestionSets.AssetCode)]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
     public override string? Code { get; set; }
 
     /// <summary>
@@ -136,7 +135,7 @@ public sealed class ItemStackSpec : CountedStackSpec
     /// belongs in it.
     /// </summary>
     [LuaField("code", Required = true)]
-    [LuaSuggests(SuggestionSets.AssetCode)]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
     public override string? Code { get; set; }
 }
 
@@ -153,7 +152,7 @@ public sealed class ResultStackSpec : CountedStackSpec
     /// belongs in it.
     /// </summary>
     [LuaField("code", Required = true)]
-    [LuaSuggests(SuggestionSets.AssetCode)]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
     public override string? Code { get; set; }
 }
 

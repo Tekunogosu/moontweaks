@@ -1,5 +1,4 @@
-using System.Collections.Generic;
-using System.Linq;
+
 using MoonTweaks.Api;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
@@ -31,7 +30,7 @@ public sealed class CookingSelector
         }
 
         pattern = new AssetLocation(spec.Code);
-        Described = spec.Code;
+        Described = Selection.Describe(spec.Code);
     }
 
     /// <summary>What the script named, for a report that says it back.</summary>
@@ -53,12 +52,6 @@ public sealed class RemoveCookingRecipes(
     public string Describe() => $"remove cooking recipes coded {selector.Described}";
 
     /// <inheritdoc/>
-    public int Apply(ICoreServerAPI api)
-    {
-        var registered = registry.Cooking;
-        var doomed = registered.Where(recipe => selector.Matches(recipe.Code)).ToList();
-
-        foreach (var recipe in doomed) registered.Remove(recipe);
-        return doomed.Count;
-    }
+    public int Apply(ICoreServerAPI api) =>
+        registry.Cooking.RemoveAll(recipe => selector.Matches(recipe.Code));
 }

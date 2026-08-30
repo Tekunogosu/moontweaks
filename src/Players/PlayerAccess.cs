@@ -29,6 +29,25 @@ public sealed class PlayerAccess(ICoreServerAPI api)
         ?? throw new ScriptError(origin, $"no player is connected with the identifier '{player}'");
 
     /// <summary>
+    /// What this server remembers about a player apart from any world, which is the
+    /// one thing here that answers for somebody who is not on the server.
+    /// </summary>
+    /// <remarks>
+    /// A different store from the one <see cref="Find"/> reaches, and kept in a
+    /// different place: this is the file that also holds the ban and whitelist rolls,
+    /// beside the saves rather than inside one. Every world this server runs therefore
+    /// reads the same entry.
+    ///
+    /// Answers for anybody the server has ever seen, since the file outlives both the
+    /// session and the world. An identifier it does not know is one this server has
+    /// never met, which is worth saying rather than answering with an empty record.
+    /// </remarks>
+    public IServerPlayerData Account(string player, ScriptOrigin origin) =>
+        api.PlayerData.GetPlayerDataByUid(player)
+        ?? throw new ScriptError(origin,
+            $"this server has no record of a player with the identifier '{player}'");
+
+    /// <summary>
     /// Hands a stack to a player, and says whether all of it reached them. The game
     /// puts it wherever it fits; nowhere to put it is a full inventory rather than a
     /// mistake, so the caller decides what to do about the rest.
@@ -88,10 +107,12 @@ public sealed class PlayerAccess(ICoreServerAPI api)
     /// </summary>
     /// <remarks>
     /// Names are how people refer to each other and identifiers are how the server
-    /// does, so this is the bridge a command typed by hand needs. It answers for
-    /// somebody offline, which most of what can be done with the answer does not:
-    /// what is stored against them can still be read and written, but nothing that
-    /// touches their body can.
+    /// does, so this is the bridge a command typed by hand needs. It is the one
+    /// question here that answers for somebody offline; everything else, what is
+    /// stored against them included, reaches a player through
+    /// <see cref="Find"/> and so needs them present. An identifier for somebody who
+    /// is not here is still worth having — it can be remembered, and it names the
+    /// same person when they come back.
     /// </remarks>
     public string? UidOf(string name) =>
         api.PlayerData.GetPlayerDataByLastKnownName(name)?.PlayerUID;
@@ -110,17 +131,11 @@ public sealed class PlayerAccess(ICoreServerAPI api)
     /// <summary>Adds or replaces one named contribution to an ability.</summary>
     public void SetStat(StatSpec spec, ScriptOrigin origin) =>
         Find(spec.Player, origin).Entity.Stats
-            .Set(spec.Stat, Scoped(spec.Name), (float)spec.Value, spec.Persistent);
+            .Set(spec.Stat, ModKey.For(spec.Name), (float)spec.Value, spec.Persistent);
 
     /// <summary>Takes back one named contribution, leaving every other alone.</summary>
     public void ClearStat(string player, string stat, string name, ScriptOrigin origin) =>
-        Find(player, origin).Entity.Stats.Remove(stat, Scoped(name));
-
-    /// <summary>
-    /// Contributions are held under this mod's own prefix, so a script cannot take
-    /// back one the game or another mod is holding.
-    /// </summary>
-    private static string Scoped(string name) => $"moontweaks:{name}";
+        Find(player, origin).Entity.Stats.Remove(stat, ModKey.For(name));
 
     /// <summary>The block a player has their cursor on, or nothing where they point at nothing.</summary>
     public LookingPayload? Looking(string player, ScriptOrigin origin)

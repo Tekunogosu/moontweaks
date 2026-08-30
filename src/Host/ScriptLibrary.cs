@@ -11,15 +11,15 @@ namespace MoonTweaks.Host;
 public static class ScriptLibrary
 {
     /// <summary>Folder under ModConfig holding everything MoonTweaks owns.</summary>
-    public const string FolderName = "moontweaks";
+    public const string FOLDER_NAME = "moontweaks";
 
-    /// <summary>Folder scripts are read from, beneath <see cref="FolderName"/>.</summary>
-    public const string ScriptsFolder = "scripts";
+    /// <summary>Folder scripts are read from, beneath <see cref="FOLDER_NAME"/>.</summary>
+    public const string SCRIPTS_FOLDER = "scripts";
 
     /// <summary>The MoonTweaks folder for this install, created if there is none yet.</summary>
     public static string PathFor()
     {
-        var folder = Path.Combine(GamePaths.ModConfig, FolderName);
+        var folder = Path.Combine(GamePaths.ModConfig, FOLDER_NAME);
         Directory.CreateDirectory(folder);
         return folder;
     }
@@ -27,7 +27,7 @@ public static class ScriptLibrary
     /// <summary>The scripts folder for this install, created if there is none yet.</summary>
     public static string ScriptsPathFor()
     {
-        var folder = Path.Combine(PathFor(), ScriptsFolder);
+        var folder = Path.Combine(PathFor(), SCRIPTS_FOLDER);
         Directory.CreateDirectory(folder);
         return folder;
     }
@@ -46,7 +46,7 @@ public static class ScriptLibrary
 
     /// <summary>
     /// Scripts sitting in <paramref name="folder"/> itself rather than under
-    /// <see cref="ScriptsFolder"/>. These do not run, so a server is told about them
+    /// <see cref="SCRIPTS_FOLDER"/>. These do not run, so a server is told about them
     /// rather than left to wonder why nothing happened.
     /// </summary>
     public static IReadOnlyList<string> Misplaced(string folder) =>

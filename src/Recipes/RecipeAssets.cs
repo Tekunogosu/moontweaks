@@ -1,9 +1,7 @@
-using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
-using Vintagestory.API.Datastructures;
 using Vintagestory.GameContent;
 
 namespace MoonTweaks.Recipes;
@@ -164,4 +162,8 @@ public sealed class RecipeAssets(IWorldAccessor world)
     /// <summary>A named asset and how many of it, as the game holds it.</summary>
     public JsonItemStack Stack(StackSpec spec, ScriptOrigin origin, string path) =>
         stacks.Stack(spec, origin, path);
+
+    /// <summary>Resolves a stack against the registries, naming the one that failed.</summary>
+    public JsonItemStack Resolve(JsonItemStack stack, ScriptOrigin origin, string path) =>
+        stacks.Resolve(stack, origin, path);
 }

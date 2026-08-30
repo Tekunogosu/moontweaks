@@ -34,7 +34,11 @@ public sealed class ScriptTimers(ICoreServerAPI api)
     private readonly List<Action> pending = [];
     private bool live;
 
-    /// <summary>How many timers are running, for the startup report.</summary>
+    /// <summary>
+    /// How many timers this run asked for, for the startup report. What was asked for
+    /// rather than what is still going: a timer that stops itself or fails does not
+    /// come back off this, and the report is written the moment they all start.
+    /// </summary>
     public int Count { get; private set; }
 
     /// <summary>
@@ -42,7 +46,10 @@ public sealed class ScriptTimers(ICoreServerAPI api)
     /// it by answering false, which is what a job spread over several ticks does once
     /// it has finished.
     /// </summary>
-    public void Every(int milliseconds, ScriptOrigin origin, ScriptValue.Func handler) =>
+    public void Every(int milliseconds, ScriptOrigin origin, ScriptValue.Func handler)
+    {
+        Waitable(milliseconds, origin, "every");
+
         Start(() =>
         {
             long listener = 0;
@@ -50,11 +57,31 @@ public sealed class ScriptTimers(ICoreServerAPI api)
                 seconds => Tick(handler, origin, seconds, () => api.World.UnregisterGameTickListener(listener)),
                 milliseconds);
         });
+    }
 
     /// <summary>Runs a handler once, this long from now.</summary>
-    public void After(int milliseconds, ScriptOrigin origin, ScriptValue.Func handler) =>
+    public void After(int milliseconds, ScriptOrigin origin, ScriptValue.Func handler)
+    {
+        Waitable(milliseconds, origin, "after");
+
         Start(() => api.World.RegisterCallback(
             seconds => Tick(handler, origin, seconds, null), milliseconds));
+    }
+
+    /// <summary>
+    /// Refuses a wait a timer could never come round from. The game is handed the
+    /// number as written and has no answer for a negative one, so a script that meant
+    /// to subtract two times and got the order wrong is told what it asked for rather
+    /// than left with a timer that silently never fires.
+    /// </summary>
+    private static void Waitable(int milliseconds, ScriptOrigin origin, string called)
+    {
+        if (milliseconds < 0)
+        {
+            throw new ScriptError(origin,
+                $"{called} was asked to wait {milliseconds}ms, and a wait cannot be negative");
+        }
+    }
 
     /// <summary>
     /// Starts a timer now, or remembers to once the run it was asked for is known to

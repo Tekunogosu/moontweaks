@@ -1,9 +1,7 @@
 using System.Collections.Generic;
-using System.Linq;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
-using Vintagestory.API.Util;
 
 namespace MoonTweaks.Recipes;
 
@@ -38,13 +36,7 @@ public sealed class RemoveGridRecipes(ScriptOrigin origin, RecipeSelector select
     public string Describe() => $"remove grid recipes producing {selector.Described}";
 
     /// <inheritdoc/>
-    public int Apply(ICoreServerAPI api)
-    {
-        var doomed = api.World.GridRecipes
-            .Where(recipe => selector.Matches(new RecipeProduct(recipe.Output?.Code, recipe.Output?.ResolvedItemStack)))
-            .ToList();
-
-        foreach (var recipe in doomed) api.World.GridRecipes.Remove(recipe);
-        return doomed.Count;
-    }
+    public int Apply(ICoreServerAPI api) =>
+        api.World.GridRecipes.RemoveAll(recipe =>
+            selector.Matches(new RecipeProduct(recipe.Output?.Code, recipe.Output?.ResolvedItemStack)));
 }

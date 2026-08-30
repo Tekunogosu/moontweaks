@@ -1,18 +1,22 @@
 using MoonTweaks.Api;
-using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
 
 namespace MoonTweaks.Recipes;
 
+// One module per way the game holds a recipe. Each is a list of what a script may
+// ask for; how any of it reaches the registry belongs to RegistryRecipeDomain.
+
 /// <summary>Recipes chipped from a stone laid on a knapping surface.</summary>
 [LuaModule("moontweaks.recipes.knapping")]
 public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
+    : RegistryRecipeDomain(log, world, registry)
 {
-    private const string Kind = "knapping";
-    private readonly AssetStacks stacks = new(world);
     private readonly VoxelRecipeFactory factory = new(world);
+
+    /// <inheritdoc/>
+    protected override string Kind => "knapping";
 
     /// <summary>
     /// Registers a new knapping recipe. An ingredient whose code contains a wildcard
@@ -23,8 +27,7 @@ public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, Recipe
     /// <param name="recipe">The recipe to add.</param>
     [LuaFunction("add")]
     public void Add(ScriptOrigin origin, KnappingRecipeSpec recipe) =>
-        log.Record(recipe, new AddRecipes<KnappingRecipe>(
-            origin, Kind, recipe.OutputCode, factory.Build<KnappingRecipe>(recipe, origin), registry));
+        RecordAddition(recipe, recipe.OutputCode, factory.Build<KnappingRecipe>(recipe, origin), origin);
 
     /// <summary>
     /// Removes every knapping recipe producing the given output code. The code may
@@ -34,7 +37,7 @@ public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, Recipe
     /// <param name="selector">Which recipes to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
     public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
-        log.Record(new RemoveRecipes<KnappingRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
+        RecordRemoval<KnappingRecipe>(selector, origin);
 
     /// <summary>
     /// Counts the knapping recipes currently registered. Reads the registry as it
@@ -43,16 +46,18 @@ public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, Recipe
     /// </summary>
     /// <param name="origin">Script line requesting the count.</param>
     [LuaFunction("count")]
-    public int Count(ScriptOrigin origin) => registry.Knapping.Count;
+    public int Count(ScriptOrigin origin) => Registry.Knapping.Count;
 }
 
 /// <summary>Recipes raised layer by layer from a lump of clay.</summary>
 [LuaModule("moontweaks.recipes.clayforming")]
 public sealed class ClayFormingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
+    : RegistryRecipeDomain(log, world, registry)
 {
-    private const string Kind = "clay forming";
-    private readonly AssetStacks stacks = new(world);
     private readonly VoxelRecipeFactory factory = new(world);
+
+    /// <inheritdoc/>
+    protected override string Kind => "clay forming";
 
     /// <summary>
     /// Registers a new clay forming recipe. An ingredient whose code contains a
@@ -63,8 +68,7 @@ public sealed class ClayFormingDomain(MutationLog log, IWorldAccessor world, Rec
     /// <param name="recipe">The recipe to add.</param>
     [LuaFunction("add")]
     public void Add(ScriptOrigin origin, ClayFormingRecipeSpec recipe) =>
-        log.Record(recipe, new AddRecipes<ClayFormingRecipe>(
-            origin, Kind, recipe.OutputCode, factory.Build<ClayFormingRecipe>(recipe, origin), registry));
+        RecordAddition(recipe, recipe.OutputCode, factory.Build<ClayFormingRecipe>(recipe, origin), origin);
 
     /// <summary>
     /// Removes every clay forming recipe producing the given output code. The code
@@ -74,7 +78,7 @@ public sealed class ClayFormingDomain(MutationLog log, IWorldAccessor world, Rec
     /// <param name="selector">Which recipes to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
     public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
-        log.Record(new RemoveRecipes<ClayFormingRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
+        RecordRemoval<ClayFormingRecipe>(selector, origin);
 
     /// <summary>
     /// Counts the clay forming recipes currently registered. Reads the registry as
@@ -83,16 +87,18 @@ public sealed class ClayFormingDomain(MutationLog log, IWorldAccessor world, Rec
     /// </summary>
     /// <param name="origin">Script line requesting the count.</param>
     [LuaFunction("count")]
-    public int Count(ScriptOrigin origin) => registry.ClayForming.Count;
+    public int Count(ScriptOrigin origin) => Registry.ClayForming.Count;
 }
 
 /// <summary>Recipes hammered from a hot ingot on an anvil.</summary>
 [LuaModule("moontweaks.recipes.smithing")]
 public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
+    : RegistryRecipeDomain(log, world, registry)
 {
-    private const string Kind = "smithing";
-    private readonly AssetStacks stacks = new(world);
     private readonly VoxelRecipeFactory factory = new(world);
+
+    /// <inheritdoc/>
+    protected override string Kind => "smithing";
 
     /// <summary>
     /// Registers a new smithing recipe. An ingredient whose code contains a wildcard
@@ -105,6 +111,7 @@ public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, Recipe
     public void Add(ScriptOrigin origin, SmithingRecipeSpec recipe)
     {
         var built = factory.Build<SmithingRecipe>(recipe, origin);
+
         foreach (var smithing in built)
         {
             // Left as the game leaves it when a script names none: the anvil groups
@@ -112,8 +119,7 @@ public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, Recipe
             smithing.Code = new AssetLocation(recipe.Code ?? smithing.Output.Code.ToString());
         }
 
-        log.Record(recipe, new AddRecipes<SmithingRecipe>(
-            origin, Kind, recipe.OutputCode, built, registry));
+        RecordAddition(recipe, recipe.OutputCode, built, origin);
     }
 
     /// <summary>
@@ -124,7 +130,7 @@ public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, Recipe
     /// <param name="selector">Which recipes to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
     public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
-        log.Record(new RemoveRecipes<SmithingRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
+        RecordRemoval<SmithingRecipe>(selector, origin);
 
     /// <summary>
     /// Counts the smithing recipes currently registered. Reads the registry as it
@@ -133,16 +139,18 @@ public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, Recipe
     /// </summary>
     /// <param name="origin">Script line requesting the count.</param>
     [LuaFunction("count")]
-    public int Count(ScriptOrigin origin) => registry.Smithing.Count;
+    public int Count(ScriptOrigin origin) => Registry.Smithing.Count;
 }
 
 /// <summary>Recipes a barrel mixes on the spot or seals for a while.</summary>
 [LuaModule("moontweaks.recipes.barrel")]
 public sealed class BarrelDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
+    : RegistryRecipeDomain(log, world, registry)
 {
-    private const string Kind = "barrel";
-    private readonly AssetStacks stacks = new(world);
     private readonly BarrelRecipeFactory factory = new(world);
+
+    /// <inheritdoc/>
+    protected override string Kind => "barrel";
 
     /// <summary>
     /// Registers a new barrel recipe. An ingredient whose code contains a wildcard
@@ -153,8 +161,7 @@ public sealed class BarrelDomain(MutationLog log, IWorldAccessor world, RecipeRe
     /// <param name="recipe">The recipe to add.</param>
     [LuaFunction("add")]
     public void Add(ScriptOrigin origin, BarrelRecipeSpec recipe) =>
-        log.Record(recipe, new AddRecipes<BarrelRecipe>(
-            origin, Kind, recipe.OutputCode, factory.Build(recipe, origin), registry));
+        RecordAddition(recipe, recipe.OutputCode, factory.Build(recipe, origin), origin);
 
     /// <summary>
     /// Removes every barrel recipe producing the given output code. The code may
@@ -164,7 +171,7 @@ public sealed class BarrelDomain(MutationLog log, IWorldAccessor world, RecipeRe
     /// <param name="selector">Which recipes to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
     public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
-        log.Record(new RemoveRecipes<BarrelRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
+        RecordRemoval<BarrelRecipe>(selector, origin);
 
     /// <summary>
     /// Counts the barrel recipes currently registered. Reads the registry as it stood
@@ -172,16 +179,18 @@ public sealed class BarrelDomain(MutationLog log, IWorldAccessor world, RecipeRe
     /// </summary>
     /// <param name="origin">Script line requesting the count.</param>
     [LuaFunction("count")]
-    public int Count(ScriptOrigin origin) => registry.Barrel.Count;
+    public int Count(ScriptOrigin origin) => Registry.Barrel.Count;
 }
 
 /// <summary>Alloys a crucible smelts from a mix of metals.</summary>
 [LuaModule("moontweaks.recipes.alloy")]
 public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
+    : RegistryRecipeDomain(log, world, registry)
 {
-    private const string Kind = "alloy";
-    private readonly AssetStacks stacks = new(world);
     private readonly AlloyRecipeFactory factory = new(world);
+
+    /// <inheritdoc/>
+    protected override string Kind => "alloy";
 
     /// <summary>
     /// Registers a new alloy. Unlike every other kind, an alloy names one metal per
@@ -192,8 +201,7 @@ public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeReg
     /// <param name="recipe">The alloy to add.</param>
     [LuaFunction("add")]
     public void Add(ScriptOrigin origin, AlloyRecipeSpec recipe) =>
-        log.Record(recipe, new AddRecipes<AlloyRecipe>(
-            origin, Kind, recipe.OutputCode, [factory.Build(recipe, origin)], registry));
+        RecordAddition(recipe, recipe.OutputCode, [factory.Build(recipe, origin)], origin);
 
     /// <summary>
     /// Removes every alloy smelting into the given output code. The code may contain
@@ -203,7 +211,7 @@ public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeReg
     /// <param name="selector">Which alloys to remove, by output code or by tags.</param>
     [LuaFunction("remove")]
     public void Remove(ScriptOrigin origin, RecipeSelectorSpec selector) =>
-        log.Record(new RemoveRecipes<AlloyRecipe>(origin, Kind, new RecipeSelector(selector, stacks, origin), registry));
+        RecordRemoval<AlloyRecipe>(selector, origin);
 
     /// <summary>
     /// Counts the alloys currently registered. Reads the registry as it stood before
@@ -211,7 +219,7 @@ public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeReg
     /// </summary>
     /// <param name="origin">Script line requesting the count.</param>
     [LuaFunction("count")]
-    public int Count(ScriptOrigin origin) => registry.Alloy.Count;
+    public int Count(ScriptOrigin origin) => Registry.Alloy.Count;
 }
 
 /// <summary>Meals a pot cooks over a fire.</summary>
@@ -224,9 +232,12 @@ public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeReg
 /// </remarks>
 [LuaModule("moontweaks.recipes.cooking")]
 public sealed class CookingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
+    : RegistryRecipeDomain(log, world, registry)
 {
-    private const string Kind = "cooking";
     private readonly CookingRecipeFactory factory = new(world);
+
+    /// <inheritdoc/>
+    protected override string Kind => "cooking";
 
     /// <summary>
     /// Registers a new meal. Its <c>code</c> names the recipe and the meal both, and
@@ -237,8 +248,9 @@ public sealed class CookingDomain(MutationLog log, IWorldAccessor world, RecipeR
     /// <param name="recipe">The meal to add.</param>
     [LuaFunction("add")]
     public void Add(ScriptOrigin origin, CookingRecipeSpec recipe) =>
-        log.Record(recipe, new AddRecipes<CookingRecipe>(
-            origin, Kind, recipe.Code, [factory.Build(recipe, origin)], registry));
+        // Named by the code it carries rather than by what it makes, since a meal has
+        // no single output and that code is what removing one matches against.
+        RecordAddition(recipe, recipe.Code, [factory.Build(recipe, origin)], origin);
 
     /// <summary>
     /// Removes every cooking recipe carrying the given code. The code may contain a
@@ -250,7 +262,7 @@ public sealed class CookingDomain(MutationLog log, IWorldAccessor world, RecipeR
     /// <param name="selector">Which recipes to remove, by the code they carry.</param>
     [LuaFunction("remove")]
     public void Remove(ScriptOrigin origin, CookingSelectorSpec selector) =>
-        log.Record(new RemoveCookingRecipes(origin, new CookingSelector(selector, origin), registry));
+        Log.Record(new RemoveCookingRecipes(origin, new CookingSelector(selector, origin), Registry));
 
     /// <summary>
     /// Counts the cooking recipes currently registered. Reads the registry as it
@@ -259,5 +271,5 @@ public sealed class CookingDomain(MutationLog log, IWorldAccessor world, RecipeR
     /// </summary>
     /// <param name="origin">Script line requesting the count.</param>
     [LuaFunction("count")]
-    public int Count(ScriptOrigin origin) => registry.Cooking.Count;
+    public int Count(ScriptOrigin origin) => Registry.Cooking.Count;
 }

@@ -1,13 +1,27 @@
 -- What the world remembers.
 --
--- `players.setData` stores against one player and is saved with them.
--- `world.setData` stores against the save game itself, so it is the home for
--- anything counted across everybody rather than for each of them: a total, a
--- running tally, a fact about the world that no single player owns.
+-- There are three places a script may put something, and which to use is decided by
+-- what the thing is about rather than by which is convenient.
 --
--- Both survive a restart. Both take any value a script can write, a table included.
--- Neither exists until there is a world, so both belong in a handler rather than in
--- a script's body — and this one says so plainly rather than failing oddly if you
+--   world.setData             about the world, not about anybody in particular.
+--                             Saved with the save game. The home for a total, a
+--                             running tally, a fact no single player owns.
+--
+--   players.setWorldData      about one player in this world. Saved with the save
+--                             game too, so a second world keeps its own and deleting
+--                             a world takes it with it. Needs the player to be here.
+--
+--   players.setAccountData    about the person rather than their game. Saved beside
+--                             the ban and whitelist rolls, so every world this server
+--                             runs reads the same value and it survives the world
+--                             being deleted. Answers for a player who is offline.
+--
+-- All three survive a restart and take any value a script can write, a table
+-- included. `players/account-data.lua` is about the third and the difference between
+-- it and the second; this file is about the first.
+--
+-- None of them exists until there is a world, so all belong in a handler rather than
+-- in a script's body — and this one says so plainly rather than failing oddly if you
 -- try it from the body.
 
 local commands = moontweaks.commands

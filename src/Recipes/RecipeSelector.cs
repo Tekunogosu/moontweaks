@@ -1,4 +1,3 @@
-using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
@@ -28,15 +27,11 @@ public sealed class RecipeSelector
     /// <summary>Reads a selector, refusing one that names nothing to match.</summary>
     public RecipeSelector(RecipeSelectorSpec spec, AssetStacks stacks, ScriptOrigin origin)
     {
-        if (spec.Code is null && spec.Tags is null)
-        {
-            throw new ScriptError(origin,
-                "neither a 'code' nor any 'tags' names what to remove, so nothing would be");
-        }
+        Selection.MustName(spec.Code, spec.Tags, "remove", origin);
 
         pattern = spec.Code is null ? null : new AssetLocation(spec.Code);
         condition = stacks.Condition(spec.Tags, origin, "tags");
-        Described = Describe(spec);
+        Described = Selection.Describe(spec.Code, spec.Tags);
     }
 
     /// <summary>What the script named, for a report that says it back.</summary>
@@ -56,14 +51,7 @@ public sealed class RecipeSelector
 
         if (condition.IsEmpty) return true;
 
-        return made.Stack?.Collectible is { } product && condition.Matches(product.Tags);
+        return made.Stack?.Collectible is { } product && AssetStacks.Matches(condition, product);
     }
 
-    private static string Describe(RecipeSelectorSpec spec) => (spec.Code, spec.Tags) switch
-    {
-        ({ } code, null) => code,
-        (null, { } tags) => $"tags {string.Join(", ", tags.Select(tag => $"'{tag}'"))}",
-        ({ } code, { } tags) => $"{code} with tags {string.Join(", ", tags.Select(tag => $"'{tag}'"))}",
-        _ => "nothing",
-    };
 }

@@ -44,12 +44,14 @@ public sealed record Check(string Name, string Source, string? Known = null)
 /// Bindings here are built as <see cref="ModuleBinding"/> by hand rather than through
 /// <see cref="Api.DomainBinder"/>. What the binder costs is the same whichever engine
 /// is underneath it, so including it would add a constant to every column and change
-/// no comparison, while making the figures answer a vaguer question.
+/// no comparison, while making the figures answer a vaguer question. That layer is
+/// not left unmeasured for it: <see cref="Binder"/> measures it on its own, once,
+/// which is where its cost is read rather than in any column here.
 /// </remarks>
 public static class Workload
 {
     /// <summary>The block code a script passes, of the length real ones run to.</summary>
-    private const string Code = "game:soil-medium-none";
+    private const string CODE = "game:soil-medium-none";
 
     /// <summary>Cases in the report's order, cheapest shape first.</summary>
     public static IReadOnlyList<Case> Cases { get; } =
@@ -64,19 +66,19 @@ public static class Workload
             "local t = {} for i = 1, $N do t[i] = i end"),
 
         new("lua: table constructor, 4 keys", "table", 1_000_000,
-            $"for i = 1, $N do local t = {{ x = i, y = i, z = i, block = '{Code}' }} end"),
+            $"for i = 1, $N do local t = {{ x = i, y = i, z = i, block = '{CODE}' }} end"),
 
         new("lua: string concat", "concat", 500_000,
             "for i = 1, $N do local s = 'game:' .. i end"),
 
         new("call: 4 scalar args", "call", 1_000_000,
-            $"for i = 1, $N do bench.noop(i, i, i, '{Code}') end"),
+            $"for i = 1, $N do bench.noop(i, i, i, '{CODE}') end"),
 
         new("call: returning a number", "call", 1_000_000,
             "for i = 1, $N do local n = bench.sum(i, i, i) end"),
 
         new("call: one 4-key table arg", "call", 500_000,
-            $"for i = 1, $N do bench.noop({{ x = i, y = i, z = i, block = '{Code}' }}) end"),
+            $"for i = 1, $N do bench.noop({{ x = i, y = i, z = i, block = '{CODE}' }}) end"),
 
         new("call: one 64-entry list arg", "call", 20_000,
             "local t = {} for i = 1, 64 do t[i] = i end\n"
@@ -190,7 +192,7 @@ public static class Workload
         ["x"] = new ScriptValue.Num(1),
         ["y"] = new ScriptValue.Num(2),
         ["player"] = new ScriptValue.Str("Theysa"),
-        ["block"] = new ScriptValue.Str(Code),
+        ["block"] = new ScriptValue.Str(CODE),
     });
 
     /// <summary>One argument as a number, or zero where a script passed something else.</summary>

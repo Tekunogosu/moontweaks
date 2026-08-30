@@ -73,7 +73,7 @@ public sealed class BlockEventPayload(IServerPlayer player, BlockPos? at, Block?
     /// read, which is what a position outside the loaded world leaves behind.
     /// </summary>
     [LuaField("block")]
-    [LuaSuggests(SuggestionSets.AssetCode)]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
     public string? Block { get; } = block?.Code?.ToString();
 
     /// <summary>Where the block stood, east to west.</summary>

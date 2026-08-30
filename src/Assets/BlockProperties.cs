@@ -45,16 +45,10 @@ public static class BlockProperties
     /// </summary>
     private static byte[] Colour(LightSpec light, ScriptOrigin origin) =>
     [
-        Byte(light.Hue, origin, "light.hue"),
-        Byte(light.Saturation, origin, "light.saturation"),
-        Byte(light.Brightness, origin, "light.brightness"),
+        ColourChannel.Of(light.Hue, origin, "light.hue"),
+        ColourChannel.Of(light.Saturation, origin, "light.saturation"),
+        ColourChannel.Of(light.Brightness, origin, "light.brightness"),
     ];
-
-    /// <summary>One part of a colour, refused rather than wrapped when out of range.</summary>
-    private static byte Byte(int value, ScriptOrigin origin, string path) =>
-        value is >= 0 and <= 255
-            ? (byte)value
-            : throw new ScriptError(origin, $"{path} must be between 0 and 255, got {value}");
 
     /// <summary>
     /// What a block leaves behind, as the game holds it. Each is resolved here rather

@@ -3,7 +3,9 @@ using MoonTweaks.Scripting;
 
 namespace MoonTweaks.Api;
 
-// One shape per way the game makes something, over the asset shapes above.
+// What every recipe kind shares, and the kinds a player shapes by hand: a grid of
+// items, or a surface worked voxel by voxel. The kinds that are neither — barrel,
+// alloy and cooking — each have a file of their own beside this one.
 
 /// <summary>
 /// What every recipe kind carries, however the game stores it: whether it is
@@ -45,7 +47,7 @@ public abstract class CraftingRecipeSpec : RecipeSpec
     /// configuration off ignore it, on this recipe exactly as on the game's own.
     /// </summary>
     [LuaField("requiresTrait")]
-    [LuaSuggests(SuggestionSets.AssetTrait)]
+    [LuaSuggests(SuggestionSets.ASSET_TRAIT)]
     public string? RequiresTrait { get; set; }
 
     /// <summary>
@@ -117,7 +119,7 @@ public sealed class RecipeSelectorSpec
     /// reaches the whole family. Required unless <c>tags</c> names what to match.
     /// </summary>
     [LuaField("code")]
-    [LuaSuggests(SuggestionSets.AssetCode)]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
     public string? Code { get; set; }
 
     /// <summary>
@@ -127,7 +129,7 @@ public sealed class RecipeSelectorSpec
     /// wildcard further.
     /// </summary>
     [LuaField("tags")]
-    [LuaSuggests(SuggestionSets.AssetTag)]
+    [LuaSuggests(SuggestionSets.ASSET_TAG)]
     public string[]? Tags { get; set; }
 }
 
@@ -206,298 +208,4 @@ public sealed class SmithingRecipeSpec : VoxelRecipeSpec
     /// </summary>
     [LuaField("code")]
     public string? Code { get; set; }
-}
-
-/// <summary>
-/// One input a barrel recipe consumes, measured in items, in litres, or in both.
-/// </summary>
-[LuaTable("BarrelIngredient", Shorthand = "code")]
-public sealed class BarrelIngredientSpec : MaterialSpec
-{
-    /// <summary>How many items the barrel must hold. Left at one for a liquid, which <c>litres</c> measures instead.</summary>
-    [LuaField("quantity", Default = "1")]
-    public int Quantity { get; set; } = 1;
-
-    /// <summary>How much of a liquid the barrel must hold. Zero for anything counted in items.</summary>
-    [LuaField("litres", Default = "0")]
-    public double Litres { get; set; }
-
-    /// <summary>How many items the recipe takes, when it takes fewer than it needs present. Takes all of them when omitted.</summary>
-    [LuaField("consumeQuantity")]
-    public int? ConsumeQuantity { get; set; }
-
-    /// <summary>How much liquid the recipe takes, when it takes less than it needs present. Takes all of it when omitted.</summary>
-    [LuaField("consumeLitres")]
-    public double? ConsumeLitres { get; set; }
-}
-
-/// <summary>What a barrel recipe produces, which may be a liquid.</summary>
-[LuaTable("BarrelOutput", Shorthand = "code")]
-public sealed class BarrelOutputSpec : CountedStackSpec
-{
-    /// <summary>How much of a liquid the recipe yields. Zero for anything counted in items.</summary>
-    [LuaField("litres", Default = "0")]
-    public double Litres { get; set; }
-}
-
-/// <summary>
-/// A barrel recipe, either mixed on the spot or left to seal for a while.
-/// </summary>
-[LuaTable("BarrelRecipe")]
-public sealed class BarrelRecipeSpec : CraftingRecipeSpec
-{
-    /// <summary>
-    /// Identifies the recipe to the game, which requires every barrel recipe to carry
-    /// one and leaves the choice open. Unrelated to the codes that name assets.
-    /// </summary>
-    [LuaField("code", Required = true)]
-    public string Code { get; set; } = "";
-
-    /// <summary>
-    /// What the barrel must hold, listed rather than keyed: a barrel has no grid, so
-    /// nothing places an ingredient anywhere in particular.
-    /// </summary>
-    [LuaField("ingredients", Required = true)]
-    public BarrelIngredientSpec[] Ingredients { get; set; } = [];
-
-    /// <summary>What the recipe produces.</summary>
-    [LuaField("output", Required = true)]
-    public BarrelOutputSpec Output { get; set; } = new();
-
-    /// <summary>
-    /// How long the barrel must stay sealed, in in-game hours. Left at zero the
-    /// recipe mixes the moment its ingredients are in, which is how the game tells
-    /// the two kinds of barrel recipe apart.
-    /// </summary>
-    [LuaField("sealHours", Default = "0")]
-    public double SealHours { get; set; }
-
-    /// <inheritdoc/>
-    public override string OutputCode => Output.Code!;
-}
-
-/// <summary>
-/// One metal an alloy is mixed from, and the share of the mix it must make up.
-/// </summary>
-/// <remarks>
-/// A crucible matches an ingredient by the exact stack its code resolves to, so
-/// neither a wildcard nor a tag reaches one, and neither a quantity nor any
-/// attributes narrow it: the shares alone decide what mixes.
-/// </remarks>
-[LuaTable("AlloyIngredient")]
-public sealed class AlloyIngredientSpec : AssetSpec
-{
-    /// <summary>Asset code of the metal, such as <c>game:ingot-copper</c>.</summary>
-    [LuaField("code", Required = true)]
-    [LuaSuggests(SuggestionSets.AssetCode)]
-    public override string? Code { get; set; }
-
-    /// <summary>
-    /// Least of the mix this metal may be, as a fraction of one. Measured against
-    /// what the crucible holds after every ore has been counted as the metal it
-    /// smelts into, so ore and ingot of the same metal count towards one share.
-    /// </summary>
-    [LuaField("minRatio", Required = true)]
-    public double MinRatio { get; set; }
-
-    /// <summary>Most of the mix this metal may be, as a fraction of one.</summary>
-    [LuaField("maxRatio", Required = true)]
-    public double MaxRatio { get; set; }
-}
-
-/// <summary>
-/// The metal an alloy yields. Carries no quantity: a crucible pours as much as went
-/// into it, so how much comes out is decided by the mix rather than by the recipe.
-/// </summary>
-[LuaTable("AlloyOutput", Shorthand = "code")]
-public sealed class AlloyOutputSpec : StackSpec
-{
-    /// <summary>
-    /// Asset code of the metal poured, such as <c>game:ingot-brass</c>. Names one
-    /// metal: an alloy has no variants to expand into, so neither a wildcard nor a
-    /// <c>{name}</c> placeholder belongs here.
-    /// </summary>
-    [LuaField("code", Required = true)]
-    [LuaSuggests(SuggestionSets.AssetCode)]
-    public override string? Code { get; set; }
-}
-
-/// <summary>
-/// An alloy a crucible smelts, named by the share each metal makes up rather than
-/// by any arrangement of them.
-/// </summary>
-[LuaTable("AlloyRecipe")]
-public sealed class AlloyRecipeSpec : RecipeSpec
-{
-    /// <summary>
-    /// The metals the mix is made of, each with the share of it that it must be.
-    /// Every one of them must be present for the alloy to smelt.
-    /// </summary>
-    [LuaField("ingredients", Required = true)]
-    public AlloyIngredientSpec[] Ingredients { get; set; } = [];
-
-    /// <summary>What the mix smelts into.</summary>
-    [LuaField("output", Required = true)]
-    public AlloyOutputSpec Output { get; set; } = new();
-
-    /// <inheritdoc/>
-    public override string OutputCode => Output.Code!;
-}
-
-/// <summary>
-/// A cooked form one of a valid stack's inputs may also take, so a recipe accepting
-/// raw meat accepts the cooked kind without listing it twice.
-/// </summary>
-[LuaTable("CookedStack", Shorthand = "code")]
-public sealed class CookedStackSpec : StackSpec
-{
-    /// <summary>Asset code of the cooked form, such as <c>game:bushmeat-cooked</c>.</summary>
-    [LuaField("code", Required = true)]
-    [LuaSuggests(SuggestionSets.AssetCode)]
-    public override string? Code { get; set; }
-}
-
-/// <summary>
-/// One thing a cooking ingredient accepts. Carries no quantity: how much of it a pot
-/// needs is the ingredient's business rather than this one's.
-/// </summary>
-[LuaTable("CookingStack", Shorthand = "code")]
-public sealed class CookingStackSpec : StackSpec
-{
-    /// <summary>
-    /// Asset code this accepts, such as <c>game:vegetable-carrot</c>. May contain a
-    /// <c>*</c> wildcard, which stays a wildcard: a pot matches against it as it
-    /// cooks rather than the recipe being expanded into one per variant.
-    /// </summary>
-    [LuaField("code", Required = true)]
-    [LuaSuggests(SuggestionSets.AssetCode)]
-    public override string? Code { get; set; }
-
-    /// <summary>
-    /// Part of the meal's shape this ingredient fills in, such as
-    /// <c>bowl/vegetable base 1/*</c>. Left out, the ingredient is not drawn.
-    /// </summary>
-    [LuaField("shapeElement")]
-    public string? ShapeElement { get; set; }
-
-    /// <summary>
-    /// Texture to draw that shape element with, written as the code the shape uses
-    /// and the texture to put there. Exactly two entries.
-    /// </summary>
-    [LuaField("textureMapping")]
-    public string[]? TextureMapping { get; set; }
-
-    /// <summary>
-    /// Cooked form this also accepts, so a recipe taking a raw ingredient takes the
-    /// cooked one without a second entry.
-    /// </summary>
-    [LuaField("cookedStack")]
-    public CookedStackSpec? CookedStack { get; set; }
-}
-
-/// <summary>
-/// One thing a cooking recipe needs, and how much of it. A pot holds four slots, and
-/// an ingredient says how many of them it may fill and what may go in them.
-/// </summary>
-[LuaTable("CookingIngredient")]
-public sealed class CookingIngredientSpec
-{
-    /// <summary>
-    /// Names this ingredient within the recipe, such as <c>vegetable-base</c>. Not an
-    /// asset code: it identifies the slot rather than what goes in it, and the game
-    /// reads it when it names the meal.
-    /// </summary>
-    [LuaField("code", Required = true)]
-    public string Code { get; set; } = "";
-
-    /// <summary>What may fill this ingredient's slots. At least one.</summary>
-    [LuaField("validStacks", Required = true)]
-    public CookingStackSpec[] ValidStacks { get; set; } = [];
-
-    /// <summary>Fewest of the pot's slots this may fill. Zero makes the ingredient optional.</summary>
-    [LuaField("minQuantity", Required = true)]
-    public int MinQuantity { get; set; }
-
-    /// <summary>Most of the pot's slots this may fill.</summary>
-    [LuaField("maxQuantity", Required = true)]
-    public int MaxQuantity { get; set; }
-
-    /// <summary>
-    /// How much of a liquid one slot of this holds, in litres. Zero for anything
-    /// counted in items rather than poured.
-    /// </summary>
-    [LuaField("portionSizeLitres", Default = "0")]
-    public double PortionSizeLitres { get; set; }
-
-    /// <summary>
-    /// What this ingredient is called when the game names the meal, such as
-    /// <c>vegetable</c>. Left out, the game calls it unknown.
-    /// </summary>
-    [LuaField("typeName")]
-    public string? TypeName { get; set; }
-}
-
-/// <summary>
-/// A meal a pot cooks, named by the ingredients that went into it rather than by one
-/// output: what comes out is a container of servings unless <c>cooksInto</c> says
-/// otherwise.
-/// </summary>
-[LuaTable("CookingRecipe")]
-public sealed class CookingRecipeSpec : RecipeSpec
-{
-    /// <summary>
-    /// Identifies the recipe and names the meal it makes, such as <c>soup</c>.
-    /// Unrelated to the codes that name assets, and no two recipes should share one.
-    /// </summary>
-    [LuaField("code", Required = true)]
-    public string Code { get; set; } = "";
-
-    /// <summary>What the pot must hold, and how much of each.</summary>
-    [LuaField("ingredients", Required = true)]
-    public CookingIngredientSpec[] Ingredients { get; set; } = [];
-
-    /// <summary>
-    /// Shape the meal is drawn with, as the path to it in the game's assets, such as
-    /// <c>block/food/meal/soup</c>. Required: a meal with no shape cannot be drawn,
-    /// and the server refuses to describe itself to a client without one.
-    /// </summary>
-    [LuaField("shape", Required = true)]
-    public string Shape { get; set; } = "";
-
-    /// <summary>
-    /// How the meal spoils. Required for the same reason the shape is: the server
-    /// writes it out for every client, and has nothing to write without it.
-    /// </summary>
-    [LuaField("perishableProps", Required = true)]
-    public TransitionableSpec PerishableProps { get; set; } = new();
-
-    /// <summary>
-    /// Item the pot yields instead of a container of servings, as hot glue rather
-    /// than a meal. Left out, the recipe makes a meal.
-    /// </summary>
-    [LuaField("cooksInto")]
-    public ResultStackSpec? CooksInto { get; set; }
-
-    /// <summary>Whether what comes out is eaten. Left alone for anything that is not.</summary>
-    [LuaField("isFood", Default = "false")]
-    public bool IsFood { get; set; }
-
-    /// <inheritdoc/>
-    public override string OutputCode => CooksInto?.Code ?? Code;
-}
-
-/// <summary>
-/// Which cooking recipes to act on, by the code the recipe carries rather than by
-/// anything it produces: a meal is named by its ingredients, so there is no one
-/// output code to match. A bare string is taken as that code.
-/// </summary>
-[LuaTable("CookingSelector", Shorthand = "code")]
-public sealed class CookingSelectorSpec
-{
-    /// <summary>
-    /// Recipe code to match, such as <c>soup</c>. May contain a <c>*</c> wildcard, so
-    /// <c>"*stew"</c> reaches every stew.
-    /// </summary>
-    [LuaField("code", Required = true)]
-    public string Code { get; set; } = "";
 }

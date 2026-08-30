@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Reflection;
 using MoonTweaks.Scripting;
 
 namespace MoonTweaks.Api;
@@ -45,7 +44,7 @@ public static class PayloadWriter
         System.Enum named => new ScriptValue.Str(named.ToString().ToLowerInvariant()),
         // A shape of its own, written through the same field metadata as any other,
         // so a table nested inside a payload reads like one handed over on its own.
-        _ when value.GetType().GetCustomAttribute<LuaTableAttribute>() is not null => Table(value),
+        _ when SpecBinder.DeclaredTable(value.GetType()) is not null => Table(value),
         // Anything a script would read with ipairs. Strings are caught above, which
         // is what keeps one from arriving here as a list of its own characters.
         System.Collections.IEnumerable many => List(many),

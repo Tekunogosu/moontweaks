@@ -26,7 +26,7 @@ public sealed class SetAssetProperties(
     public string Counts => kind;
 
     /// <inheritdoc/>
-    public string Describe() => $"set {kind} properties on {AssetSearch.Named(spec)}";
+    public string Describe() => $"set {kind} properties on {Selection.Describe(spec.Code, spec.Tags)}";
 
     /// <inheritdoc/>
     /// <remarks>

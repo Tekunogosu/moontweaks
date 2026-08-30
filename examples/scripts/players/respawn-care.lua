@@ -10,7 +10,7 @@ local players = moontweaks.players
 -- Remember where they fell, before anything moves them.
 events.playerDeath(function(e)
   local at = players.position(e.player)
-  players.setData(e.player, "diedAt", { x = at.x, y = at.y, z = at.z })
+  players.setWorldData(e.player, "diedAt", { x = at.x, y = at.y, z = at.z })
 end)
 
 events.playerRespawn(function(e)
@@ -24,7 +24,7 @@ events.playerRespawn(function(e)
 
   players.say(e.player, "You wake up whole.")
 
-  local where = players.getData(e.player, "diedAt")
+  local where = players.getWorldData(e.player, "diedAt")
   if where then
     players.say(e.player, ("Your things are near %d, %d, %d.")
       :format(where.x, where.y, where.z))
@@ -34,7 +34,7 @@ end)
 -- What was remembered is saved with the player, so it survives a restart: a player
 -- who dies, leaves and comes back days later is still told where to look.
 events.playerJoin(function(e)
-  local where = players.getData(e.player, "diedAt")
+  local where = players.getWorldData(e.player, "diedAt")
   if where then
     players.say(e.player, ("You last died at %d, %d, %d.")
       :format(where.x, where.y, where.z))

@@ -24,7 +24,7 @@ public sealed class CookingRecipeFactory(IWorldAccessor world)
     /// alternatives that a given pot never holds together. The game's own meat stew
     /// names nine.
     /// </remarks>
-    private const int PotSlots = 4;
+    private const int POT_SLOTS = 4;
 
     private readonly AssetStacks stacks = new(world);
 
@@ -95,10 +95,10 @@ public sealed class CookingRecipeFactory(IWorldAccessor world)
     private static void Slots(CookingRecipeSpec spec, ScriptOrigin origin)
     {
         var least = spec.Ingredients.Sum(ingredient => ingredient.MinQuantity);
-        if (least > PotSlots)
+        if (least > POT_SLOTS)
         {
             throw new ScriptError(origin,
-                $"the fewest slots the ingredients need add up to {least}, and a pot holds {PotSlots}");
+                $"the fewest slots the ingredients need add up to {least}, and a pot holds {POT_SLOTS}");
         }
     }
 
@@ -122,10 +122,10 @@ public sealed class CookingRecipeFactory(IWorldAccessor world)
                 $"{at} has a maxQuantity of {spec.MaxQuantity} below its minQuantity of {spec.MinQuantity}");
         }
 
-        if (spec.MaxQuantity > PotSlots)
+        if (spec.MaxQuantity > POT_SLOTS)
         {
             throw new ScriptError(origin,
-                $"{at}.maxQuantity asks for {spec.MaxQuantity} slots, and a pot holds {PotSlots}");
+                $"{at}.maxQuantity asks for {spec.MaxQuantity} slots, and a pot holds {POT_SLOTS}");
         }
 
         return new CookingRecipeIngredient

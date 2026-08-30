@@ -34,7 +34,17 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
     /// re-sends the chunk it touched, so a script filling a shape one block at a time
     /// pays that cost per block; queued writes pay it once at the commit.
     /// </summary>
-    private readonly IBulkBlockAccessor bulk = api.World.GetBlockAccessorBulkUpdate(true, true);
+    /// <remarks>
+    /// Asked for on first use rather than when this is built. Every run builds one of
+    /// these as it binds its modules, which is while the server is still loading and
+    /// before there is a world to write into; a dry run builds one too and never
+    /// queues a block in it. Most scripts never queue a block at all, and one that
+    /// does is running in a handler, by which time the world is certainly there.
+    /// </remarks>
+    private IBulkBlockAccessor? bulk;
+
+    /// <inheritdoc cref="bulk"/>
+    private IBulkBlockAccessor Bulk => bulk ??= api.World.GetBlockAccessorBulkUpdate(true, true);
 
     /// <summary>
     /// What a code names, kept so the same one is looked up once however often it is
@@ -67,11 +77,15 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
 
     /// <summary>Queues a block, to be written when <see cref="Commit"/> is called.</summary>
     public void Queue(int blockId, int x, int y, int z) =>
-        bulk.SetBlock(blockId, new BlockPos(x, y, z));
+        Bulk.SetBlock(blockId, new BlockPos(x, y, z));
 
     /// <summary>Writes everything queued, relighting and sending each chunk once.</summary>
     public int Commit()
     {
+        // Nothing was ever queued, so there is nothing to write and no reason to ask
+        // the world for an accessor to write it with.
+        if (bulk is null) return 0;
+
         var queued = bulk.StagedBlocks.Count;
         bulk.Commit();
         return queued;
@@ -170,21 +184,14 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
     }
 
     /// <summary>
-    /// A colour as the single number the game draws with. Checked rather than
-    /// truncated, so a part written past 255 names itself instead of silently
-    /// wrapping round into a different colour.
+    /// A colour as the single number the game draws with, in the order it packs one:
+    /// alpha highest and red lowest.
     /// </summary>
     private static int Packed(ColourSpec colour, ScriptOrigin origin) =>
-        Byte(colour.Alpha, origin, "colour.alpha") << 24
-        | Byte(colour.Blue, origin, "colour.blue") << 16
-        | Byte(colour.Green, origin, "colour.green") << 8
-        | Byte(colour.Red, origin, "colour.red");
-
-    /// <inheritdoc cref="Packed"/>
-    private static int Byte(int value, ScriptOrigin origin, string path) =>
-        value is >= 0 and <= 255
-            ? value
-            : throw new ScriptError(origin, $"{path} must be between 0 and 255, got {value}");
+        ColourChannel.Of(colour.Alpha, origin, "colour.alpha") << 24
+        | ColourChannel.Of(colour.Blue, origin, "colour.blue") << 16
+        | ColourChannel.Of(colour.Green, origin, "colour.green") << 8
+        | ColourChannel.Of(colour.Red, origin, "colour.red");
 
     /// <summary>
     /// What the world itself remembers, saved with the save game rather than with any
@@ -192,11 +199,11 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
     /// home for anything counted or tracked across everybody.
     /// </summary>
     public void Remember(string key, ScriptValue value, ScriptOrigin origin) =>
-        Save(origin).StoreData(Scoped(key), ScriptJson.Write(value));
+        Save(origin).StoreData(ModKey.For(key), ScriptJson.Write(value));
 
     /// <summary>What the world remembered under a name, or nil where nothing was.</summary>
     public ScriptValue Recall(string key, ScriptOrigin origin) =>
-        ScriptJson.Parse(Save(origin).GetData<string?>(Scoped(key), null));
+        ScriptJson.Parse(Save(origin).GetData<string?>(ModKey.For(key)));
 
     /// <summary>
     /// The save game, which only exists once there is a world. Named in the failure
@@ -208,10 +215,4 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
         ?? throw new ScriptError(origin,
             "there is no world yet, so nothing can be remembered against it; "
             + "this belongs in an event handler rather than in a script's body");
-
-    /// <summary>
-    /// Keys are stored under this mod's own prefix, so a script cannot read or
-    /// overwrite what another mod saved against the same world.
-    /// </summary>
-    private static string Scoped(string key) => $"moontweaks:{key}";
 }

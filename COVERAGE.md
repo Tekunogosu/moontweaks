@@ -13,8 +13,10 @@ though nobody had looked at it.
 | Recipes | every kind | Kinds other mods declare |
 | Item properties | 15 fields | Creative tabs, spoilage list, particles |
 | Block properties | 12 further fields | Sounds, collision boxes, crop behaviour, decor |
-| Players | 33 functions | Inventory past `give`, groups, connection facts |
-| World | 15 functions | Entities, block entities, area scans, sound, explosions |
+| Players | 34 functions | Groups, richer messages, connection facts |
+| World | 15 functions | Area scans, sound, explosions, land claims |
+| Entities | 23 functions | Mounting, pathing, behaviours |
+| Inventory | 12 functions | Moving between two places in one call |
 | Calendar | 8 functions | Nothing worth naming |
 | Events | 16 of 50 | See `TODO.md` for the classification |
 | Scheduling | 2 functions | Nothing worth naming |
@@ -79,7 +81,7 @@ which is the different mod that `TODO.md` describes under names and descriptions
 
 ## Players
 
-Thirty-three functions reach where a player is and which way they face, their
+Thirty-four functions reach where a player is and which way they face, their
 health, hunger and tiredness, their mode, their spawn, whether they sleep, what
 they have eaten, what they are looking at, what they may do, what their abilities
 come to, their chat, and whatever a script chose to remember about them.
@@ -97,10 +99,11 @@ cannot clear one the game or another mod is holding.
 
 Also unbound:
 
-- **Inventory.** `players.give` hands a stack over through `TryGiveItemstack` and
-  says whether it fitted, which is the one piece a command giving something out
-  needs. The rest of `IPlayerInventoryManager` — the hotbar, the held slot, reading
-  or taking from what a player carries — is unreached, and is its own domain.
+- **Inventory** is reached, through `moontweaks.inventory` rather than here.
+  `players.give` remains the one-line way to hand something over and hear whether it
+  fitted. What `IPlayerInventoryManager` still keeps to itself is moving a stack from
+  one place to another in a single call: a script does it as a `take` and a `put`, and
+  has to put back what the second half could not place.
 - **Granting privileges.** Reading them is bound; `IPermissionManager` also declares,
   grants, denies and revokes them, and none of that is. `SetRole` is deliberately
   excluded: a script that can set roles can grant itself anything.
@@ -111,8 +114,9 @@ Also unbound:
 - **Groups.** `Groups` and `GetGroup` name the chat groups a player belongs to,
   which is what messaging anything other than general chat needs. `IGroupManager`
   creates and removes them.
-- **What entity they are looking at.** `CurrentBlockSelection` is bound as
-  `players.looking`; `CurrentEntitySelection` waits on the entity domain.
+- **What they are looking at** is reached: `players.looking` for the block and
+  `players.lookingAtEntity` for the creature, which hands back the identifier
+  `moontweaks.entities` takes.
 - **Connection facts.** `Ping`, `IpAddress`, `LanguageCode`, `ConnectionState`.
 - **Offline players past a name.** `IPlayerDataManager` answers for somebody who is
   not here; `uidOf` uses it, and the rest of what it holds is unreached.
@@ -126,15 +130,14 @@ screen, and remember something against the save game.
 
 Still unreached:
 
-- **Entities.** `GetEntitiesAround`, `GetEntityById`, `SpawnEntity`,
-  `SpawnItemEntity`, `DespawnEntity`, `GetNearestEntity`,
-  `GetEntitiesInsideCuboid`. Nothing reaches an entity that is not a player. Wants
-  deciding first how a script names one.
-- **Players near a place.** `GetPlayersAround` and `NearestPlayer` answer for
-  players what the entity calls answer generally.
-- **Block entities.** `GetBlockEntity` reaches what a chest holds or what a firepit
-  is burning. `SpawnBlockEntity` and `RemoveBlockEntity` place and clear them.
-  Nothing reaches any of it.
+- **Entities** are reached, through `moontweaks.entities`. What is left there is
+  mounting, pathing and behaviours, none of which has been asked for.
+- **Players near a place.** `moontweaks.entities.around` answers this already, since
+  a player's body is an entity and `skipPlayers` turns them back on. `GetPlayersAround`
+  and `NearestPlayer` would answer it directly and are unbound.
+- **Block entities past their inventory.** `moontweaks.inventory` reaches what a chest
+  holds. What a firepit is burning, what a quern is grinding and everything else a
+  `BlockEntity` keeps is unreached, as are `SpawnBlockEntity` and `RemoveBlockEntity`.
 - **Area scans.** `WalkBlocks` and `SearchBlocks` walk a region inside the engine.
   A script doing the same through `blockAt` pays a call per block, which the README
   already warns is the expensive mistake — so the engine's own scan is the fix, not
@@ -160,6 +163,43 @@ Still unreached:
 - **World facts a script cannot change.** Light level tables, sun brightness, sea
   level as a setting rather than a reading, and the world configuration that
   `classExclusiveRecipes` is read from.
+
+## Entities
+
+`moontweaks.entities` reaches everything alive that is not a player, and the stacks
+lying on the floor besides. It finds them — `around`, `nearest`, `count`, `get` — and
+changes them: spawning and despawning, killing and hurting, health, position, fire,
+names, abilities, and whatever a script chose to remember against one.
+
+An entity is named by the identifier a search hands back, in the same way a player is
+named by theirs. The two differ in one way a script has to know about: a player's
+identifier outlives everything, while an entity's is good only while the entity is
+loaded. A chunk unloading takes one out of reach without saying so, which is what
+`isLoaded` exists to answer.
+
+Left unbound: mounting and dismounting, the pathfinding an entity does for itself, and
+the behaviours it is built from. Each is a domain rather than a field, and none has
+been asked for.
+
+## Inventory
+
+`moontweaks.inventory` reaches any set of slots, named by where it is — a player and
+which of their inventories, a block position, or an entity that carries one. One shape
+rather than three families of function, because everything a script does to a chest it
+also does to a backpack.
+
+Reading is `size`, `list`, `count` and `slot`; writing is `put`, `take`, `setSlot`,
+`clearSlot` and `clear`; and `held`, `setHeld` and `clearHeld` reach the one slot a
+player has in their hand. Slots are numbered from 1, as everything in Lua is.
+
+Both `put` and `take` say how much they actually moved, which is rarely something a
+caller may assume: a bag may not hold enough and a chest may not have room. A script
+charging for something reads that number rather than trusting it.
+
+What is left is the one thing `IPlayerInventoryManager` does that this does not:
+moving a stack from one place to another in a single operation, with the game deciding
+where it best fits. A script spells that as a `take` and a `put`, and has to put back
+what the second half could not place.
 
 ## Calendar
 

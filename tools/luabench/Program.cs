@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using MoonTweaks.Scripting;
@@ -22,27 +21,21 @@ namespace MoonTweaks.LuaBench;
 public static class Program
 {
     /// <summary>Exit code for a run with nothing to report against it.</summary>
-    private const int Agreed = 0;
+    private const int AGREED = 0;
 
     /// <summary>
     /// Exit code for a run where two engines read the same Lua differently, or where
     /// an engine was named that does not exist.
     /// </summary>
-    private const int Disagreed = 1;
-
-    /// <summary>
-    /// Operations to run before timing anything, however short the run asked for is.
-    /// Below roughly this many the figures are the runtime compiling itself.
-    /// </summary>
-    private const int WarmupFloor = 200_000;
+    private const int DISAGREED = 1;
 
     /// <summary>Runs the benchmark and reports it.</summary>
     public static int Main(string[] arguments)
     {
         if (arguments.Contains("--help") || arguments.Contains("-h"))
         {
-            Console.WriteLine(Usage);
-            return Agreed;
+            Console.WriteLine(USAGE);
+            return AGREED;
         }
 
         var asJson = arguments.Contains("--json");
@@ -52,20 +45,22 @@ public static class Program
         if (names.Count == 0)
         {
             Console.Error.WriteLine($"no such engine; this mod offers {string.Join(", ", ScriptEngine.Names)}");
-            return Disagreed;
+            return DISAGREED;
         }
 
         var scale = quick ? 20 : 1;
         var engines = names.Select(name => Measure(name, scale)).ToList();
         var disagreements = Disagreements(engines);
+        // Measured once rather than per engine: nothing in it is an engine's doing.
+        var binder = Binder.Measure(scale);
 
-        if (asJson) Report.Json(engines, disagreements);
-        else Report.Text(engines, disagreements, quick);
+        if (asJson) Report.Json(engines, binder, disagreements);
+        else Report.Text(engines, binder, disagreements, quick);
 
-        return disagreements.Any(entry => entry.Unexplained) ? Disagreed : Agreed;
+        return disagreements.Any(entry => entry.Unexplained) ? DISAGREED : AGREED;
     }
 
-    private const string Usage = """
+    private const string USAGE = """
         luabench - measure the interpreter MoonTweaks runs scripts on
 
         usage: luabench [--engine NAME]... [--quick] [--json]
@@ -73,6 +68,9 @@ public static class Program
           --engine NAME  measure only this engine; repeatable (default: all)
           --quick        divide every iteration count by 20, for a fast check
           --json         emit the results as JSON instead of a table
+
+        Cost covers the interpreter; Binder covers the layer above it, which every
+        engine reaches through the same values and so is measured once.
 
         One engine is registered, so the checks are recorded rather than compared.
         Register a candidate beside it and this becomes the comparison that decides
@@ -122,7 +120,7 @@ public static class Program
         foreach (var subject in Workload.Cases)
         {
             var iterations = Math.Max(1, subject.Iterations / scale);
-            timings.Add(Time(subject.Name, subject.Unit, iterations,
+            timings.Add(Measurement.Of(subject.Name, subject.Unit, iterations,
                 count => host.Run(subject.FileFor(count))));
         }
 
@@ -132,42 +130,13 @@ public static class Program
         if (recorder.Handler is { } handler)
         {
             var iterations = Math.Max(1, 500_000 / scale);
-            timings.Add(Time("handler: host calls script", "call", iterations, count =>
+            timings.Add(Measurement.Of("handler: host calls script", "call", iterations, count =>
             {
                 for (var i = 0; i < count; i++) handler.Call([Workload.HandlerPayload]);
             }));
         }
 
         return new EngineResult(name, checks, timings);
-    }
-
-    /// <summary>
-    /// Times one case, reporting what one operation cost and what it allocated.
-    /// </summary>
-    /// <remarks>
-    /// The body runs once at a fraction of the count before it is measured, so what
-    /// is timed is compiled code rather than the runtime still compiling it. A first
-    /// run reads several times slow for that reason and says nothing about an engine.
-    /// </remarks>
-    private static Timing Time(string name, string unit, int iterations, Action<int> body)
-    {
-        // A fixed floor rather than a fraction of the count: a small run would
-        // otherwise warm up proportionally less and report the runtime still
-        // compiling itself as though that were the engine.
-        body(Math.Max(iterations / 10, Math.Min(iterations, WarmupFloor)));
-
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-
-        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-        var clock = Stopwatch.StartNew();
-        body(iterations);
-        clock.Stop();
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
-
-        return new Timing(name, unit, iterations,
-            clock.Elapsed.TotalMilliseconds * 1_000_000.0 / iterations, (double)allocated / iterations);
     }
 
     /// <summary>

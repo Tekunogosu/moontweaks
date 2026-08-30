@@ -123,8 +123,9 @@ square, ragged rows, a pattern that leaves no stone, and any character other tha
 those two are all refused with the row named.
 
 `examples/scripts/` holds worked scripts grouped by what they are about —
-`recipes/`, `assets/`, `players/`, `world/`, `calendar/`, `server/`, `events/` and
-`commands/` — checked by `lua-language-server` on every documentation build.
+`recipes/`, `assets/`, `players/`, `entities/`, `inventory/`, `world/`, `calendar/`,
+`server/`, `events/` and `commands/` — checked by `lua-language-server` on every
+documentation build.
 
 ## How it works
 
@@ -535,6 +536,14 @@ the heaviest thing a script does here, more than doubled.
 `./scripts/bench.sh` measures the interpreter and records what it makes of the Lua
 its checks put through it. It needs no running server: the workload reaches an
 engine only through `IScriptHost`, and the game is not part of that.
+
+It reports two tables. `Cost` is the interpreter, one column per engine, and its
+bindings are built by hand so that no engine is charged for the layer above it.
+`Binder` is that layer — reading the table a script wrote into the shape a binding
+takes, and writing the table a handler is given — measured once, because every
+engine reaches it through the same neutral values. A server crosses it on every call
+a script makes and again for every event it raises, so a regression there costs more
+than one in the engine.
 
 ```sh
 ./scripts/bench.sh                    # check, then measure

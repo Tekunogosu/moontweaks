@@ -16,24 +16,8 @@ public sealed class BarrelRecipeFactory(IWorldAccessor world)
     /// Translates one spec, expands whatever wildcards it names and resolves the
     /// result, so a recipe that reaches the log is one the game has already accepted.
     /// </summary>
-    public IReadOnlyList<BarrelRecipe> Build(BarrelRecipeSpec spec, ScriptOrigin origin)
-    {
-        var built = Create(spec, origin);
-        built.OnParsed(world);
-
-        var resolved = built.GenerateRecipesForAllIngredientCombinations(world)
-            .OfType<BarrelRecipe>()
-            .Where(variant => variant.Resolve(world, $"moontweaks {origin}"))
-            .ToList();
-
-        if (resolved.Count == 0)
-        {
-            throw new ScriptError(origin,
-                $"no recipe resolved for {spec.OutputCode}; check that every code exists");
-        }
-
-        return resolved;
-    }
+    public IReadOnlyList<BarrelRecipe> Build(BarrelRecipeSpec spec, ScriptOrigin origin) =>
+        RecipeExpansion.Resolve(Create(spec, origin), world, spec.OutputCode, origin);
 
     /// <summary>Translates one spec, rejecting what a barrel could never hold.</summary>
     private BarrelRecipe Create(BarrelRecipeSpec spec, ScriptOrigin origin)

@@ -30,7 +30,7 @@ public sealed record SuggestionSet(
 public static class AssetCodeLibrary
 {
     /// <summary>Name of the generated file inside the library folder.</summary>
-    public const string FileName = "codes.lua";
+    public const string FILE_NAME = "codes.lua";
 
     /// <summary>
     /// Every set the library declares. Values are read from <paramref name="world"/>,
@@ -44,17 +44,17 @@ public static class AssetCodeLibrary
     /// </remarks>
     public static IReadOnlyList<SuggestionSet> SetsOf(IWorldAccessor? world) =>
     [
-        new(SuggestionSets.AssetCode, "codes",
+        new(SuggestionSets.ASSET_CODE, "codes",
             "An asset code. The values below are what this server's registries held\n"
             + "when this file was written; any other string is still accepted.",
             world is null ? [] : CodesOf(world)),
 
-        new(SuggestionSets.AssetTag, "tags",
+        new(SuggestionSets.ASSET_TAG, "tags",
             "A tag an item or block carries, naming what it is rather than what it is\n"
             + "called. Any other string is still accepted.",
             world is null ? [] : TagsOf(world)),
 
-        new(SuggestionSets.AssetTrait, "traits",
+        new(SuggestionSets.ASSET_TRAIT, "traits",
             "A character trait, which a recipe may demand of whoever crafts it.\n"
             + "Any other string is still accepted.",
             world is null ? [] : TraitsOf(world)),
@@ -64,16 +64,15 @@ public static class AssetCodeLibrary
     /// Writes the file unless what is already listed there is this server's. Returns
     /// the sets it wrote, or null when nothing needed writing.
     /// </summary>
-    public static IReadOnlyList<SuggestionSet>? Install(
-        string folder, IWorldAccessor world, bool force = false) =>
-        Install(folder, SetsOf(world), force);
+    public static IReadOnlyList<SuggestionSet>? Install(string folder, IWorldAccessor world) =>
+        Install(folder, SetsOf(world));
 
-    /// <inheritdoc cref="Install(string, IWorldAccessor, bool)"/>
+    /// <inheritdoc cref="Install(string, IWorldAccessor)"/>
     public static IReadOnlyList<SuggestionSet>? Install(
         string folder, IReadOnlyList<SuggestionSet> sets, bool force = false)
     {
         var contents = Render(sets);
-        var target = Path.Combine(folder, EditorSupport.LibraryFolder, FileName);
+        var target = Path.Combine(folder, EditorSupport.LIBRARY_FOLDER, FILE_NAME);
 
         if (!force && File.Exists(target)
             && LibraryHeader.MarkerIn(File.ReadLines(target)) is { } marker
@@ -139,7 +138,7 @@ public static class AssetCodeLibrary
         output.AppendLine("---@meta");
         output.AppendLine($"--- Values this server offers: {Describe(sets)}.");
         output.AppendLine("--- Generated from the running game; do not edit.");
-        output.AppendLine($"{LibraryHeader.BuildMarker}{LibraryHeader.Fingerprint(body.ToString())}");
+        output.AppendLine($"{LibraryHeader.BUILD_MARKER}{LibraryHeader.Fingerprint(body.ToString())}");
         output.AppendLine();
         output.Append(body);
         return output.ToString();

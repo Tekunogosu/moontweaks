@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using MoonTweaks.Api;
@@ -25,7 +24,7 @@ public sealed class ItemDomain(MutationLog log, IWorldAccessor world)
     public void Set(ScriptOrigin origin, AssetPropertiesSpec properties) =>
         log.Record(AssetSearch.Change(
             origin, "item", properties, stacks,
-            code => world.SearchItems(code).Cast<CollectibleObject>(), world.Items));
+            world.SearchItems, world.Items));
 
     /// <summary>Counts the items the registry holds.</summary>
     /// <param name="origin">Script line requesting the count.</param>
@@ -74,16 +73,13 @@ internal static class AssetSearch
         System.Func<AssetLocation, IEnumerable<CollectibleObject>> byCode,
         IEnumerable<CollectibleObject> everything)
     {
-        if (spec.Code is null && spec.Tags is null)
-        {
-            throw new ScriptError(origin,
-                "neither a 'code' nor any 'tags' names what to change, so nothing would be");
-        }
+        Selection.MustName(spec.Code, spec.Tags, "change", origin);
 
         if (!CollectibleProperties.ChangesAnything(spec))
         {
             throw new ScriptError(origin,
-                $"{Named(spec)} names no property to change, so this would do nothing");
+                $"{Selection.Describe(spec.Code, spec.Tags)} names no property to change, "
+                + "so this would do nothing");
         }
 
         // A code searches the registry, which is what narrows the scan; tags alone
@@ -97,18 +93,11 @@ internal static class AssetSearch
 
         if (matched.Count == 0)
         {
-            throw new ScriptError(origin, $"no {kind} matches {Named(spec)}");
+            throw new ScriptError(origin,
+                $"no {kind} matches {Selection.Describe(spec.Code, spec.Tags)}");
         }
 
         return new SetAssetProperties(origin, kind, spec, matched, stacks);
     }
 
-    /// <summary>What a script said to change, for a message naming it back.</summary>
-    internal static string Named(AssetPropertiesSpec spec) => (spec.Code, spec.Tags) switch
-    {
-        ({ } code, null) => $"'{code}'",
-        (null, { } tags) => $"tags {string.Join(", ", tags.Select(tag => $"'{tag}'"))}",
-        ({ } code, { } tags) => $"'{code}' with tags {string.Join(", ", tags.Select(tag => $"'{tag}'"))}",
-        _ => "nothing",
-    };
 }

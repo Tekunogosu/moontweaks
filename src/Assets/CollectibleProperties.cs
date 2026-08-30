@@ -65,7 +65,7 @@ public static class CollectibleProperties
         if (spec.SmeltingType is { } kind) props.SmeltingType = ValueSet.As<EnumSmeltType>(kind);
         if (spec.SmeltedStack is { } smelted)
         {
-            props.SmeltedStack = Resolved(stacks.Stack(smelted, origin, "combustible.smeltedStack"), stacks, origin);
+            props.SmeltedStack = Stack(smelted, stacks, origin, "combustible.smeltedStack");
         }
     }
 
@@ -82,7 +82,7 @@ public static class CollectibleProperties
         if (spec.Intoxication is { } intoxication) props.Intoxication = (float)intoxication;
         if (spec.EatenStack is { } eaten)
         {
-            props.EatenStack = Resolved(stacks.Stack(eaten, origin, "nutrition.eatenStack"), stacks, origin);
+            props.EatenStack = Stack(eaten, stacks, origin, "nutrition.eatenStack");
         }
     }
 
@@ -92,7 +92,7 @@ public static class CollectibleProperties
     {
         asset.GrindingProps ??= new GrindingProperties();
         asset.GrindingProps.GroundStack =
-            Resolved(stacks.Stack(spec.GroundStack, origin, "grinding.groundStack"), stacks, origin);
+            Stack(spec.GroundStack, stacks, origin, "grinding.groundStack");
     }
 
     /// <summary>What crushing it yields, merged into whatever it already said.</summary>
@@ -101,7 +101,7 @@ public static class CollectibleProperties
     {
         var props = asset.CrushingProps ??= new CrushingProperties();
 
-        props.CrushedStack = Resolved(stacks.Stack(spec.CrushedStack, origin, "crushing.crushedStack"), stacks, origin);
+        props.CrushedStack = Stack(spec.CrushedStack, stacks, origin, "crushing.crushedStack");
         if (spec.HardnessTier is { } tier) props.HardnessTier = tier;
         if (spec.Quantity is { } spread)
         {
@@ -110,19 +110,13 @@ public static class CollectibleProperties
     }
 
     /// <summary>
-    /// A stack the game can hand out. These are resolved when their owner is loaded,
+    /// A stack the game can hand out. These are resolved as their owner is loaded,
     /// which has already happened by the time a script names one, so an unresolved
     /// stack would reach a player as nothing at all.
     /// </summary>
-    private static JsonItemStack Resolved(JsonItemStack stack, AssetStacks stacks, ScriptOrigin origin)
-    {
-        if (!stack.Resolve(stacks.World, $"moontweaks {origin}"))
-        {
-            throw new ScriptError(origin, $"'{stack.Code}' could not be resolved to a stack");
-        }
-
-        return stack;
-    }
+    private static JsonItemStack Stack(
+        StackSpec spec, AssetStacks stacks, ScriptOrigin origin, string path) =>
+        stacks.Resolve(stacks.Stack(spec, origin, path), origin, path);
 
     /// <summary>
     /// The keys that say what to change rather than what to change it to. Everything

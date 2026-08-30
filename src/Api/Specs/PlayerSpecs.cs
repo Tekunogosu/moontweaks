@@ -2,6 +2,22 @@ namespace MoonTweaks.Api;
 
 // What a script writes to change a player, and what it is told back about one.
 
+/// <summary>Which mode a player is playing in.</summary>
+public enum EnumPlayKind
+{
+    /// <summary>Visiting without a character of their own.</summary>
+    Guest,
+
+    /// <summary>Playing the game as it is meant.</summary>
+    Survival,
+
+    /// <summary>Building freely, with everything to hand.</summary>
+    Creative,
+
+    /// <summary>Watching without taking part.</summary>
+    Spectator,
+}
+
 /// <summary>Which side of a block is meant.</summary>
 public enum EnumFaceKind
 {
@@ -94,7 +110,7 @@ public sealed class LookingPayload(int x, int y, int z, string? block, EnumFaceK
 
     /// <summary>Code of the block, or nil where the selection no longer names one.</summary>
     [LuaField("block")]
-    [LuaSuggests(SuggestionSets.AssetCode)]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
     public string? Block { get; } = block;
 
     /// <summary>Which side of it they are pointing at, or nil where the game did not say.</summary>

@@ -11,14 +11,14 @@ local players = moontweaks.players
 -- welcomed, and never again however often they come back. Anything given out once
 -- belongs here rather than in `playerJoin`, which would hand it over every time.
 events.playerCreate(function(e)
-  players.setData(e.player, "firstSeen", { name = e.playerName })
+  players.setWorldData(e.player, "firstSeen", { name = e.playerName })
   players.say(e.player, "Welcome to the world for the first time, " .. e.playerName .. ".")
 end)
 
 -- `playerJoin` fires on every join, this one included.
 events.playerJoin(function(e)
-  local visits = (players.getData(e.player, "visits") or 0) + 1
-  players.setData(e.player, "visits", visits)
+  local visits = (players.getWorldData(e.player, "visits") or 0) + 1
+  players.setWorldData(e.player, "visits", visits)
 end)
 
 -- `playerNowPlaying` fires once they are actually in the world and the server has
@@ -30,7 +30,7 @@ end)
 -- `playerReady` is last: the client has reported that it finished joining, so this
 -- is the safe place to speak to someone and be sure they see it.
 events.playerReady(function(e)
-  local visits = players.getData(e.player, "visits") or 1
+  local visits = players.getWorldData(e.player, "visits") or 1
   players.say(e.player, ("Visit number %d. You are in %s mode.")
     :format(visits, players.gameMode(e.player)))
 end)
@@ -47,7 +47,7 @@ end)
 -- so anything that must happen exactly once per departure goes here, not above.
 events.playerDisconnect(function(e)
   local at = players.position(e.player)
-  players.setData(e.player, "leftAt", { x = at.x, y = at.y, z = at.z })
+  players.setWorldData(e.player, "leftAt", { x = at.x, y = at.y, z = at.z })
 end)
 
 -- `playerSwitchGameMode` fires after the change, so asking gives the new mode

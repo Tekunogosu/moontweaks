@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using MoonTweaks.Api;
 using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
@@ -21,25 +20,11 @@ public sealed class GridDomain(MutationLog log, IWorldAccessor world)
     /// <param name="origin">Script line requesting the change.</param>
     /// <param name="recipe">The recipe to add.</param>
     [LuaFunction("add")]
-    public void Add(ScriptOrigin origin, GridRecipeSpec recipe)
-    {
-        var built = factory.Create(recipe, origin);
-        built.OnParsed(world);
-
-        var resolved = new List<GridRecipe>();
-        foreach (var variant in built.GenerateRecipesForAllIngredientCombinations(world))
-        {
-            if (variant is GridRecipe grid && grid.Resolve(world, $"moontweaks {origin}")) resolved.Add(grid);
-        }
-
-        if (resolved.Count == 0)
-        {
-            throw new ScriptError(origin,
-                $"no recipe resolved for {recipe.OutputCode}; check that every ingredient code exists");
-        }
-
-        log.Record(recipe, new AddGridRecipe(origin, recipe.OutputCode, resolved));
-    }
+    public void Add(ScriptOrigin origin, GridRecipeSpec recipe) =>
+        log.Record(recipe, new AddGridRecipe(
+            origin,
+            recipe.OutputCode,
+            RecipeExpansion.Resolve(factory.Create(recipe, origin), world, recipe.OutputCode, origin)));
 
     /// <summary>
     /// Removes every grid recipe producing the given output code. The code may

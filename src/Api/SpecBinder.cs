@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -55,10 +56,9 @@ public static class SpecBinder
             property.SetValue(spec, Convert(property.PropertyType, entry, origin, $"{path}.{key}"));
         }
 
-        foreach (var (key, property) in fields)
+        foreach (var key in RequiredOf(specType))
         {
-            var field = property.GetCustomAttribute<LuaFieldAttribute>()!;
-            if (field.Required && !entries.ContainsKey(key))
+            if (!entries.ContainsKey(key))
             {
                 throw new ScriptError(origin, $"{path} is missing required field '{key}'");
             }
@@ -164,7 +164,7 @@ public static class SpecBinder
         // than key them by a pattern character.
         if (underlying.IsArray
             && underlying.GetElementType() is { } element
-            && element.GetCustomAttribute<LuaTableAttribute>() is not null)
+            && DeclaredTable(element) is not null)
         {
             var entries = Items(value, origin, path, "a list");
             var bound = Array.CreateInstance(element, entries.Count);
@@ -199,7 +199,7 @@ public static class SpecBinder
             return result;
         }
 
-        if (underlying.GetCustomAttribute<LuaTableAttribute>() is not null)
+        if (DeclaredTable(underlying) is not null)
         {
             return Bind(underlying, value, origin, path);
         }
@@ -230,15 +230,49 @@ public static class SpecBinder
     private static ScriptError Expected(ScriptOrigin origin, string path, string expected, ScriptValue got) =>
         new(origin, $"{path} expects {expected}, got {got.TypeName}");
 
+    // What a shape is made of never changes while the mod is loaded, and reading it
+    // costs a walk of the type's properties and an attribute lookup on each. Both
+    // questions below are asked on paths a server takes constantly — every argument a
+    // script fills in, and every table handed to a handler, which is once per event
+    // raised and once per timer tick — so each type is read once and remembered.
+    private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<string, PropertyInfo>> Fields = new();
+    private static readonly ConcurrentDictionary<Type, LuaTableAttribute?> Tables = new();
+    private static readonly ConcurrentDictionary<Type, IReadOnlyList<string>> Required = new();
+
     /// <summary>Every documented field of a spec, keyed by the name scripts write.</summary>
     public static IReadOnlyDictionary<string, PropertyInfo> FieldsOf(Type specType) =>
-        specType.GetProperties()
+        Fields.GetOrAdd(specType, static type => type.GetProperties()
             .Where(property => property.GetCustomAttribute<LuaFieldAttribute>() is not null)
-            .ToDictionary(property => property.GetCustomAttribute<LuaFieldAttribute>()!.Name);
+            .ToDictionary(property => property.GetCustomAttribute<LuaFieldAttribute>()!.Name));
+
+    /// <summary>
+    /// Keys a shape refuses to be built without, worked out once. Read from the same
+    /// annotations as everything else, so a field made required above is required
+    /// here without anything being told about it.
+    /// </summary>
+    /// <remarks>
+    /// Remembered rather than asked each time for the reason the fields themselves
+    /// are: reading an annotation builds the attribute object afresh on every call,
+    /// and this asked once per field of every table a script writes.
+    /// </remarks>
+    private static IReadOnlyList<string> RequiredOf(Type specType) =>
+        Required.GetOrAdd(specType, static type =>
+            (IReadOnlyList<string>)FieldsOf(type)
+                .Where(field => field.Value.GetCustomAttribute<LuaFieldAttribute>()!.Required)
+                .Select(field => field.Key)
+                .ToArray());
+
+    /// <summary>
+    /// The table annotation a type carries, or null where it is not a documented shape
+    /// at all. Sole owner of that question, so what the binder reads a table into and
+    /// what the writer hands one back as are decided the same way.
+    /// </summary>
+    public static LuaTableAttribute? DeclaredTable(Type type) =>
+        Tables.GetOrAdd(type, static candidate => candidate.GetCustomAttribute<LuaTableAttribute>());
 
     /// <summary>The table annotation of a spec, which every spec is required to carry.</summary>
     public static LuaTableAttribute TableAttributeOf(Type specType) =>
-        specType.GetCustomAttribute<LuaTableAttribute>()
+        DeclaredTable(specType)
         ?? throw new InvalidOperationException($"{specType.Name} is not annotated with [LuaTable]");
 
     /// <summary>Offers the closest known field name when a script misspells one.</summary>

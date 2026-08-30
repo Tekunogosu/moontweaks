@@ -86,13 +86,13 @@ public sealed class LuaSuggestsAttribute(string values) : Attribute
 public static class SuggestionSets
 {
     /// <summary>Every code the item and block registries hold.</summary>
-    public const string AssetCode = "AssetCode";
+    public const string ASSET_CODE = "AssetCode";
 
     /// <summary>Every tag any item or block carries.</summary>
-    public const string AssetTag = "AssetTag";
+    public const string ASSET_TAG = "AssetTag";
 
     /// <summary>Every character trait a server's assets define.</summary>
-    public const string AssetTrait = "AssetTrait";
+    public const string ASSET_TRAIT = "AssetTrait";
 }
 
 /// <summary>

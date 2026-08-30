@@ -85,7 +85,26 @@ public static class DomainBinder
                 index++;
             }
 
-            return Lift(invoke(domain, supplied));
+            try
+            {
+                return Lift(invoke(domain, supplied));
+            }
+            catch (ScriptError)
+            {
+                // Already says where it happened and what the author got wrong.
+                throw;
+            }
+            catch (Exception failure)
+            {
+                // Anything else is a failure this mod did not anticipate: a game call
+                // refusing something no check covers, or a mistake of its own. Either
+                // way it reaches a script author, who can act on the line it happened
+                // on and can act on nothing at all without it. The type is named
+                // because an unanticipated failure is worth reporting as a bug, and a
+                // bare sentence is not enough to chase one with.
+                throw new ScriptError(origin,
+                    $"{call} failed unexpectedly ({failure.GetType().Name}): {failure.Message}");
+            }
         });
     }
 
@@ -98,7 +117,9 @@ public static class DomainBinder
     /// reflection wrapped it in a <see cref="TargetInvocationException"/> that had to
     /// be unwrapped again. A <see cref="ScriptError"/> has to reach the run loop as
     /// itself: caught there it names the script, the line and the mistake, and uncaught
-    /// it takes the mod down with a stack trace in place of that sentence.
+    /// it takes the mod down with a stack trace in place of that sentence. What the
+    /// caller does with anything else it threw is decided in <see cref="BindFunction"/>,
+    /// which is the last place the line it happened on is still known.
     /// </remarks>
     private static Func<object, object?[], object?> InvokerFor(MethodInfo method)
     {

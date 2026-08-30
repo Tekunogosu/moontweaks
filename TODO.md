@@ -10,6 +10,58 @@ listed here is.
 Ordered by how far each is from done: the ones at the top need one decision, the
 ones at the bottom need several.
 
+## Quieten or drop ClientSyncProbe before release
+
+`ClientSyncProbe` loads on every client and writes one line into that player's log at
+`LevelFinalize`, naming how many grid and knapping recipes the client received. It is
+instrumentation for developing this mod, and a player who installs the mod did not
+ask for it.
+
+There is a reason to keep the capability rather than delete it: recipe sync is the
+one thing a server cannot check on its own. What the server registered and what a
+client actually received are different questions, and this is what answers the
+second.
+
+So the decision is between deleting the system outright and keeping it silent by
+default. The cheap version of silent is `api.Logger.VerboseDebug` in place of
+`Notification`, which leaves the check available to anyone running a client with
+verbose logging and writes nothing into an ordinary player's log. A setting in
+`config.json` would work too, but the probe is client-side and the settings file is
+the server's, so that is more machinery than the question is worth.
+
+Decide before the first release. Whichever way it goes, the README paragraph
+describing it changes with it.
+
+## Compiled setters for reading a table into a shape
+
+`SpecBinder.BindEntries` builds a spec with `Activator.CreateInstance` and writes each
+key with `PropertyInfo.SetValue`, both of which go through reflection on every call.
+`DomainBinder.InvokerFor` already solves the same problem the other way round, by
+compiling an expression tree once per bound method, so the technique is in the
+codebase and the pattern to copy is next door.
+
+`bench.sh` now reports the row this would move: `bind: one Area table`, currently
+about 500ns and 880 bytes per call, against 128ns for the four scalar arguments that
+skip the shape entirely. Worth doing when that gap starts to matter — a script
+scanning its surroundings every tick crosses it once per call — and worth leaving
+alone until then, since it trades readable reflection for generated code.
+
+## Nothing checks that the shipped examples parse
+
+`examples/scripts/` is embedded in the build and written into every server's
+MoonTweaks folder, and no part of the build reads any of it. A typo in one ships, and
+the first person to find it is an author who copied it expecting it to work.
+
+Compiling them needs no server and no bindings — `IScriptHost` can load a chunk
+without running it, and a chunk that calls `moontweaks.players.setWorldData` compiles
+whether or not that function exists. So the check is: walk `examples/scripts`, load
+each file, report the ones that fail. All 40 pass today; this is about keeping it that
+way.
+
+The natural home is `scripts/docs.sh --check`, which already refuses to pass on an
+undocumented member and is what CI runs, or a few lines in `luabench`, which already
+references the engine.
+
 ## Recipe fields still unbound
 
 `showInCreatedBy`, `mergeAttributesFrom`, `durabilityChange` and `matchingType`
@@ -162,20 +214,11 @@ than after.
 ## What a handler can do to the world
 
 `moontweaks.players` reaches a player's body, their standing and their memory.
-`moontweaks.world` reads and writes blocks, reads the weather and remembers things
-against the save game. Two domains are still missing entirely, and each wants the
-same treatment the recipe kinds had — one owner for reaching the thing, and a spec
-for what a script writes.
-
-**Entities.** Nothing touches an entity that is not a player: spawning, despawning,
-finding what is nearby, reading what one is. The first decision is how a script
-names one, since an entity has an id that does not survive a restart rather than a
-code that does.
-
-**Inventory.** `players.give` hands something over and says whether it fitted.
-Reading what a player carries, taking something from them, and reaching a chest
-through `GetBlockEntity` are all unreached, and all three are the same problem: a
-slot, and what a script may do to one.
+`moontweaks.entities` reaches everything else alive. `moontweaks.inventory` reaches
+any set of slots. `moontweaks.world` reads and writes blocks, reads the weather and
+remembers things against the save game. What is left is smaller than it was, and each
+piece wants the same treatment the recipe kinds had — one owner for reaching the
+thing, and a spec for what a script writes.
 
 **Scanning an area.** `WalkBlocks` and `SearchBlocks` walk a region inside the
 engine. A script doing the same through `blockAt` pays a call per block, which is
@@ -189,6 +232,17 @@ all.
 **Land claims.** `ILandClaimAPI.TestAccess` asks whether somebody may build
 somewhere. Anything editing blocks on a populated server should be asking it, and
 `world.setBlock` currently does not.
+
+**Block entities past their inventory.** `moontweaks.inventory` reaches what a chest
+holds. What a firepit is burning and what a quern is grinding sit on the block entity
+rather than in its slots, and reaching them means naming a shape per kind of block —
+which is a domain rather than a binding.
+
+**Moving a stack in one operation.** `put` and `take` each say how much they moved, so
+a script moving something between two places does both and has to put back what the
+second half could not place. `IPlayerInventoryManager.TryTransferAway` does it as one
+operation with the game choosing where it best fits. Worth binding once something
+writes that put-back by hand twice.
 
 Deliberately unbound: `Role`, `SetRole` and `Disconnect`, along with the granting
 half of `IPermissionManager`. A script that can set roles or grant privileges can

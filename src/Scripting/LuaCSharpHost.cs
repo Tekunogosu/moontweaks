@@ -24,7 +24,7 @@ namespace MoonTweaks.Scripting;
 public sealed class LuaCSharpHost : IScriptHost
 {
     /// <summary>Name this engine is selected by in the settings file.</summary>
-    public const string EngineName = "luacsharp";
+    public const string ENGINE_NAME = "luacsharp";
 
     /// <summary>
     /// Globals the basic library defines that this host takes back out. Withheld for
@@ -135,7 +135,7 @@ public sealed class LuaCSharpHost : IScriptHost
             if (frames[i].Function is not LuaClosure closure) continue;
 
             var lines = closure.Proto.LineInfo;
-            return new ScriptOrigin(closure.Name ?? "<script>",
+            return new ScriptOrigin(closure.Name,
                 instruction >= 0 && instruction < lines.Length ? lines[instruction] : 0);
         }
 

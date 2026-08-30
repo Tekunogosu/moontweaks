@@ -14,7 +14,7 @@ namespace MoonTweaks.Recipes;
 public sealed class VoxelRecipeFactory(IWorldAccessor world)
 {
     /// <summary>Side of the square grid every one of these kinds is worked on.</summary>
-    private const int SurfaceSize = 16;
+    private const int SURFACE_SIZE = 16;
 
     private readonly RecipeAssets assets = new(world);
 
@@ -23,24 +23,8 @@ public sealed class VoxelRecipeFactory(IWorldAccessor world)
     /// result, so a recipe that reaches the log is one the game has already accepted.
     /// </summary>
     public IReadOnlyList<TRecipe> Build<TRecipe>(VoxelRecipeSpec spec, ScriptOrigin origin)
-        where TRecipe : LayeredVoxelRecipe, new()
-    {
-        var built = Create<TRecipe>(spec, origin);
-        built.OnParsed(world);
-
-        var resolved = built.GenerateRecipesForAllIngredientCombinations(world)
-            .OfType<TRecipe>()
-            .Where(variant => variant.Resolve(world, $"moontweaks {origin}"))
-            .ToList();
-
-        if (resolved.Count == 0)
-        {
-            throw new ScriptError(origin,
-                $"no recipe resolved for {spec.OutputCode}; check that every code exists");
-        }
-
-        return resolved;
-    }
+        where TRecipe : LayeredVoxelRecipe, new() =>
+        RecipeExpansion.Resolve(Create<TRecipe>(spec, origin), world, spec.OutputCode, origin);
 
     /// <summary>Translates one spec, rejecting patterns the surface cannot hold.</summary>
     private TRecipe Create<TRecipe>(VoxelRecipeSpec spec, ScriptOrigin origin)
@@ -77,18 +61,18 @@ public sealed class VoxelRecipeFactory(IWorldAccessor world)
 
         var depth = pattern[0].Length;
         if (depth == 0) throw new ScriptError(origin, "pattern layer 1 has no rows");
-        if (depth > SurfaceSize)
+        if (depth > SURFACE_SIZE)
         {
             throw new ScriptError(origin,
-                $"pattern is {depth} rows deep but the surface is {SurfaceSize}");
+                $"pattern is {depth} rows deep but the surface is {SURFACE_SIZE}");
         }
 
         var width = pattern[0][0].Length;
         if (width == 0) throw new ScriptError(origin, "pattern row 1 is empty");
-        if (width > SurfaceSize)
+        if (width > SURFACE_SIZE)
         {
             throw new ScriptError(origin,
-                $"pattern row 1 is {width} cells wide but the surface is {SurfaceSize}");
+                $"pattern row 1 is {width} cells wide but the surface is {SURFACE_SIZE}");
         }
 
         foreach (var (layer, index) in pattern.Select((layer, index) => (layer, index)))

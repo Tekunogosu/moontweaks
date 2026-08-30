@@ -37,7 +37,7 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     [LuaFunction("setBlock")]
     public void SetBlock(
         ScriptOrigin origin,
-        [LuaSuggests(SuggestionSets.AssetCode)] string code, int x, int y, int z) =>
+        [LuaSuggests(SuggestionSets.ASSET_CODE)] string code, int x, int y, int z) =>
         world.Set(world.IdOf(code, origin), x, y, z);
 
     /// <summary>
@@ -53,7 +53,7 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     [LuaFunction("queueBlock")]
     public void QueueBlock(
         ScriptOrigin origin,
-        [LuaSuggests(SuggestionSets.AssetCode)] string code, int x, int y, int z) =>
+        [LuaSuggests(SuggestionSets.ASSET_CODE)] string code, int x, int y, int z) =>
         world.Queue(world.IdOf(code, origin), x, y, z);
 
     /// <summary>Writes everything queued, and says how many blocks that was.</summary>
@@ -64,7 +64,7 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// <summary>
     /// Drops a stack into the world, as a broken block would. A <c>velocity</c>
     /// throws it rather than letting it fall where it was put, and an <c>owner</c>
-    /// keeps that player from collecting it for a second, which together are what let
+    /// keeps that player from collecting it for a second, together are what let
     /// a script put something down without it going straight back where it came from.
     /// </summary>
     /// <param name="origin">Script line dropping it.</param>
@@ -101,7 +101,7 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     [LuaFunction("exchangeBlock")]
     public void ExchangeBlock(
         ScriptOrigin origin,
-        [LuaSuggests(SuggestionSets.AssetCode)] string code, int x, int y, int z) =>
+        [LuaSuggests(SuggestionSets.ASSET_CODE)] string code, int x, int y, int z) =>
         world.Exchange(world.IdOf(code, origin), x, y, z);
 
     /// <summary>
@@ -174,7 +174,7 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// blocks under the same slot is how a drawing is taken back.
     /// </remarks>
     /// <param name="origin">Script line drawing them.</param>
-    /// <param name="highlight">Who to draw for, which blocks, and in what colour.</param>
+    /// <param name="highlight">Who to draw for, which blocks, and in what color.</param>
     [LuaFunction("highlight")]
     public void Highlight(ScriptOrigin origin, HighlightSpec highlight) =>
         world.Highlight(highlight, origin);
@@ -182,7 +182,7 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// <summary>
     /// Remembers something about the world, saved with the save game rather than with
     /// any player and so still there after a restart. The counterpart of
-    /// <c>moontweaks.players.setData</c>, and the only home for anything counted
+    /// <c>moontweaks.players.setWorldData</c>, and the only home for anything counted
     /// across everybody rather than for each of them.
     /// </summary>
     /// <param name="origin">Script line storing it.</param>

@@ -35,14 +35,14 @@ events.didUseBlock(function(e)
   if e.block ~= "game:bed-wood-head-north" then return end
 
   local now = calendar.now()
-  local last = players.getData(e.player, "lastSlept")
+  local last = players.getWorldData(e.player, "lastSlept")
 
   if last then
     players.say(e.player, ("You last slept %.1f in-game hours ago.")
       :format(now.totalHours - last))
   end
 
-  players.setData(e.player, "lastSlept", now.totalHours)
+  players.setWorldData(e.player, "lastSlept", now.totalHours)
 end)
 
 -- Moving the clock moves time itself rather than skipping to an hour, so everything

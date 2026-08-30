@@ -17,7 +17,7 @@ public static partial class HtmlWriter
         page.AppendLine("<html lang=\"en\"><head><meta charset=\"utf-8\">");
         page.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
         page.AppendLine($"<title>MoonTweaks {Escape(api.Version)} API</title>");
-        page.AppendLine($"<style>{Stylesheet}</style></head><body>");
+        page.AppendLine($"<style>{STYLESHEET}</style></head><body>");
 
         WriteSidebar(page, api);
 
@@ -174,7 +174,7 @@ public static partial class HtmlWriter
     [GeneratedRegex("[^a-z0-9]+")]
     private static partial Regex NonAnchor();
 
-    private const string Stylesheet = """
+    private const string STYLESHEET = """
         :root {
           --bg: #ffffff; --fg: #1b1b1d; --muted: #5c5c66; --line: #e2e2e8;
           --accent: #2f6f4f; --code-bg: #f4f4f7; --nav-bg: #fafafc; --required: #9a3b2f;

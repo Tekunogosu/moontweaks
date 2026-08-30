@@ -1,7 +1,6 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 
@@ -15,7 +14,7 @@ namespace MoonTweaks.Host;
 public sealed class MoonTweaksConfig
 {
     /// <summary>Name of the settings file inside the MoonTweaks folder.</summary>
-    public const string FileName = "config.json";
+    public const string FILE_NAME = "config.json";
 
     private static readonly JsonSerializerOptions Format = new()
     {
@@ -43,19 +42,13 @@ public sealed class MoonTweaksConfig
     /// </summary>
     public static MoonTweaksConfig Load(string folder, ILogger logger)
     {
-        return Read(folder, logger);
-    }
-
-    /// <summary>Reads the file, or writes and returns the defaults when there is none.</summary>
-    private static MoonTweaksConfig Read(string folder, ILogger logger)
-    {
-        var path = Path.Combine(folder, FileName);
+        var path = Path.Combine(folder, FILE_NAME);
 
         if (!File.Exists(path))
         {
             var defaults = new MoonTweaksConfig();
             File.WriteAllText(path, JsonSerializer.Serialize(defaults, Format));
-            logger.Notification("[moontweaks] wrote {0} with its defaults", FileName);
+            logger.Notification("[moontweaks] wrote {0} with its defaults", FILE_NAME);
             return defaults;
         }
 
@@ -66,7 +59,7 @@ public sealed class MoonTweaksConfig
         }
         catch (JsonException error)
         {
-            logger.Error("[moontweaks] {0} could not be read ({1}); using defaults", FileName, error.Message);
+            logger.Error("[moontweaks] {0} could not be read ({1}); using defaults", FILE_NAME, error.Message);
             return new MoonTweaksConfig();
         }
     }

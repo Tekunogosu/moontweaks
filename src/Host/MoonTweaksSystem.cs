@@ -1,6 +1,6 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using MoonTweaks.Api;
 using MoonTweaks.Commands;
 using MoonTweaks.Events;
 using MoonTweaks.Recipes;
@@ -81,7 +81,7 @@ public class MoonTweaksSystem : ModSystem
                     // A check is a dry run, so its handlers are never called and its
                     // interpreter goes with it rather than joining the live one.
                     using var run = ScriptRun.Execute(
-                        api, ScriptEngine.Create(ScriptEngine.Default),
+                        api, ScriptEngine.Create(ScriptEngine.DEFAULT),
                         ScriptLibrary.ScriptsPathFor(), new RecipeRegistry(api),
                         new ScriptEvents(api), new ScriptCommands(api, commandNames),
                         new ScriptTimers(api));
@@ -106,7 +106,7 @@ public class MoonTweaksSystem : ModSystem
                     var sets = AssetCodeLibrary.SetsOf(api.World);
                     AssetCodeLibrary.Install(folder, sets, force: true);
                     return TextCommandResult.Success(
-                        $"wrote {EditorSupport.LibraryFolder}/{AssetCodeLibrary.FileName} "
+                        $"wrote {EditorSupport.LIBRARY_FOLDER}/{AssetCodeLibrary.FILE_NAME} "
                         + $"with {AssetCodeLibrary.Describe(sets)}");
                 })
             .EndSubCommand();
@@ -127,20 +127,20 @@ public class MoonTweaksSystem : ModSystem
         if (AssetCodeLibrary.Install(folder, server.World) is { } sets)
         {
             server.Logger.Notification("[moontweaks] wrote {0}/{1} with {2}",
-                EditorSupport.LibraryFolder, AssetCodeLibrary.FileName, AssetCodeLibrary.Describe(sets));
+                EditorSupport.LIBRARY_FOLDER, AssetCodeLibrary.FILE_NAME, AssetCodeLibrary.Describe(sets));
         }
 
         foreach (var misplaced in ScriptLibrary.Misplaced(folder))
         {
             server.Logger.Warning("[moontweaks] {0} sits beside the {1} folder rather than in it, so it does not run",
-                misplaced, ScriptLibrary.ScriptsFolder);
+                misplaced, ScriptLibrary.SCRIPTS_FOLDER);
         }
 
         var registry = new RecipeRegistry(server);
         events = new ScriptEvents(server);
         var commands = new ScriptCommands(server);
         var timers = new ScriptTimers(server);
-        var engine = ScriptEngine.Create(ScriptEngine.Default);
+        var engine = ScriptEngine.Create(ScriptEngine.DEFAULT);
         var run = ScriptRun.Execute(server, engine, scriptsFolder, registry, events, commands, timers);
 
         if (run.Scripts.Count == 0)
@@ -162,19 +162,20 @@ public class MoonTweaksSystem : ModSystem
 
         var affected = run.Log.Apply(server, server.Logger);
         applied = run.Log;
-        // The run succeeded and its handlers are the live ones, so this is where the
-        // game is actually subscribed to and the commands are registered. A check
-        // never reaches here, which is what keeps it from doing either twice.
-        events.Activate();
-        // Taken before activating, which empties the list it was recorded in, and
-        // kept so a later check knows which names this mod put there itself.
-        commandNames = commands.Names.ToList();
-        commands.Activate();
-        timers.Activate();
         // Kept rather than disposed: a script may have left a handler behind, and it
         // is only callable while the interpreter that made it is alive.
         host = run.Host;
         RecipeBase.CollectiblePreSearchResultsCache.Clear();
+
+        // Taken before activating, which empties the list it was recorded in, and
+        // kept so a later check knows which names this mod put there itself.
+        commandNames = commands.Names.ToList();
+        // The run succeeded and its handlers are the live ones, so this is where the
+        // game is actually subscribed to and the commands are registered. A check
+        // never reaches here, which is what keeps it from doing either twice.
+        Start(server.Logger, "event handlers", events.Activate);
+        Start(server.Logger, "commands", commands.Activate);
+        Start(server.Logger, "timers", timers.Activate);
 
         // Nothing downstream reports this: a surface takes the first recipe whose
         // identifier matches, and saves that identifier with the block, so a
@@ -194,7 +195,7 @@ public class MoonTweaksSystem : ModSystem
 
         server.Logger.Notification(
             "[moontweaks] {0} script(s) on {1}, {2} change(s), {3} affected; {4} recipes now",
-            run.Scripts.Count, ScriptEngine.Default, run.Log.Pending.Count, affected, string.Join(", ", held));
+            run.Scripts.Count, ScriptEngine.DEFAULT, run.Log.Pending.Count, affected, string.Join(", ", held));
 
         if (events.Count > 0)
         {
@@ -210,6 +211,30 @@ public class MoonTweaksSystem : ModSystem
         if (timers.Count > 0)
         {
             server.Logger.Notification("[moontweaks] {0} timer(s) running", timers.Count);
+        }
+    }
+
+    /// <summary>
+    /// Carries out one of the things a successful run asked for, reporting a refusal
+    /// rather than letting it out.
+    /// </summary>
+    /// <remarks>
+    /// Each of the three is attempted whatever the ones before it did. Only the game
+    /// can refuse a command, and it does so as the command is registered — which is
+    /// long after the script that asked for it finished, and after every recipe has
+    /// already been applied. Letting that out of here takes the mod down mid-startup
+    /// with a stack trace, leaving a server whose recipes changed, whose timers never
+    /// started, and with nothing in the log a script author could act on.
+    /// </remarks>
+    private static void Start(ILogger logger, string what, Action activate)
+    {
+        try
+        {
+            activate();
+        }
+        catch (Exception refused)
+        {
+            logger.Error("[moontweaks] {0} could not be started: {1}", what, refused.Message);
         }
     }
 
