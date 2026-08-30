@@ -32,36 +32,6 @@ the server's, so that is more machinery than the question is worth.
 Decide before the first release. Whichever way it goes, the README paragraph
 describing it changes with it.
 
-## Compiled setters for reading a table into a shape
-
-`SpecBinder.BindEntries` builds a spec with `Activator.CreateInstance` and writes each
-key with `PropertyInfo.SetValue`, both of which go through reflection on every call.
-`DomainBinder.InvokerFor` already solves the same problem the other way round, by
-compiling an expression tree once per bound method, so the technique is in the
-codebase and the pattern to copy is next door.
-
-`bench.sh` now reports the row this would move: `bind: one Area table`, currently
-about 500ns and 880 bytes per call, against 128ns for the four scalar arguments that
-skip the shape entirely. Worth doing when that gap starts to matter — a script
-scanning its surroundings every tick crosses it once per call — and worth leaving
-alone until then, since it trades readable reflection for generated code.
-
-## Nothing checks that the shipped examples parse
-
-`examples/scripts/` is embedded in the build and written into every server's
-MoonTweaks folder, and no part of the build reads any of it. A typo in one ships, and
-the first person to find it is an author who copied it expecting it to work.
-
-Compiling them needs no server and no bindings — `IScriptHost` can load a chunk
-without running it, and a chunk that calls `moontweaks.players.setWorldData` compiles
-whether or not that function exists. So the check is: walk `examples/scripts`, load
-each file, report the ones that fail. All 40 pass today; this is about keeping it that
-way.
-
-The natural home is `scripts/docs.sh --check`, which already refuses to pass on an
-undocumented member and is what CI runs, or a few lines in `luabench`, which already
-references the engine.
-
 ## Recipe fields still unbound
 
 `showInCreatedBy`, `mergeAttributesFrom`, `durabilityChange` and `matchingType`
@@ -156,27 +126,31 @@ What stops this being mechanical is ownership: an undo needs a stack, the stack
 needs a lifetime, and neither belongs to a script that may fail halfway. Decide
 whether an undo is per command, per script or per server before binding anything.
 
-## Loading a chunk deliberately
-
-`world.isLoaded` says whether a position can be written to. Nothing brings a chunk
-in, so a script acting far from a player can only decline. `LoadChunkColumn` and
-`TestChunkExists` are the calls, and both answer through a callback rather than
-returning, so this wants the same shape a handler already has.
-
 ## The events still unbound
 
-Sixteen are bound. `IServerEventAPI` declares 34 of its own and inherits 16 more
-from `IEventAPI`, so 34 are unbound. They fall into groups that want quite
-different things, listed here nearest to done first.
+Twenty are bound. They fall into groups that want quite different things, listed here
+nearest to done first.
 
-**Notifications carrying something new** want a payload shape apiece:
-`DidPlaceBlock` (the block replaced and the stack placed, over `BlockEvent`),
-`AfterActiveSlotChanged`, `MountGaitReceived`, `ChunkColumnLoaded`,
-`ChunkColumnUnloaded`, `PlayerDimensionChanged`, `ChunkDirty`, `MapRegionLoaded`,
-`MapRegionUnloaded`, and the entity events `IEventAPI` adds — `OnEntitySpawn`,
-`OnEntityLoaded`, `OnEntityDeath`, `OnEntityDespawn`, `EntityMounted`,
-`EntityUnmounted`. The entity ones want the entity domain deciding first how a
-script names an entity that is not a player.
+**Notifications carrying something new** want a payload shape apiece. What is left:
+`MountGaitReceived`, `ChunkDirty`, `MapRegionLoaded` and `MapRegionUnloaded`.
+`ChunkDirty` is raised from `MarkChunkDirty`, which a busy server calls constantly —
+it belongs with the hot-path group below rather than here unless something actually
+wants it.
+
+`PlayerDimensionChanged` is declared on `IEventAPI` and nothing in the server ever
+raises it: the only call sites for its trigger are the declaration itself. Not worth
+binding until the game raises it.
+
+**The entity events cannot be bound as things stand, and that is now checked rather
+than suspected.** `OnEntitySpawn`, `OnEntityLoaded`, `OnEntityDeath`, `OnEntityDespawn`,
+`EntityMounted` and `EntityUnmounted` all raise straight out of `ServerMain`, and
+`WorldgenWorldAccessor` — the accessor handed to worldgen, which runs on the chunk
+generation thread — exposes `SpawnEntity` delegating directly to that same world. So a
+creature generated with a chunk raises `OnEntitySpawn` off the main thread, and
+`TriggerEntityLoaded` is reached from `LoadEntity` on the same path. The interpreter is
+not thread safe and nothing here serialises calls into it, so binding these is a race
+rather than a feature. They move into reach when the marshalling described below
+exists, not before.
 
 **Events whose handler must answer** are the ones needing a decision rather than
 work. `CanUseBlock` and `CanPlaceOrBreakBlock` return a bool, `BreakBlock`,
@@ -193,7 +167,7 @@ stranger.
 
 **Events on a hot path** should stay unbound whatever else is. `OnGetClimate`,
 `OnGetWindSpeed`, `MatchesGridRecipe` and `MatchesRecipe` are raised per frame or
-per match attempt, and a script call costs roughly 600ns against 3ns for the same
+per match attempt, and a script call costs roughly 130ns against 3ns for the same
 method in C#. Binding one puts the interpreter inside the game's inner loop. The
 pull-based readings are bound instead: `world.climateAt` and `world.windAt` answer
 the same questions when a script asks rather than when the game does.
@@ -201,13 +175,11 @@ the same questions when a script asks rather than when the game does.
 **Events raised off the main thread** cannot be bound as things stand:
 `BeginChunkColumnLoadChunkThread`, `OnTrySpawnGroupNearOffthread`,
 `PhysicsThreadStart`, and `OnTrySpawnEntity`, which `GenCreatures` raises from
-chunk column generation. The interpreter is not thread safe and nothing here
-serialises calls into it, so binding one would be a race rather than a feature.
-Offering them means one place that marshals a call onto the main thread, and
-`IEventAPI.EnqueueMainThreadTask` is what such a place would be built on.
-`ChunkColumnLoaded` and `ChunkColumnUnloaded` were checked and are main-thread;
-the entity events have not been, and want checking before they are bound rather
-than after.
+chunk column generation. Offering any of them — or the entity events above — means
+one place that marshals a call onto the main thread, and
+`IEventAPI.EnqueueMainThreadTask` is what such a place would be built on. That one
+place is now the single thing standing between this mod and a whole group of events,
+so it is the piece worth building next in this section.
 
 `AssetsFinalizers` is obsolete and wants binding never.
 
@@ -215,23 +187,11 @@ than after.
 
 `moontweaks.players` reaches a player's body, their standing and their memory.
 `moontweaks.entities` reaches everything else alive. `moontweaks.inventory` reaches
-any set of slots. `moontweaks.world` reads and writes blocks, reads the weather and
-remembers things against the save game. What is left is smaller than it was, and each
-piece wants the same treatment the recipe kinds had — one owner for reaching the
+any set of slots. `moontweaks.world` reads and writes blocks, searches a
+region, reads the weather, plays sounds, throws off particles, asks about land claims
+and remembers things against the save game. What is left is smaller than it was, and
+each piece wants the same treatment the recipe kinds had — one owner for reaching the
 thing, and a spec for what a script writes.
-
-**Scanning an area.** `WalkBlocks` and `SearchBlocks` walk a region inside the
-engine. A script doing the same through `blockAt` pays a call per block, which is
-the expensive mistake the README already warns about, so this is a fix rather than
-a convenience.
-
-**Sound and particles.** `PlaySoundAt` and `SpawnParticles` reach a vanilla client
-the same way `world.highlight` does, and are how a scripted effect is noticed at
-all.
-
-**Land claims.** `ILandClaimAPI.TestAccess` asks whether somebody may build
-somewhere. Anything editing blocks on a populated server should be asking it, and
-`world.setBlock` currently does not.
 
 **Block entities past their inventory.** `moontweaks.inventory` reaches what a chest
 holds. What a firepit is burning and what a quern is grinding sit on the block entity
@@ -256,12 +216,12 @@ alongside per-command permissions rather than before it.
 needs to guard a block of codes that only exist on some servers. It does not reach
 into what another mod declared.
 
-Two things would: `IWorldAccessor.GetRecipeRegistry(code)` resolves a recipe kind by
-its code rather than by its type, which is what a scripted edit to another mod's
-recipes needs. `IModLoader.GetModSystem` reaches a mod system outright — which is
-where the survival mod keeps weather (`WeatherSystemServer`), temporal stability
-(`SystemTemporalStability`) and block reinforcement (`ModSystemBlockReinforcement`).
+Reaching another mod's recipes is done: `moontweaks.recipes.kinds`, `count` and
+`remove` reach any registered kind by its code, matching on what a recipe's output
+resolved to, since that is all a kind this mod has never seen reliably offers.
 
-The recipe registry one is worth doing and is only a lookup. The mod system one
-couples this to another mod's internals across versions, and wants a decision about
-whether that coupling is acceptable before any of it is written.
+What is left is `IModLoader.GetModSystem`, which reaches a mod system outright — where
+the survival mod keeps weather (`WeatherSystemServer`), temporal stability
+(`SystemTemporalStability`) and block reinforcement (`ModSystemBlockReinforcement`).
+That couples this mod to another's internals across versions, and wants a decision
+about whether that coupling is acceptable before any of it is written.

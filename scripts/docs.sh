@@ -27,3 +27,16 @@ echo "  examples/.luarc.json"
 echo "  examples/.vscode/extensions.json"
 echo "  examples/library/moontweaks.lua"
 echo "  examples/library/codes.lua"
+
+# The examples are shipped in the mod and scaffolded against the library just
+# written, so they are checked against the types this build actually produces.
+# CI runs this and fails on it; here it runs when the tool is installed and says
+# so when it is not, rather than passing quietly either way.
+if command -v lua-language-server >/dev/null 2>&1; then
+    echo
+    lua-language-server --check "$ROOT/examples" --checklevel Warning
+else
+    echo
+    echo "lua-language-server is not installed, so the examples were not checked here."
+    echo "CI checks them on every push; install it to get the same answer locally."
+fi

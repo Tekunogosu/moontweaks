@@ -35,6 +35,62 @@ public sealed class EventDomain(ScriptEvents events)
         ScriptOrigin origin, [LuaPayload(typeof(BlockEventPayload))] ScriptValue.Func handler) =>
         events.OnDidBreakBlock(origin, handler);
 
+    /// <summary>
+    /// Called after a player puts a block down. <c>block</c> is what now stands there
+    /// and <c>replaced</c> is what it went over, which is air where nothing was.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("didPlaceBlock")]
+    public void DidPlaceBlock(
+        ScriptOrigin origin, [LuaPayload(typeof(BlockPlacedEventPayload))] ScriptValue.Func handler) =>
+        events.OnDidPlaceBlock(origin, handler);
+
+    /// <summary>
+    /// Called after a player changes which hotbar slot they are holding. Ask
+    /// <c>moontweaks.inventory.held</c> what is now in their hand — the event says who
+    /// changed it rather than carrying the slot, since what is in it is the useful part.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerChangeSlot")]
+    public void PlayerChangeSlot(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
+        events.OnPlayerChangeSlot(origin, handler);
+
+    /// <summary>
+    /// Called once a column of chunks has been brought in and its blocks can be
+    /// reached. This is what lets a script act on a place nobody is standing, together
+    /// with <c>moontweaks.world.loadChunk</c>.
+    /// </summary>
+    /// <remarks>
+    /// A busy server loads columns constantly, so a handler here runs often. Keep it
+    /// short, and decide whether the column is one worth acting on before doing
+    /// anything that costs.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("chunkColumnLoaded")]
+    public void ChunkColumnLoaded(
+        ScriptOrigin origin, [LuaPayload(typeof(ChunkColumnEventPayload))] ScriptValue.Func handler) =>
+        events.OnChunkColumnLoaded(origin, handler);
+
+    /// <summary>
+    /// Called as one chunk is let go, which is where anything remembered about its
+    /// blocks should be forgotten. The blocks themselves are on their way out and
+    /// should not be reached.
+    /// </summary>
+    /// <remarks>
+    /// Raised once per chunk rather than once per column, so a column leaving memory
+    /// calls this once for every chunk stacked at that place. <c>chunkY</c> says which.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("chunkUnloaded")]
+    public void ChunkUnloaded(
+        ScriptOrigin origin, [LuaPayload(typeof(ChunkEventPayload))] ScriptValue.Func handler) =>
+        events.OnChunkUnloaded(origin, handler);
+
     /// <summary>Called when a player joins.</summary>
     /// <param name="origin">Script line adding the handler.</param>
     /// <param name="handler">Called each time it happens.</param>

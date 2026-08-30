@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using MoonTweaks.Api;
 using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
@@ -117,6 +118,35 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     public bool IsLoaded(ScriptOrigin origin, int x, int y, int z) => world.IsLoaded(x, y, z);
 
     /// <summary>
+    /// Asks for the chunk holding a position to be brought in, and says whether it was
+    /// already there. Answering false is the ordinary case rather than a failure: it
+    /// means the request was made.
+    /// </summary>
+    /// <remarks>
+    /// The one way a script reaches somewhere nobody is standing. Everything that
+    /// writes to the world does nothing at all in a chunk that is not loaded, and says
+    /// nothing about it, so a script acting far from a player asks for the chunk, waits
+    /// a tick or two, and checks <c>isLoaded</c> before it writes:
+    ///
+    /// <code>
+    /// if not world.loadChunk(x, z) then
+    ///   moontweaks.server.after(2000, function()
+    ///     if world.isLoaded(x, 64, z) then build(x, z) end
+    ///   end)
+    /// end
+    /// </code>
+    ///
+    /// The chunk is not held open once it arrives. It unloads again on the game's own
+    /// terms, so a script must not assume a chunk it asked for an hour ago is still
+    /// there.
+    /// </remarks>
+    /// <param name="origin">Script line asking for it.</param>
+    /// <param name="x">Any block position in the column wanted, east to west.</param>
+    /// <param name="z">Any block position in the column wanted, north to south.</param>
+    [LuaFunction("loadChunk")]
+    public bool LoadChunk(ScriptOrigin origin, int x, int z) => world.Load(x, z);
+
+    /// <summary>
     /// The height of the ground in one column, or nil where that column is not
     /// loaded. Read from the map the world already keeps rather than by looking down
     /// a block at a time, so this costs one call where the obvious way costs a
@@ -163,6 +193,72 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// <param name="z">Where to ask.</param>
     [LuaFunction("windAt")]
     public VectorPayload WindAt(ScriptOrigin origin, int x, int y, int z) => world.Wind(x, y, z);
+
+    /// <summary>
+    /// Every block in a box that a code names, and where each stands. One call
+    /// whatever the box holds, where walking it with <c>blockAt</c> costs a call per
+    /// block — which is why this exists rather than being left to a loop.
+    /// </summary>
+    /// <remarks>
+    /// Chunks that are not loaded hold nothing to look at and are stepped over, so a
+    /// box reaching past what is loaded answers for the part of it that is loaded.
+    /// Ask <c>isLoaded</c> about a corner first where that matters.
+    ///
+    /// The search stops once it has <c>limit</c> matches, so a box holding more than
+    /// that is not read to the end. Raise it deliberately: every match is a table.
+    /// </remarks>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="region">Which box to search, and what to look for in it.</param>
+    [LuaFunction("findBlocks")]
+    public IReadOnlyList<BlockAtPayload> FindBlocks(ScriptOrigin origin, RegionSpec region) =>
+        world.Find(region, out _);
+
+    /// <summary>
+    /// How many blocks in a box a code names. Cheaper than counting what
+    /// <c>findBlocks</c> hands back, since nothing is described that is only going to
+    /// be counted.
+    /// </summary>
+    /// <inheritdoc cref="FindBlocks" path="/remarks"/>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="region">Which box to search, and what to count in it.</param>
+    [LuaFunction("countBlocks")]
+    public int CountBlocks(ScriptOrigin origin, RegionSpec region) => world.Count(region, out _);
+
+    /// <summary>
+    /// Whether a player may build at a place, and what stops them where they may not.
+    /// Reading it enforces nothing; it is how a script refuses politely rather than
+    /// writing over somebody's claim.
+    /// </summary>
+    /// <remarks>
+    /// <c>setBlock</c> and the rest do not ask this on a script's behalf. They write
+    /// as the server rather than as a player, which is right for a script laying out
+    /// terrain and wrong for one acting on what a player asked for — so the choice is
+    /// left here, where the script knows which it is doing.
+    /// </remarks>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="access">Who wants to act, where, and what they want to do.</param>
+    [LuaFunction("testAccess")]
+    public EnumAccessResponse TestAccess(ScriptOrigin origin, AccessSpec access) =>
+        world.Access(access, origin);
+
+    /// <summary>
+    /// Plays one of the game's own sounds at a place, which everybody near enough
+    /// hears. Nothing needs installing on their machine.
+    /// </summary>
+    /// <param name="origin">Script line playing it.</param>
+    /// <param name="sound">Which sound, where, how loud and how far.</param>
+    [LuaFunction("playSound")]
+    public void PlaySound(ScriptOrigin origin, SoundSpec sound) => world.Play(sound);
+
+    /// <summary>
+    /// Throws off particles at a place, drawn on every screen near enough to see them.
+    /// Given one point they appear there; given two they fill the box between.
+    /// </summary>
+    /// <param name="origin">Script line spawning them.</param>
+    /// <param name="particles">Where they appear, how many, what colour and how they move.</param>
+    [LuaFunction("spawnParticles")]
+    public void SpawnParticles(ScriptOrigin origin, ParticlesSpec particles) =>
+        world.Particles(particles, origin);
 
     /// <summary>
     /// Outlines a set of blocks on one player's screen. Nothing needs installing on

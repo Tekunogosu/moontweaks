@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using MoonTweaks.Scripting;
 
@@ -18,11 +19,10 @@ public static class SpecBinder
     public static object Bind(Type specType, ScriptValue value, ScriptOrigin origin, string path)
     {
         var table = TableAttributeOf(specType);
-        var fields = FieldsOf(specType);
 
         if (value is ScriptValue.Str shorthand && table.Shorthand is { } shorthandField)
         {
-            return BindEntries(specType, fields, new Dictionary<string, ScriptValue>
+            return BindEntries(specType, new Dictionary<string, ScriptValue>
             {
                 [shorthandField] = shorthand,
             }, origin, path);
@@ -34,29 +34,29 @@ public static class SpecBinder
                 $"{path} expects a table{(table.Shorthand is null ? "" : " or a string")}, got {value.TypeName}");
         }
 
-        return BindEntries(specType, fields, map.Entries, origin, path);
+        return BindEntries(specType, map.Entries, origin, path);
     }
 
     /// <summary>Assigns every known key and rejects the rest.</summary>
     private static object BindEntries(
         Type specType,
-        IReadOnlyDictionary<string, PropertyInfo> fields,
         IReadOnlyDictionary<string, ScriptValue> entries,
         ScriptOrigin origin,
         string path)
     {
-        var spec = Activator.CreateInstance(specType)!;
+        var shape = ShapeOf(specType);
+        var spec = shape.Create();
 
         foreach (var (key, entry) in entries)
         {
-            if (!fields.TryGetValue(key, out var property))
+            if (!shape.Fields.TryGetValue(key, out var field))
             {
-                throw new ScriptError(origin, $"{path} has no field '{key}'{Suggest(key, fields.Keys)}");
+                throw new ScriptError(origin, $"{path} has no field '{key}'{Suggest(key, shape.Fields.Keys)}");
             }
-            property.SetValue(spec, Convert(property.PropertyType, entry, origin, $"{path}.{key}"));
+            field.Set(spec, Convert(field.Type, entry, origin, $"{path}.{key}"));
         }
 
-        foreach (var key in RequiredOf(specType))
+        foreach (var key in shape.Required)
         {
             if (!entries.ContainsKey(key))
             {
@@ -237,30 +237,70 @@ public static class SpecBinder
     // raised and once per timer tick — so each type is read once and remembered.
     private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<string, PropertyInfo>> Fields = new();
     private static readonly ConcurrentDictionary<Type, LuaTableAttribute?> Tables = new();
-    private static readonly ConcurrentDictionary<Type, IReadOnlyList<string>> Required = new();
+    private static readonly ConcurrentDictionary<Type, Shape> Shapes = new();
+
+    /// <summary>One field of a shape, with the work of reaching it done once.</summary>
+    /// <param name="Type">What the field holds, which decides how a value is converted.</param>
+    /// <param name="Set">Writes a converted value onto an instance.</param>
+    private sealed record Field(Type Type, Action<object, object?> Set);
+
+    /// <summary>
+    /// Everything needed to read a table into one shape, worked out once: how to make
+    /// one, how to write each key onto it, and which keys it refuses to be built
+    /// without.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="Required"/> is the array rather than an interface over it, so
+    /// walking it uses the array's own enumerator. Through <c>IReadOnlyList</c> the
+    /// same loop allocates an enumerator on the heap, once per table a script writes.
+    /// </remarks>
+    private sealed record Shape(
+        Func<object> Create,
+        IReadOnlyDictionary<string, Field> Fields,
+        string[] Required);
+
+    /// <summary>
+    /// How to build one shape, compiled on first use. Reading a table is the hottest
+    /// thing a script does here, and reflection charges for the same lookups on every
+    /// one; a compiled constructor and setter cost what calling a delegate costs.
+    /// </summary>
+    /// <remarks>
+    /// The same trade <see cref="DomainBinder"/> already makes for calling a bound
+    /// method. What a shape is made of cannot change while the mod is loaded, so
+    /// nothing here goes stale.
+    /// </remarks>
+    private static Shape ShapeOf(Type specType) => Shapes.GetOrAdd(specType, static type =>
+    {
+        var documented = FieldsOf(type);
+
+        return new Shape(
+            Expression.Lambda<Func<object>>(Expression.New(type)).Compile(),
+            documented.ToDictionary(
+                entry => entry.Key,
+                entry => new Field(entry.Value.PropertyType, SetterFor(entry.Value))),
+            [.. documented
+                .Where(entry => entry.Value.GetCustomAttribute<LuaFieldAttribute>()!.Required)
+                .Select(entry => entry.Key)]);
+    });
+
+    /// <summary>Compiles a direct write to one property.</summary>
+    private static Action<object, object?> SetterFor(PropertyInfo property)
+    {
+        var target = Expression.Parameter(typeof(object), "target");
+        var value = Expression.Parameter(typeof(object), "value");
+
+        var write = Expression.Assign(
+            Expression.Property(Expression.Convert(target, property.DeclaringType!), property),
+            Expression.Convert(value, property.PropertyType));
+
+        return Expression.Lambda<Action<object, object?>>(write, target, value).Compile();
+    }
 
     /// <summary>Every documented field of a spec, keyed by the name scripts write.</summary>
     public static IReadOnlyDictionary<string, PropertyInfo> FieldsOf(Type specType) =>
         Fields.GetOrAdd(specType, static type => type.GetProperties()
             .Where(property => property.GetCustomAttribute<LuaFieldAttribute>() is not null)
             .ToDictionary(property => property.GetCustomAttribute<LuaFieldAttribute>()!.Name));
-
-    /// <summary>
-    /// Keys a shape refuses to be built without, worked out once. Read from the same
-    /// annotations as everything else, so a field made required above is required
-    /// here without anything being told about it.
-    /// </summary>
-    /// <remarks>
-    /// Remembered rather than asked each time for the reason the fields themselves
-    /// are: reading an annotation builds the attribute object afresh on every call,
-    /// and this asked once per field of every table a script writes.
-    /// </remarks>
-    private static IReadOnlyList<string> RequiredOf(Type specType) =>
-        Required.GetOrAdd(specType, static type =>
-            (IReadOnlyList<string>)FieldsOf(type)
-                .Where(field => field.Value.GetCustomAttribute<LuaFieldAttribute>()!.Required)
-                .Select(field => field.Key)
-                .ToArray());
 
     /// <summary>
     /// The table annotation a type carries, or null where it is not a documented shape

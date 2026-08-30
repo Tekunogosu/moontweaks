@@ -121,3 +121,52 @@ public enum EnumLightKind
     /// <summary>How bright the sun itself is, rather than what it reaches.</summary>
     Sunbrightness,
 }
+
+/// <summary>What somebody wants to do to a place, which a claim may or may not allow.</summary>
+public enum EnumAccessKind
+{
+    /// <summary>Place a block there or take one away.</summary>
+    BuildOrBreak,
+
+    /// <summary>Open or operate what stands there, without changing it.</summary>
+    Use,
+
+    /// <summary>Walk through it.</summary>
+    Traverse,
+}
+
+/// <summary>Whether somebody may act on a place, and what stops them where they may not.</summary>
+public enum EnumAccessResponse
+{
+    /// <summary>They may.</summary>
+    Granted,
+
+    /// <summary>They are watching rather than playing.</summary>
+    InSpectatorMode,
+
+    /// <summary>They are visiting without a character of their own.</summary>
+    InGuestMode,
+
+    /// <summary>They are dead.</summary>
+    PlayerDead,
+
+    /// <summary>They do not hold the privilege it takes.</summary>
+    NoPrivilege,
+
+    /// <summary>Somebody else has claimed the land.</summary>
+    LandClaimed,
+
+    /// <summary>Another mod refused it.</summary>
+    DeniedByMod,
+}
+
+/// <summary>Which shape a particle is drawn as.</summary>
+public enum EnumParticleKind
+{
+    /// <summary>A flat square facing the viewer, which is what most effects use.</summary>
+    Quad,
+
+    /// <summary>A solid cube, as a broken block throws off.</summary>
+    Cube,
+}
+

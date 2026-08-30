@@ -1,11 +1,14 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Players;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace MoonTweaks.World;
 
@@ -92,6 +95,135 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
     }
 
     /// <summary>
+    /// Every block in a box that a code names, and where each stands. The search runs
+    /// inside the game: one crossing whatever the box holds, where asking block by
+    /// block costs one per block.
+    /// </summary>
+    /// <remarks>
+    /// Chunks that are not loaded hold nothing to look at and are passed over, so a
+    /// box reaching past what is loaded answers for the part that is. The caller is
+    /// told how many were missed rather than left to wonder why a box came back empty.
+    /// </remarks>
+    public IReadOnlyList<BlockAtPayload> Find(RegionSpec region, out int unloaded)
+    {
+        var wanted = region.Code is null ? null : new AssetLocation(region.Code);
+        var found = new List<BlockAtPayload>();
+        var missed = 0;
+
+        Search(region, wanted, (block, at) =>
+        {
+            // The accessor reuses one position between calls, so what is wanted from
+            // it is read now rather than kept.
+            found.Add(new BlockAtPayload(at.X, at.Y, at.Z, block.Code!.ToString()));
+            return found.Count < region.Limit;
+        }, () => missed++);
+
+        unloaded = missed;
+        return found;
+    }
+
+    /// <summary>
+    /// How many blocks in a box a code names. Counts rather than describes, so nothing
+    /// is built for a question answered by a number.
+    /// </summary>
+    /// <inheritdoc cref="Find" path="/remarks"/>
+    public int Count(RegionSpec region, out int unloaded)
+    {
+        var wanted = region.Code is null ? null : new AssetLocation(region.Code);
+        var counted = 0;
+        var missed = 0;
+
+        Search(region, wanted, (_, _) => ++counted < region.Limit, () => missed++);
+
+        unloaded = missed;
+        return counted;
+    }
+
+    /// <summary>
+    /// Walks a box, handing over every block a code names. Sole owner of that walk, so
+    /// counting and listing read the same box in the same order and agree about which
+    /// blocks are in it.
+    /// </summary>
+    /// <remarks>
+    /// The corners are sorted rather than trusted: the game requires the lower one
+    /// first and quietly finds nothing when given them the other way round, which a
+    /// script writing a box from two remembered positions would hit constantly.
+    /// </remarks>
+    private void Search(
+        RegionSpec region, AssetLocation? wanted, ActionConsumable<Block, BlockPos> onMatch, Action onMissing)
+    {
+        world.BlockAccessor.SearchBlocks(
+            new BlockPos(Math.Min(region.X, region.ToX), Math.Min(region.Y, region.ToY), Math.Min(region.Z, region.ToZ)),
+            new BlockPos(Math.Max(region.X, region.ToX), Math.Max(region.Y, region.ToY), Math.Max(region.Z, region.ToZ)),
+            (block, at) =>
+                // A block the game holds no code for is nothing a script can name, so
+                // it matches nothing and is stepped over. The game null-checks this
+                // field itself, whatever the declared type says.
+                block?.Code is { } code && (wanted is null || WildcardUtil.Match(wanted, code))
+                    ? onMatch(block, at)
+                    : true,
+            (_, _, _) => onMissing());
+    }
+
+    /// <summary>
+    /// Whether a player may act on a place, and what stops them where they may not.
+    /// Answers rather than enforces: reading it changes nothing.
+    /// </summary>
+    public EnumAccessResponse Access(AccessSpec spec, ScriptOrigin origin) =>
+        ValueSet.As<EnumAccessResponse>(api.World.Claims.TestAccess(
+            players.Find(spec.Player, origin),
+            new BlockPos(spec.X, spec.Y, spec.Z),
+            ValueSet.As<EnumBlockAccessFlags>(spec.What)));
+
+    /// <summary>Plays one of the game's own sounds at a place, for everybody near enough.</summary>
+    /// <remarks>
+    /// Two calls rather than one because the game offers two: naming a pitch asks for
+    /// exactly that pitch, and naming none lets the game vary it a little each time,
+    /// which is what stops a repeated sound reading as a loop.
+    /// </remarks>
+    public void Play(SoundSpec sound)
+    {
+        var played = new AssetLocation(sound.Sound);
+
+        if (sound.Pitch is { } pitch)
+        {
+            world.PlaySoundAt(
+                played, sound.X, sound.Y, sound.Z, null, (float)pitch,
+                (float)sound.Range, (float)sound.Volume);
+            return;
+        }
+
+        world.PlaySoundAt(
+            played, sound.X, sound.Y, sound.Z,
+            range: (float)sound.Range, volume: (float)sound.Volume);
+    }
+
+    /// <summary>Throws off particles at a place, drawn on every screen near enough to see.</summary>
+    public void Particles(ParticlesSpec spec, ScriptOrigin origin)
+    {
+        var from = new Vec3d(spec.X, spec.Y, spec.Z);
+        var to = new Vec3d(spec.ToX ?? spec.X, spec.ToY ?? spec.Y, spec.ToZ ?? spec.Z);
+        var slowest = Speed(spec.Velocity);
+        var fastest = spec.ToVelocity is null ? slowest : Speed(spec.ToVelocity);
+
+        world.SpawnParticles(
+            (float)spec.Quantity,
+            spec.Colour is { } colour ? Packed(colour, origin) : OPAQUE,
+            from, to, slowest, fastest,
+            (float)spec.Life, (float)spec.Gravity, (float)spec.Size,
+            ValueSet.As<EnumParticleModel>(spec.Model));
+    }
+
+    /// <summary>An opaque white, for particles a script gave no colour.</summary>
+    private const int OPAQUE = unchecked((int)0xFFFFFFFF);
+
+    /// <summary>A velocity as the game holds it, or stillness where a script named none.</summary>
+    private static Vec3f Speed(VelocitySpec? velocity) =>
+        velocity is null
+            ? new Vec3f(0, 0, 0)
+            : new Vec3f((float)velocity.X, (float)velocity.Y, (float)velocity.Z);
+
+    /// <summary>
     /// Drops a stack into the world, thrown if a velocity says so and marked as
     /// somebody's if an owner does.
     /// </summary>
@@ -126,6 +258,29 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
     /// </summary>
     public void Exchange(int blockId, int x, int y, int z) =>
         world.BlockAccessor.ExchangeBlock(blockId, new BlockPos(x, y, z));
+
+    /// <summary>
+    /// Asks for the chunk column holding a position to be brought in, and says whether
+    /// it was already there.
+    /// </summary>
+    /// <remarks>
+    /// Taken in block coordinates like everything else here, and turned into the chunk
+    /// coordinates the game wants. Asking is all this does: the column arrives over the
+    /// following ticks, so a script that wants to write there checks
+    /// <see cref="IsLoaded"/> from a later tick rather than on the next line.
+    ///
+    /// The column is not held open. It unloads again on the game's own terms once
+    /// nothing is keeping it, which is what stops a script quietly pinning the world
+    /// into memory a chunk at a time.
+    /// </remarks>
+    public bool Load(int x, int z)
+    {
+        if (IsLoaded(x, 0, z)) return true;
+
+        api.WorldManager.LoadChunkColumn(
+            x / GlobalConstants.ChunkSize, z / GlobalConstants.ChunkSize);
+        return false;
+    }
 
     /// <summary>Whether the chunk holding a position is loaded, and so whether writing there does anything.</summary>
     public bool IsLoaded(int x, int y, int z) =>

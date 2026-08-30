@@ -209,3 +209,40 @@ public sealed class SmithingRecipeSpec : VoxelRecipeSpec
     [LuaField("code")]
     public string? Code { get; set; }
 }
+
+/// <summary>
+/// Which recipes to remove from a kind named by the code it is registered under,
+/// rather than by one this mod knows the shape of.
+/// </summary>
+/// <remarks>
+/// Matches on what the recipe's output resolved to, since that is all a kind this mod
+/// has never heard of reliably offers. A recipe whose output resolved to nothing
+/// matches nothing, and one that is not a recipe at all is left alone.
+/// </remarks>
+[LuaTable("KindSelector")]
+public sealed class KindSelectorSpec
+{
+    /// <summary>
+    /// Code the kind is registered under, such as <c>knappingrecipes</c>. Ask
+    /// <c>moontweaks.recipes.kinds</c> for what this server has.
+    /// </summary>
+    [LuaField("kind", Required = true)]
+    public string Kind { get; set; } = "";
+
+    /// <summary>
+    /// Output code to match. May contain a <c>*</c> wildcard. Required unless
+    /// <c>tags</c> names what to match.
+    /// </summary>
+    [LuaField("code")]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
+    public string? Code { get; set; }
+
+    /// <summary>
+    /// Tags the output must carry. Used alone, or alongside <c>code</c> to narrow a
+    /// wildcard further.
+    /// </summary>
+    [LuaField("tags")]
+    [LuaSuggests(SuggestionSets.ASSET_TAG)]
+    public string[]? Tags { get; set; }
+}
+

@@ -1,9 +1,26 @@
 # MoonTweaks
 
-Lua scripting for Vintage Story recipes. Drop a `.lua` file into a server's
-config folder and it rewrites the crafting registries at load, without compiling
-a mod or patching JSON. Starting the server once scaffolds that folder into a
-workspace your editor already understands.
+MoonTweaks brings Lua scripting to Vintage Story! *Most* of the C# api has been implemented which gives you a lot of 
+flexibility. Add new recipes, modify existing ones, create new commands, modify player data, set new spawn points.. you 
+really can do pretty much anything you can think of. A good use is adding recipe compatibilities between mods, that's
+what I use it for, and some QoL recipes like Firewood -> sticks and respawn at beds (both are in the examples).
+
+A proper C# mod is still required if you want to add new assets as
+this runs entirely on the server (can be used in singleplayer without issue). This also means that creating new UIs on 
+the client is not available (at least yet, I may add it to a client side mod in the future if there is demand for it).
+
+Now, Lua *IS* slower than writing a full C#. It's really designed for smaller customizations. While you could write a full
+mod in Lua with MoonTweaks, it's not recommended. That being said, a lot of work went into making it run as performant
+as possible. If you do experience significant performance issue while utilizing MoonTweaks, please create an issue and 
+post your code, I'll do what I can to fix the issues.
+
+I try to include as many examples into the project as possible so you can see the full suite of what is available. If 
+you have a script you would like to contribute, please open a PR or an issue and I can get it in for you. 
+
+
+Note: AI was used in the creation of this project. As such, there may be bugs that have been missed. I try to create 
+extensive testing suites and manually check every functionality for correctness, but things will always slip through the 
+cracks.
 
 ## Writing scripts
 

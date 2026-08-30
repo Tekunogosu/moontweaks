@@ -55,6 +55,45 @@ public sealed class ScriptEvents(ICoreServerAPI api)
             api.Event.DidBreakBlock += (player, brokenId, selection) => occurred(
                 new BlockEventPayload(player, selection?.Position, api.World.GetBlock(brokenId))));
 
+    /// <summary>Called after a player puts a block down.</summary>
+    /// <remarks>
+    /// Placing leaves the new block standing, so what stands there is what was placed.
+    /// What it went over has already gone, and the game hands that over separately.
+    /// </remarks>
+    public void OnDidPlaceBlock(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("didPlaceBlock", origin, handler, occurred =>
+            api.Event.DidPlaceBlock += (player, replacedId, selection, _) => occurred(
+                new BlockPlacedEventPayload(
+                    player, selection?.Position, Standing(selection?.Position),
+                    api.World.GetBlock(replacedId))));
+
+    /// <summary>Called when a column of chunks has been brought in.</summary>
+    /// <remarks>
+    /// Raised on the thread the server ticks on, once the column is ready rather than
+    /// while it is being read, so what a handler does to those blocks is safe to do.
+    /// </remarks>
+    public void OnChunkColumnLoaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("chunkColumnLoaded", origin, handler, occurred =>
+            api.Event.ChunkColumnLoaded += (at, _) => occurred(new ChunkColumnEventPayload(at.X, at.Y)));
+
+    /// <summary>Called as one chunk is let go.</summary>
+    /// <remarks>
+    /// Named for what it does rather than for what the game calls it. The game raises
+    /// this once per layer of a column rather than once for the column, so a column
+    /// going out of memory calls a handler once for every chunk stacked at that place.
+    ///
+    /// The blocks are on their way out, so this is for forgetting what was remembered
+    /// about them rather than for reaching them.
+    /// </remarks>
+    public void OnChunkUnloaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("chunkUnloaded", origin, handler, occurred =>
+            api.Event.ChunkColumnUnloaded += at => occurred(new ChunkEventPayload(at.X, at.Y, at.Z)));
+
+    /// <summary>Called after a player changes which hotbar slot they are holding.</summary>
+    public void OnPlayerChangeSlot(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("playerChangeSlot", origin, handler, occurred =>
+            api.Event.AfterActiveSlotChanged += (player, _) => occurred(new PlayerEventPayload(player)));
+
     /// <summary>Called when a player joins.</summary>
     public void OnPlayerJoin(ScriptOrigin origin, ScriptValue.Func handler) =>
         On("playerJoin", origin, handler, occurred =>

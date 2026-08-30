@@ -29,3 +29,22 @@ events.didBreakBlock(function(e)
   moontweaks.log.info(("%s broke %s at %d %d %d")
     :format(e.playerName, e.block or "nothing", e.x, e.y, e.z))
 end)
+
+-- Placing completes the three. `block` is what now stands there and `replaced` is
+-- what it went over, which is `game:air` wherever nothing was — so the two together
+-- say whether something was built on empty ground or over something else.
+events.didPlaceBlock(function(e)
+  if e.replaced == "game:air" or not e.replaced then return end
+
+  players.say(e.player, ("You built over %s."):format(e.replaced))
+end)
+
+-- Changing which slot is held says who did it rather than which slot, because what is
+-- in their hand is the useful part and the inventory module answers that.
+events.playerChangeSlot(function(e)
+  local held = moontweaks.inventory.held(e.player)
+  if held and held.code:find("^game:torch") then
+    players.say(e.player, "Mind the thatch.")
+  end
+end)
+

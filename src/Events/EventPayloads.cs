@@ -1,5 +1,6 @@
 using MoonTweaks.Api;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -65,7 +66,7 @@ public class PlayerEventPayload(IServerPlayer player) : EventPayload
 /// depends on what the event did to it, and a broken one no longer stands there.
 /// </param>
 [LuaTable("BlockEvent", Given = true)]
-public sealed class BlockEventPayload(IServerPlayer player, BlockPos? at, Block? block)
+public class BlockEventPayload(IServerPlayer player, BlockPos? at, Block? block)
     : PlayerEventPayload(player)
 {
     /// <summary>
@@ -88,3 +89,88 @@ public sealed class BlockEventPayload(IServerPlayer player, BlockPos? at, Block?
     [LuaField("z")]
     public int Z { get; } = at?.Z ?? 0;
 }
+
+/// <summary>
+/// A block a player put down, and what stood there before it.
+/// </summary>
+/// <param name="player">Player who placed it.</param>
+/// <param name="at">Where it went.</param>
+/// <param name="block">Block that now stands there.</param>
+/// <param name="replaced">
+/// Block it went over, which is air wherever nothing was standing. Supplied rather
+/// than looked up: it has already gone by the time a handler runs.
+/// </param>
+[LuaTable("BlockPlacedEvent", Given = true)]
+public sealed class BlockPlacedEventPayload(
+    IServerPlayer player, BlockPos? at, Block? block, Block? replaced)
+    : BlockEventPayload(player, at, block)
+{
+    /// <summary>
+    /// Code of what stood there before, which is <c>game:air</c> where nothing did.
+    /// Nil where the code could not be read.
+    /// </summary>
+    [LuaField("replaced")]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
+    public string? Replaced { get; } = replaced?.Code?.ToString();
+}
+
+/// <summary>One column of chunks the server brought in.</summary>
+/// <remarks>
+/// A column is every chunk at one place on the map, from the world's floor to its
+/// ceiling, so it has no height of its own. Given in both the chunk coordinates the
+/// game counts in and the block coordinates everything a script writes counts in.
+/// </remarks>
+/// <param name="chunkX">Which column, east to west, counted in chunks.</param>
+/// <param name="chunkZ">Which column, north to south, counted in chunks.</param>
+[LuaTable("ChunkColumnEvent", Given = true)]
+public class ChunkColumnEventPayload(int chunkX, int chunkZ) : EventPayload
+{
+    /// <summary>Which column, east to west, counted in chunks.</summary>
+    [LuaField("chunkX")]
+    public int ChunkX { get; } = chunkX;
+
+    /// <summary>Which column, north to south, counted in chunks.</summary>
+    [LuaField("chunkZ")]
+    public int ChunkZ { get; } = chunkZ;
+
+    /// <summary>
+    /// The block position of the column's lowest corner, east to west, which is what
+    /// every other <c>moontweaks.world</c> function counts in.
+    /// </summary>
+    [LuaField("x")]
+    public int X { get; } = chunkX * GlobalConstants.ChunkSize;
+
+    /// <summary>
+    /// The block position of the column's lowest corner, north to south, which is what
+    /// every other <c>moontweaks.world</c> function counts in.
+    /// </summary>
+    [LuaField("z")]
+    public int Z { get; } = chunkZ * GlobalConstants.ChunkSize;
+
+    /// <summary>How wide the column is, in blocks, which is the same in both directions.</summary>
+    [LuaField("size")]
+    public int Size { get; } = GlobalConstants.ChunkSize;
+}
+
+/// <summary>One chunk the server let go, which is one layer of a column.</summary>
+/// <remarks>
+/// The game raises its unload event once per layer rather than once per column,
+/// whatever its own name for it suggests, so this carries the height the layer sat at
+/// and is named for what actually happens.
+/// </remarks>
+/// <param name="chunkX">Which chunk, east to west, counted in chunks.</param>
+/// <param name="chunkY">Which layer, from the world's floor upwards, counted in chunks.</param>
+/// <param name="chunkZ">Which chunk, north to south, counted in chunks.</param>
+[LuaTable("ChunkEvent", Given = true)]
+public sealed class ChunkEventPayload(int chunkX, int chunkY, int chunkZ)
+    : ChunkColumnEventPayload(chunkX, chunkZ)
+{
+    /// <summary>Which layer, from the world's floor upwards, counted in chunks.</summary>
+    [LuaField("chunkY")]
+    public int ChunkY { get; } = chunkY;
+
+    /// <summary>The block position of the chunk's lowest corner, from the world's floor upwards.</summary>
+    [LuaField("y")]
+    public int Y { get; } = chunkY * GlobalConstants.ChunkSize;
+}
+

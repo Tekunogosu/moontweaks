@@ -248,3 +248,220 @@ public sealed class HighlightSpec
     [LuaField("colour")]
     public ColourSpec? Colour { get; set; }
 }
+
+/// <summary>
+/// A box of blocks to look through, given as two opposite corners. Either corner may
+/// be the lower one: the box is worked out from both rather than assumed.
+/// </summary>
+/// <remarks>
+/// A search runs inside the game rather than in Lua, which is the whole point of it.
+/// Walking the same box with <c>blockAt</c> costs a crossing into a binding for every
+/// block; this costs one, however many blocks the box holds.
+/// </remarks>
+[LuaTable("Region")]
+public sealed class RegionSpec
+{
+    /// <summary>One corner, east to west.</summary>
+    [LuaField("x", Required = true)]
+    public int X { get; set; }
+
+    /// <summary>One corner, from the world's floor upwards.</summary>
+    [LuaField("y", Required = true)]
+    public int Y { get; set; }
+
+    /// <summary>One corner, north to south.</summary>
+    [LuaField("z", Required = true)]
+    public int Z { get; set; }
+
+    /// <summary>The opposite corner, east to west.</summary>
+    [LuaField("toX", Required = true)]
+    public int ToX { get; set; }
+
+    /// <summary>The opposite corner, from the world's floor upwards.</summary>
+    [LuaField("toY", Required = true)]
+    public int ToY { get; set; }
+
+    /// <summary>The opposite corner, north to south.</summary>
+    [LuaField("toZ", Required = true)]
+    public int ToZ { get; set; }
+
+    /// <summary>
+    /// Only count what this code names, which may be a <c>*</c> wildcard such as
+    /// <c>game:ore-*</c>. Every block is counted when omitted, air included.
+    /// </summary>
+    [LuaField("code")]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
+    public string? Code { get; set; }
+
+    /// <summary>
+    /// How many matches to stop after. A bound rather than a promise: a box holding
+    /// more than this many is not fully searched, and the search stops the moment it
+    /// has this many rather than reading the rest of the box.
+    /// </summary>
+    [LuaField("limit", Default = "4096")]
+    public int Limit { get; set; } = 4096;
+}
+
+/// <summary>One block a search found, and where it stands.</summary>
+[LuaTable("BlockAt", Given = true)]
+public sealed class BlockAtPayload(int x, int y, int z, string block)
+{
+    /// <summary>Where it stands, east to west.</summary>
+    [LuaField("x")]
+    public int X { get; } = x;
+
+    /// <summary>Where it stands, from the world's floor upwards.</summary>
+    [LuaField("y")]
+    public int Y { get; } = y;
+
+    /// <summary>Where it stands, north to south.</summary>
+    [LuaField("z")]
+    public int Z { get; } = z;
+
+    /// <summary>Code of the block standing there.</summary>
+    [LuaField("block")]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
+    public string Block { get; } = block;
+}
+
+/// <summary>Whether one player may act on one place.</summary>
+[LuaTable("Access")]
+public sealed class AccessSpec
+{
+    /// <summary>Identifier of the player asking, as an event gives it.</summary>
+    [LuaField("player", Required = true)]
+    public string Player { get; set; } = "";
+
+    /// <summary>Which block they want to act on, east to west.</summary>
+    [LuaField("x", Required = true)]
+    public int X { get; set; }
+
+    /// <summary>Which block, from the world's floor upwards.</summary>
+    [LuaField("y", Required = true)]
+    public int Y { get; set; }
+
+    /// <summary>Which block, north to south.</summary>
+    [LuaField("z", Required = true)]
+    public int Z { get; set; }
+
+    /// <summary>What they want to do there. Building or breaking when omitted.</summary>
+    [LuaField("what", Default = "\"buildorbreak\"")]
+    public EnumAccessKind What { get; set; } = EnumAccessKind.BuildOrBreak;
+}
+
+/// <summary>A sound played at a place, which everybody near enough hears.</summary>
+/// <remarks>
+/// Nothing needs installing on a player's machine: the sound is one the game already
+/// ships, named by its asset path, and the server tells each client to play it.
+/// </remarks>
+[LuaTable("Sound")]
+public sealed class SoundSpec
+{
+    /// <summary>
+    /// Path to the sound in the game's assets, such as <c>game:sounds/block/dirt</c>.
+    /// A path the game has no sound for plays nothing and says nothing.
+    /// </summary>
+    [LuaField("sound", Required = true)]
+    public string Sound { get; set; } = "";
+
+    /// <summary>Where it comes from, east to west.</summary>
+    [LuaField("x", Required = true)]
+    public double X { get; set; }
+
+    /// <summary>Where it comes from, from the world's floor upwards.</summary>
+    [LuaField("y", Required = true)]
+    public double Y { get; set; }
+
+    /// <summary>Where it comes from, north to south.</summary>
+    [LuaField("z", Required = true)]
+    public double Z { get; set; }
+
+    /// <summary>How far away it can still be heard, in blocks.</summary>
+    [LuaField("range", Default = "32")]
+    public double Range { get; set; } = 32;
+
+    /// <summary>How loud it is, where 1 is the sound as it was recorded.</summary>
+    [LuaField("volume", Default = "1")]
+    public double Volume { get; set; } = 1;
+
+    /// <summary>
+    /// How high it sounds, where 1 is unaltered. Left out, the game varies it slightly
+    /// each time, which is what stops a repeated sound reading as a loop.
+    /// </summary>
+    [LuaField("pitch")]
+    public double? Pitch { get; set; }
+}
+
+/// <summary>Particles thrown off at a place, drawn on every screen near enough to see.</summary>
+/// <remarks>
+/// The second thing a server-side script can draw on somebody's screen, alongside
+/// <c>highlight</c>. Given one point they appear there; given two they fill the box
+/// between, which is what makes a cloud rather than a spot.
+/// </remarks>
+[LuaTable("Particles")]
+public sealed class ParticlesSpec
+{
+    /// <summary>Where they appear, east to west.</summary>
+    [LuaField("x", Required = true)]
+    public double X { get; set; }
+
+    /// <summary>Where they appear, from the world's floor upwards.</summary>
+    [LuaField("y", Required = true)]
+    public double Y { get; set; }
+
+    /// <summary>Where they appear, north to south.</summary>
+    [LuaField("z", Required = true)]
+    public double Z { get; set; }
+
+    /// <summary>Far corner of the box they fill, east to west. The near one when omitted.</summary>
+    [LuaField("toX")]
+    public double? ToX { get; set; }
+
+    /// <summary>Far corner, from the world's floor upwards. The near one when omitted.</summary>
+    [LuaField("toY")]
+    public double? ToY { get; set; }
+
+    /// <summary>Far corner, north to south. The near one when omitted.</summary>
+    [LuaField("toZ")]
+    public double? ToZ { get; set; }
+
+    /// <summary>How many to throw off.</summary>
+    [LuaField("quantity", Default = "8")]
+    public double Quantity { get; set; } = 8;
+
+    /// <summary>What colour they are. An opaque white when omitted.</summary>
+    [LuaField("colour")]
+    public ColourSpec? Colour { get; set; }
+
+    /// <summary>How fast they move and which way. Still when omitted.</summary>
+    [LuaField("velocity")]
+    public VelocitySpec? Velocity { get; set; }
+
+    /// <summary>
+    /// The fastest they may move, so each particle is drawn somewhere between this and
+    /// <c>velocity</c>. The same as <c>velocity</c> when omitted, which moves them all
+    /// alike.
+    /// </summary>
+    [LuaField("toVelocity")]
+    public VelocitySpec? ToVelocity { get; set; }
+
+    /// <summary>How long each lasts, in seconds.</summary>
+    [LuaField("life", Default = "1")]
+    public double Life { get; set; } = 1;
+
+    /// <summary>
+    /// How strongly they fall, where 1 falls as a dropped stack does and 0 hangs where
+    /// it appeared. Negative makes them rise, as smoke does.
+    /// </summary>
+    [LuaField("gravity", Default = "1")]
+    public double Gravity { get; set; } = 1;
+
+    /// <summary>How big each is, where 1 is the ordinary size.</summary>
+    [LuaField("size", Default = "1")]
+    public double Size { get; set; } = 1;
+
+    /// <summary>Which shape each is drawn as.</summary>
+    [LuaField("model", Default = "\"quad\"")]
+    public EnumParticleKind Model { get; set; } = EnumParticleKind.Quad;
+}
+

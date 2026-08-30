@@ -60,6 +60,7 @@ public sealed record ScriptRun(
         // that resolves for a recipe resolves the same way for a stack handed over.
         var stacks = new AssetStacks(server.World);
 
+        host.Bind(DomainBinder.Bind(new RecipeKindDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new GridDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new KnappingDomain(log, server.World, registry)));
         host.Bind(DomainBinder.Bind(new ClayFormingDomain(log, server.World, registry)));
