@@ -95,6 +95,12 @@ public sealed class LuaCSharpHost : IScriptHost
         }
         catch (LuaRuntimeException e)
         {
+            // An error this mod raised inside a bound call comes back wrapped, and it
+            // already names the line the binding read off the callstack. Rebuilding
+            // one around its message would name that line a second time, since
+            // LuaRuntimeException.Message hands back the exception it wraps.
+            if (e.GetBaseException() is ScriptError raised) throw raised;
+
             throw new ScriptError(OriginOf(e, file.Name), MessageOf(e));
         }
     }

@@ -122,3 +122,40 @@ grid.add {
     attributes = { moontweaksOrigin = "example", durability = 100 },
   },
 }
+
+-- `consume` and `durabilityChange` are the game's other spelling of `isTool` and
+-- `toolDurabilityCost`; a recipe writes one pair or the other, and writing both is
+-- refused. The pair says two things the tool spelling cannot. `consume = false`
+-- with no durability cost keeps an ingredient untouched, which is how the game
+-- crafts from a schematic: present to build from, and not spent doing so. And
+-- `breakOnZeroDurability` lets a worn-out tool survive the craft that emptied it,
+-- staying in the grid rather than shattering. The game's own recipe files spell
+-- that field `break`, which Lua keeps as a keyword.
+grid.add {
+  name = "moontweaks:bone-shard-chiselled",
+  pattern = { "CB" },
+  ingredients = {
+    B = "game:bone",
+    C = { tags = { "tool-chisel" }, consume = false, durabilityChange = -20, breakOnZeroDurability = false },
+  },
+  output = { code = "game:bone", quantity = 2 },
+}
+
+-- `mergeAttributesFrom` carries attributes onto the output from several
+-- ingredients where `copyAttributesFrom` carries them from one, naming the pattern
+-- characters they sit under. What the output already declares survives a
+-- collision, and an earlier character survives a later one. `showInCreatedBy`
+-- keeps the recipe off the "Created by" list on its product's handbook page, which
+-- is how a second way to craft something stays available without crowding the page
+-- a player reads.
+grid.add {
+  name = "moontweaks:axe-flint-merged",
+  showInCreatedBy = false,
+  mergeAttributesFrom = { "T", "B" },
+  pattern = { "TB" },
+  ingredients = {
+    T = "game:axehead-flint",
+    B = "game:bone",
+  },
+  output = "game:axe-flint",
+}

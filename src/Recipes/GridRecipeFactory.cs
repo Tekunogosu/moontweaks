@@ -41,6 +41,9 @@ public sealed class GridRecipeFactory(IWorldAccessor world)
             throw new ScriptError(origin, $"ingredients declares '{key}' but the pattern never uses it");
         }
 
+        Cells(spec, "copyAttributesFrom", spec.CopyAttributesFrom is { } copied ? [copied] : [], origin);
+        Cells(spec, "mergeAttributesFrom", spec.MergeAttributesFrom ?? [], origin);
+
         return assets.Recipe(new GridRecipe
         {
             IngredientPattern = string.Join(",", spec.Pattern),
@@ -48,11 +51,26 @@ public sealed class GridRecipeFactory(IWorldAccessor world)
             Height = spec.Pattern.Length,
             Shapeless = spec.Shapeless,
             CopyAttributesFrom = spec.CopyAttributesFrom,
+            MergeAttributesFrom = spec.MergeAttributesFrom ?? [],
+            ShowInCreatedBy = spec.ShowInCreatedBy,
             AverageDurability = spec.AverageDurability,
             Ingredients = spec.Ingredients.ToDictionary(
                 entry => entry.Key,
                 entry => assets.Ingredient(entry.Value, origin, $"ingredients.{entry.Key}")),
             Output = assets.Output(spec.Output, origin),
         }, spec, origin);
+    }
+
+    /// <summary>
+    /// Checks the pattern characters a field names against the ones the recipe
+    /// declares. The game looks an ingredient up by that character and skips a miss
+    /// in silence, so a misspelling costs the output its attributes and says nothing.
+    /// </summary>
+    private static void Cells(GridRecipeSpec spec, string field, string[] cells, ScriptOrigin origin)
+    {
+        if (cells.FirstOrDefault(cell => !spec.Ingredients.ContainsKey(cell)) is { } missing)
+        {
+            throw new ScriptError(origin, $"{field} names '{missing}' but ingredients has no such key");
+        }
     }
 }

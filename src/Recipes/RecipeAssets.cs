@@ -100,12 +100,75 @@ public sealed class RecipeAssets(IWorldAccessor world)
     {
         var ingredient = Ingredient((MaterialSpec)spec, origin, path);
         ingredient.Quantity = spec.Quantity;
-        ingredient.IsTool = spec.IsTool;
-        ingredient.ToolDurabilityCost = spec.ToolDurabilityCost;
+        Consumption(ingredient, spec, origin, path);
         ingredient.ReturnedStack = spec.ReturnedStack is { } returned
             ? Stack(returned, origin, $"{path}.returnedStack")
             : null;
         return ingredient;
+    }
+
+    /// <summary>
+    /// What a craft does to an ingredient: takes it, wears it, or leaves it be. Sole
+    /// owner of that question, since the game spells it twice and a recipe writing
+    /// both spellings has said one thing two ways.
+    /// </summary>
+    /// <remarks>
+    /// Written as <c>Consume</c> and <c>DurabilityChange</c>, which is the spelling
+    /// the game serialises to clients and every reader consults. <c>IsTool</c> is
+    /// deliberately left alone: <c>CraftingRecipeIngredient.Resolve</c> overwrites
+    /// <c>DurabilityChange</c> from <c>ToolDurabilityCost</c> wherever it is set, so
+    /// setting it would discard the figure a script wrote. <c>Break</c> crosses to no
+    /// client, so a client shows a tool shattering that the server kept until the
+    /// slot resyncs.
+    /// </remarks>
+    private static void Consumption(
+        CraftingRecipeIngredient ingredient, IngredientSpec spec, ScriptOrigin origin, string path)
+    {
+        if (spec.IsTool && (spec.Consume is not null || spec.DurabilityChange is not null))
+        {
+            throw new ScriptError(origin,
+                $"{path} names 'isTool' alongside 'consume' or 'durabilityChange', which say the same thing " +
+                "in the game's two spellings — keep whichever reads better and drop the other");
+        }
+
+        if (spec.ToolDurabilityCost is not null && !spec.IsTool)
+        {
+            throw new ScriptError(origin,
+                $"{path} names 'toolDurabilityCost' without 'isTool', and durability is only spent by an " +
+                "ingredient the craft leaves behind — add 'isTool = true', or spell the cost as " +
+                "'consume = false' with a negative 'durabilityChange'");
+        }
+
+        if (spec.DurabilityChange > 0)
+        {
+            throw new ScriptError(origin,
+                $"{path} gives 'durabilityChange' a positive number, which asks the craft to repair the " +
+                "ingredient. Nothing in the game's crafting does that, so write the durability it costs as " +
+                "a negative number");
+        }
+
+        // Two spellings, one figure: the cost is what the ingredient loses, so the
+        // rest of this reads the same whichever the script wrote.
+        var consumed = !spec.IsTool && spec.Consume is not false;
+        var cost = spec.IsTool ? spec.ToolDurabilityCost ?? 0 : -(spec.DurabilityChange ?? 0);
+
+        if (consumed && cost != 0)
+        {
+            throw new ScriptError(origin,
+                $"{path} spends durability on an ingredient the craft consumes, which the game ignores — " +
+                "add 'consume = false' to keep the ingredient, or drop the durability cost");
+        }
+
+        if (!spec.BreakOnZeroDurability && cost == 0)
+        {
+            throw new ScriptError(origin,
+                $"{path} sets 'breakOnZeroDurability' on an ingredient that loses no durability, so there " +
+                "is nothing for it to survive");
+        }
+
+        ingredient.Consume = consumed;
+        ingredient.DurabilityChange = -cost;
+        ingredient.Break = spec.BreakOnZeroDurability;
     }
 
     /// <summary>

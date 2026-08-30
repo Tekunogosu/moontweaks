@@ -32,16 +32,22 @@ the server's, so that is more machinery than the question is worth.
 Decide before the first release. Whichever way it goes, the README paragraph
 describing it changes with it.
 
-## Recipe fields still unbound
+## An ingredient's matching type is the game's to decide
 
-`showInCreatedBy`, `mergeAttributesFrom`, `durabilityChange` and `matchingType`
-are bound on none of the kinds, and vanilla's own recipe files use them zero
-times. Leave them out until something asks: an offered field that does nothing is
-worse than an absent one.
+Not a task: a note, so it is not investigated twice. `matchingType` is the one
+field on an ingredient no script can set. `CraftingRecipeIngredient.Resolve`
+opens by assigning it from `IRecipeIngredient.GetMatchType`, which reads the code
+for a wildcard, an advanced wildcard or a regex, and reads whether a name sits
+beside it. Every recipe this mod builds is resolved, so a value written there is
+gone before the first match is attempted. The code string already says what a
+script would be reaching for.
 
-`averageDurability` is bound on grid recipes alone for the same reason. It is
-read only as a product lands in a crafting output slot, and a knapping surface
-clones its resolved output stack directly rather than passing through there.
+`averageDurability` and `showInCreatedBy` are bound on grid recipes alone, each
+because only that kind reads them. The first is read as a product lands in a
+crafting output slot, through `OnCreatedByCrafting`, and a knapping surface
+clones its resolved output stack directly rather than passing through there. The
+second is read by the handbook, which consults it building the "Created by" list
+for grid recipes and skips it for every other kind.
 
 ## Codes a handler compares are unverifiable
 

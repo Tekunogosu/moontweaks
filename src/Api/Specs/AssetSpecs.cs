@@ -172,7 +172,35 @@ public sealed class IngredientSpec : MaterialSpec
 
     /// <summary>Durability removed when this is used as a tool.</summary>
     [LuaField("toolDurabilityCost", Default = "0")]
-    public int ToolDurabilityCost { get; set; }
+    public int? ToolDurabilityCost { get; set; }
+
+    /// <summary>
+    /// Taken by the craft. Setting this to <c>false</c> keeps the ingredient where it
+    /// is, which is how a schematic is used: present to craft from, and not spent
+    /// doing so. Says what <c>isTool</c> says without claiming the ingredient is a
+    /// tool that wears, so a recipe writes one spelling or the other and not both.
+    /// </summary>
+    [LuaField("consume", Default = "true")]
+    public bool? Consume { get; set; }
+
+    /// <summary>
+    /// Durability the craft costs this, as the negative number the game stores, so
+    /// <c>-5</c> spends five points. Stands to <c>consume</c> as
+    /// <c>toolDurabilityCost</c> stands to <c>isTool</c>. A positive number is
+    /// refused: nothing in the game's crafting repairs an ingredient, so it would
+    /// read as a repair and do nothing.
+    /// </summary>
+    [LuaField("durabilityChange", Default = "0")]
+    public int? DurabilityChange { get; set; }
+
+    /// <summary>
+    /// Destroyed once a craft leaves it at no durability. Setting this to
+    /// <c>false</c> leaves the worn-out item in the grid instead. The game's own
+    /// recipe files spell this <c>break</c>, which Lua keeps as a keyword, so it
+    /// carries the name the game gives the same field once loaded.
+    /// </summary>
+    [LuaField("breakOnZeroDurability", Default = "true")]
+    public bool BreakOnZeroDurability { get; set; } = true;
 
     /// <summary>
     /// Handed back to the crafter once this ingredient is consumed. Nothing is

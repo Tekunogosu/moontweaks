@@ -95,6 +95,22 @@ public sealed class GridRecipeSpec : CraftingRecipeSpec
     public string? CopyAttributesFrom { get; set; }
 
     /// <summary>
+    /// Merges item attributes from the ingredients under these pattern characters
+    /// onto the output. What the output already carries survives a collision, and an
+    /// earlier character survives a later one.
+    /// </summary>
+    [LuaField("mergeAttributesFrom")]
+    public string[]? MergeAttributesFrom { get; set; }
+
+    /// <summary>
+    /// Lists the recipe under "Created by" on its product's handbook page. Bound on
+    /// this kind alone: the handbook reads the flag for grid recipes and for no other
+    /// kind.
+    /// </summary>
+    [LuaField("showInCreatedBy", Default = "true")]
+    public bool ShowInCreatedBy { get; set; } = true;
+
+    /// <summary>
     /// Gives the product the durability the tools that made it averaged. Bound on
     /// this kind alone: it is read as the product lands in the crafting output slot,
     /// which no other kind passes through.
