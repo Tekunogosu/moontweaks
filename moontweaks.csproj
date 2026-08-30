@@ -17,12 +17,6 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
-  <!-- Vintage Story install; override with the VINTAGE_STORY environment variable. -->
-  <PropertyGroup>
-    <VintageStoryDir Condition="'$(VINTAGE_STORY)' != ''">$(VINTAGE_STORY)</VintageStoryDir>
-    <VintageStoryDir Condition="'$(VintageStoryDir)' == ''">$(HOME)/.local/share/vintagestory</VintageStoryDir>
-  </PropertyGroup>
-
   <!-- The library is produced by ./scripts/docs.sh from a prior build, so a plain
        `dotnet build` may not have one yet; the mod reports its absence at startup. -->
   <ItemGroup>

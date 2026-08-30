@@ -91,6 +91,89 @@ public sealed class EventDomain(ScriptEvents events)
         ScriptOrigin origin, [LuaPayload(typeof(ChunkEventPayload))] ScriptValue.Func handler) =>
         events.OnChunkUnloaded(origin, handler);
 
+    // The six below reach things that are not players. The game raises them wherever
+    // it happens to be — chunk generation spawns creatures on its own thread — so a
+    // handler is called on the tick after the event rather than during it. What it is
+    // told is what was true at the moment; what it reaches for wants checking with
+    // moontweaks.entities.isLoaded first.
+
+    /// <summary>
+    /// Called when something is put into the world, however it got there: generated
+    /// with a chunk, bred, or spawned by a script.
+    /// </summary>
+    /// <remarks>
+    /// Runs on the tick after the spawn, so the thing it describes may already be gone
+    /// — a creature generated into a chunk nobody stayed near, for instance. Ask
+    /// <c>moontweaks.entities.isLoaded</c> before reaching for it.
+    ///
+    /// Worldgen fills a chunk with creatures at once, so a busy server calls this in
+    /// bursts. Decide whether the code is one worth caring about before doing anything
+    /// that costs.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entitySpawn")]
+    public void EntitySpawn(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityEventPayload))] ScriptValue.Func handler) =>
+        events.OnEntitySpawn(origin, handler);
+
+    /// <summary>
+    /// Called when something comes back with the chunk it was saved in. The
+    /// counterpart of a despawn whose reason was <c>unload</c>: the same creature
+    /// returning rather than a new one appearing, which is what makes this the place
+    /// to put back whatever was remembered about it.
+    /// </summary>
+    /// <inheritdoc cref="EntitySpawn" path="/remarks"/>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityLoaded")]
+    public void EntityLoaded(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityEventPayload))] ScriptValue.Func handler) =>
+        events.OnEntityLoaded(origin, handler);
+
+    /// <summary>
+    /// Called when anything alive dies, rather than players alone. <c>byPlayer</c>
+    /// names whoever is responsible where one is, so an arrow names the archer rather
+    /// than the arrow.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityDeath")]
+    public void EntityDeath(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityDeathEventPayload))] ScriptValue.Func handler) =>
+        events.OnEntityDeath(origin, handler);
+
+    /// <summary>
+    /// Called when something leaves the world, however it went. Read <c>reason</c>
+    /// before concluding anything is gone for good: <c>unload</c> means its chunk left
+    /// memory and it will be back.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityDespawn")]
+    public void EntityDespawn(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityDespawnEventPayload))] ScriptValue.Func handler) =>
+        events.OnEntityDespawn(origin, handler);
+
+    /// <summary>
+    /// Called when something climbs onto something else. <c>id</c> is whoever climbed
+    /// on and <c>mount</c> is what they climbed onto.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityMounted")]
+    public void EntityMounted(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityMountEventPayload))] ScriptValue.Func handler) =>
+        events.OnEntityMounted(origin, handler);
+
+    /// <summary>Called when something gets off what it was riding.</summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityUnmounted")]
+    public void EntityUnmounted(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityMountEventPayload))] ScriptValue.Func handler) =>
+        events.OnEntityUnmounted(origin, handler);
+
     /// <summary>Called when a player joins.</summary>
     /// <param name="origin">Script line adding the handler.</param>
     /// <param name="handler">Called each time it happens.</param>

@@ -1,5 +1,6 @@
 using MoonTweaks.Api;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -172,5 +173,125 @@ public sealed class ChunkEventPayload(int chunkX, int chunkY, int chunkZ)
     /// <summary>The block position of the chunk's lowest corner, from the world's floor upwards.</summary>
     [LuaField("y")]
     public int Y { get; } = chunkY * GlobalConstants.ChunkSize;
+}
+
+/// <summary>
+/// Something alive, or something lying on the ground, that the world did something
+/// with.
+/// </summary>
+/// <remarks>
+/// Read from the entity when the event happened rather than when the handler runs.
+/// These events may arrive on a thread of the game's own, and the handler is called on
+/// the next tick of the main one, by which time the entity may have moved or gone —
+/// so what a handler is told is what was true at the moment, and <c>id</c> is what it
+/// asks about now.
+/// </remarks>
+/// <param name="entity">The entity it happened to.</param>
+[LuaTable("EntityEvent", Given = true)]
+public class EntityEventPayload(Entity entity) : EventPayload
+{
+    /// <summary>
+    /// The server's own identifier for it, which every <c>moontweaks.entities</c>
+    /// function takes. Ask <c>entities.isLoaded</c> before reaching for it: a handler
+    /// runs after the event, and the entity may already be gone.
+    /// </summary>
+    [LuaField("id")]
+    public double Id { get; } = entity.EntityId;
+
+    /// <summary>Entity code, such as <c>game:wolf-male</c>.</summary>
+    [LuaField("code")]
+    public string Code { get; } = entity.Code?.ToString() ?? "";
+
+    /// <summary>What it was called, which is its name tag where it had one.</summary>
+    [LuaField("name")]
+    public string Name { get; } = entity.GetName() ?? "";
+
+    /// <summary>Where it was, east to west.</summary>
+    [LuaField("x")]
+    public double X { get; } = entity.Pos.X;
+
+    /// <summary>Where it was, from the world's floor upwards.</summary>
+    [LuaField("y")]
+    public double Y { get; } = entity.Pos.Y;
+
+    /// <summary>Where it was, north to south.</summary>
+    [LuaField("z")]
+    public double Z { get; } = entity.Pos.Z;
+
+    /// <summary>
+    /// Identifier of the player this was, or nil where it was not one. A player's body
+    /// is an entity like any other, so these events see them too.
+    /// </summary>
+    [LuaField("player")]
+    public string? Player { get; } = (entity as EntityPlayer)?.PlayerUID;
+}
+
+/// <summary>Something that died, and what killed it.</summary>
+/// <param name="entity">The entity that died.</param>
+/// <param name="cause">What killed it, where the game said.</param>
+[LuaTable("EntityDeathEvent", Given = true)]
+public sealed class EntityDeathEventPayload(Entity entity, DamageSource? cause)
+    : EntityEventPayload(entity)
+{
+    // Whoever is answerable for the damage. The game fills CauseEntity in for a
+    // projectile alone, naming whoever threw it, and leaves it null for a melee blow,
+    // which names the attacker in SourceEntity instead. Neither field answers on its
+    // own; GetCauseEntity is the one that answers for both.
+    private readonly Entity? killer = cause?.GetCauseEntity();
+
+    /// <summary>What killed it, or nil where the game named nothing.</summary>
+    [LuaField("cause")]
+    public EnumHurtKind? Cause { get; } =
+        cause is null ? null : ValueSet.As<EnumHurtKind>(cause.Type);
+
+    /// <summary>
+    /// Identifier of the player that killed it, or nil where no player did. This is
+    /// whoever is responsible rather than what struck the blow, so an arrow names the
+    /// archer.
+    /// </summary>
+    [LuaField("byPlayer")]
+    public string? ByPlayer => (killer as EntityPlayer)?.PlayerUID;
+
+    /// <summary>
+    /// Identifier of the entity that killed it, or nil where nothing did. Names the
+    /// responsible creature rather than the arrow it fired.
+    /// </summary>
+    [LuaField("byEntity")]
+    public double? ByEntity => killer?.EntityId;
+}
+
+/// <summary>Something that left the world, and why.</summary>
+/// <param name="entity">The entity that left.</param>
+/// <param name="reason">Why it left.</param>
+[LuaTable("EntityDespawnEvent", Given = true)]
+public sealed class EntityDespawnEventPayload(Entity entity, EntityDespawnData? reason)
+    : EntityEventPayload(entity)
+{
+    /// <summary>
+    /// Why it went. <c>unload</c> is the one worth checking for: the entity is not gone
+    /// from the world, only out of reach until its chunk comes back.
+    /// </summary>
+    [LuaField("reason")]
+    public EnumDespawnKind? Reason { get; } =
+        reason is null ? null : ValueSet.As<EnumDespawnKind>(reason.Reason);
+}
+
+/// <summary>Something that got on or off something else.</summary>
+/// <param name="entity">The one that mounted or dismounted.</param>
+/// <param name="seat">The seat it took, which belongs to whatever it climbed onto.</param>
+[LuaTable("EntityMountEvent", Given = true)]
+public sealed class EntityMountEventPayload(Entity entity, IMountableSeat? seat)
+    : EntityEventPayload(entity)
+{
+    /// <summary>
+    /// Identifier of what it climbed onto — the boat or the animal rather than the
+    /// seat. Nil where the game named none.
+    /// </summary>
+    [LuaField("mount")]
+    public double? Mount { get; } = seat?.Entity?.EntityId;
+
+    /// <summary>Which seat of it was taken, where the mount has more than one.</summary>
+    [LuaField("seat")]
+    public string? Seat { get; } = seat?.SeatId;
 }
 

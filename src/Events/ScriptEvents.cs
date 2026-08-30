@@ -94,6 +94,48 @@ public sealed class ScriptEvents(ICoreServerAPI api)
         On("playerChangeSlot", origin, handler, occurred =>
             api.Event.AfterActiveSlotChanged += (player, _) => occurred(new PlayerEventPayload(player)));
 
+    /// <summary>Called when something is put into the world.</summary>
+    /// <remarks>
+    /// Raised wherever the game happened to spawn it, chunk generation included, so
+    /// this is delivered on the following tick.
+    /// </remarks>
+    public void OnEntitySpawn(ScriptOrigin origin, ScriptValue.Func handler) =>
+        OnAnyThread("entitySpawn", origin, handler, occurred =>
+            api.Event.OnEntitySpawn += entity => occurred(new EntityEventPayload(entity)));
+
+    /// <summary>Called when something comes back with the chunk it was saved in.</summary>
+    /// <remarks>
+    /// The counterpart of a despawn for <c>unload</c>: the same creature, returning
+    /// rather than appearing. Raised on the chunk's own thread, so delivered late.
+    /// </remarks>
+    public void OnEntityLoaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+        OnAnyThread("entityLoaded", origin, handler, occurred =>
+            api.Event.OnEntityLoaded += entity => occurred(new EntityEventPayload(entity)));
+
+    /// <summary>Called when something dies, for anything alive rather than players alone.</summary>
+    public void OnEntityDeath(ScriptOrigin origin, ScriptValue.Func handler) =>
+        OnAnyThread("entityDeath", origin, handler, occurred =>
+            api.Event.OnEntityDeath += (entity, cause) =>
+                occurred(new EntityDeathEventPayload(entity, cause)));
+
+    /// <summary>Called when something leaves the world, however it went.</summary>
+    public void OnEntityDespawn(ScriptOrigin origin, ScriptValue.Func handler) =>
+        OnAnyThread("entityDespawn", origin, handler, occurred =>
+            api.Event.OnEntityDespawn += (entity, reason) =>
+                occurred(new EntityDespawnEventPayload(entity, reason)));
+
+    /// <summary>Called when something climbs onto something else.</summary>
+    public void OnEntityMounted(ScriptOrigin origin, ScriptValue.Func handler) =>
+        OnAnyThread("entityMounted", origin, handler, occurred =>
+            api.Event.EntityMounted += (entity, seat) =>
+                occurred(new EntityMountEventPayload(entity, seat)));
+
+    /// <summary>Called when something gets off what it was riding.</summary>
+    public void OnEntityUnmounted(ScriptOrigin origin, ScriptValue.Func handler) =>
+        OnAnyThread("entityUnmounted", origin, handler, occurred =>
+            api.Event.EntityUnmounted += (entity, seat) =>
+                occurred(new EntityMountEventPayload(entity, seat)));
+
     /// <summary>Called when a player joins.</summary>
     public void OnPlayerJoin(ScriptOrigin origin, ScriptValue.Func handler) =>
         On("playerJoin", origin, handler, occurred =>
@@ -176,6 +218,34 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     public void OnServerResume(ScriptOrigin origin, ScriptValue.Func handler) =>
         On("serverResume", origin, handler, occurred =>
             api.Event.ServerResume += () => occurred(ServerEventPayload.Instance));
+
+    /// <summary>
+    /// Adds a handler for an event the game may raise on any thread it likes, and
+    /// calls it on the next tick of the one the server runs on.
+    /// </summary>
+    /// <remarks>
+    /// There is one interpreter for the whole server and it is not thread safe. Most
+    /// of the game's events arrive on the thread it ticks on, and those are added
+    /// through <see cref="On"/> and called where they land. The rest do not: a chunk
+    /// being generated spawns creatures on the generation thread, and calling a script
+    /// from there while the main thread is already inside the interpreter is a race.
+    ///
+    /// So the payload is built where the event happened — a snapshot of plain numbers
+    /// and strings, which is what every shape here already is — and only the call is
+    /// handed across. Two things follow, and both reach script authors rather than
+    /// staying here. The handler runs a tick late, so what it is told may already have
+    /// changed and anything it reaches for wants checking first. And the game decides
+    /// when to run the queue, so a burst of events — worldgen filling a chunk with
+    /// creatures — arrives as a burst of calls.
+    ///
+    /// This is the safe default. Reaching for <see cref="On"/> instead is worth doing
+    /// only for an event known to arrive on the main thread, and worth the checking
+    /// that claim needs.
+    /// </remarks>
+    private void OnAnyThread(
+        string name, ScriptOrigin origin, ScriptValue.Func handler, Action<Occurred> subscribe) =>
+        On(name, origin, handler, occurred => subscribe(
+            about => api.Event.EnqueueMainThreadTask(() => occurred(about), $"moontweaks:{name}")));
 
     /// <summary>
     /// Adds a handler, and remembers to subscribe to the game's event the first time

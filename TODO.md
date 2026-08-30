@@ -128,8 +128,8 @@ whether an undo is per command, per script or per server before binding anything
 
 ## The events still unbound
 
-Twenty are bound. They fall into groups that want quite different things, listed here
-nearest to done first.
+Twenty-six are bound. What is left falls into groups that want quite different
+things, listed here nearest to done first.
 
 **Notifications carrying something new** want a payload shape apiece. What is left:
 `MountGaitReceived`, `ChunkDirty`, `MapRegionLoaded` and `MapRegionUnloaded`.
@@ -138,32 +138,27 @@ it belongs with the hot-path group below rather than here unless something actua
 wants it.
 
 `PlayerDimensionChanged` is declared on `IEventAPI` and nothing in the server ever
-raises it: the only call sites for its trigger are the declaration itself. Not worth
-binding until the game raises it.
-
-**The entity events cannot be bound as things stand, and that is now checked rather
-than suspected.** `OnEntitySpawn`, `OnEntityLoaded`, `OnEntityDeath`, `OnEntityDespawn`,
-`EntityMounted` and `EntityUnmounted` all raise straight out of `ServerMain`, and
-`WorldgenWorldAccessor` — the accessor handed to worldgen, which runs on the chunk
-generation thread — exposes `SpawnEntity` delegating directly to that same world. So a
-creature generated with a chunk raises `OnEntitySpawn` off the main thread, and
-`TriggerEntityLoaded` is reached from `LoadEntity` on the same path. The interpreter is
-not thread safe and nothing here serialises calls into it, so binding these is a race
-rather than a feature. They move into reach when the marshalling described below
-exists, not before.
+raises it: the only call site for its trigger is the declaration. Not worth binding
+until the game raises it.
 
 **Events whose handler must answer** are the ones needing a decision rather than
-work. `CanUseBlock` and `CanPlaceOrBreakBlock` return a bool, `BreakBlock`,
-`HandInteract` and `OnPlayerInteractEntity` take a `ref EnumHandling`, `PlayerChat`
-takes `ref string message` and a `BoolRef consumed`, `BeforeActiveSlotChanged`
-returns `EnumHandling`, `ServerSuspend` returns `EnumSuspendState`, and
-`OnTestBlockAccess` and `OnTestBlockAccessClaim` decide whether somebody may touch
-a place at all. `ScriptValue.Func.Call` already hands back what a handler returned
-and `Raise` throws it away, so the machinery is half there. What is missing is a
-rule: several handlers may answer one event, and what a veto beside an approval
-means has to be decided before any of these is offered. The two access ones are
-the sharpest case, since answering wrongly hands somebody else's build to a
-stranger.
+work, and they are now the only group with nothing built towards them. `CanUseBlock`
+and `CanPlaceOrBreakBlock` return a bool, `BreakBlock`, `HandInteract` and
+`OnPlayerInteractEntity` take a `ref EnumHandling`, `PlayerChat` takes
+`ref string message` and a `BoolRef consumed`, `BeforeActiveSlotChanged` returns
+`EnumHandling`, `ServerSuspend` returns `EnumSuspendState`, and `OnTestBlockAccess`
+and `OnTestBlockAccessClaim` decide whether somebody may touch a place at all.
+`ScriptValue.Func.Call` already hands back what a handler returned and `Raise` throws
+it away, so the machinery is half there. What is missing is a rule: several handlers
+may answer one event, and what a veto beside an approval means has to be decided
+before any of these is offered. The two access ones are the sharpest case, since
+answering wrongly hands somebody else's build to a stranger.
+
+Marshalling does not help this group and never will. These events need an answer on
+the thread that asked, and anything deferred to the next tick answers after the
+decision was made — so the four raised off the main thread
+(`OnTrySpawnEntity`, `OnTrySpawnGroupNearOffthread`, and the two access ones where
+they are reached off-thread) stay out of reach whatever is decided about vetoes.
 
 **Events on a hot path** should stay unbound whatever else is. `OnGetClimate`,
 `OnGetWindSpeed`, `MatchesGridRecipe` and `MatchesRecipe` are raised per frame or
@@ -172,14 +167,13 @@ method in C#. Binding one puts the interpreter inside the game's inner loop. The
 pull-based readings are bound instead: `world.climateAt` and `world.windAt` answer
 the same questions when a script asks rather than when the game does.
 
-**Events raised off the main thread** cannot be bound as things stand:
-`BeginChunkColumnLoadChunkThread`, `OnTrySpawnGroupNearOffthread`,
-`PhysicsThreadStart`, and `OnTrySpawnEntity`, which `GenCreatures` raises from
-chunk column generation. Offering any of them — or the entity events above — means
-one place that marshals a call onto the main thread, and
-`IEventAPI.EnqueueMainThreadTask` is what such a place would be built on. That one
-place is now the single thing standing between this mod and a whole group of events,
-so it is the piece worth building next in this section.
+**Events raised off the main thread** are no longer blocked as a group.
+`ScriptEvents.OnAnyThread` builds the payload where the event lands and hands only the
+call to the main thread through `IEventAPI.EnqueueMainThreadTask`, which is what the
+six entity events are bound through. `BeginChunkColumnLoadChunkThread` and
+`PhysicsThreadStart` could be bound the same way and are not, for want of anything
+asking: the first says a chunk is about to be read and the second fires once at
+startup.
 
 `AssetsFinalizers` is obsolete and wants binding never.
 

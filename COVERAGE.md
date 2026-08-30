@@ -10,19 +10,20 @@ though nobody had looked at it.
 
 | Area | Reached | Missing in one line |
 | --- | --- | --- |
-| Recipes | every kind | Kinds other mods declare |
+| Recipes | every kind, vanilla and modded | Editing a kind this mod has never seen |
 | Item properties | 15 fields | Creative tabs, spoilage list, particles |
 | Block properties | 12 further fields | Sounds, collision boxes, crop behaviour, decor |
-| Players | 34 functions | Groups, richer messages, connection facts |
-| World | 15 functions | Area scans, sound, explosions, land claims |
-| Entities | 23 functions | Mounting, pathing, behaviours |
-| Inventory | 12 functions | Moving between two places in one call |
+| Asset registry | counting them | Listing or testing a code from a script |
+| Players | 36 functions | Groups, richer messages, connection facts, reading a spawn |
+| World | 21 functions | The fluid layer, explosions, decor, ray casting |
+| Entities | 23 functions | Selecting by tag, mounting, pathing, behaviours |
+| Inventory | 12 functions | What one stack carries, moving between two places at once |
 | Calendar | 8 functions | Nothing worth naming |
-| Events | 16 of 50 | See `TODO.md` for the classification |
+| Events | 26 of 50 | See `TODO.md` for the classification |
 | Scheduling | 2 functions | Nothing worth naming |
-| Commands | declaring one | Editing a command another mod declared |
+| Commands | declaring one | Six argument kinds of two dozen, aliases, others' commands |
 | Storage | per player and per world | Nothing worth naming |
-| Server state | facts and three rules | Shutdown, run phase, most of the config |
+| Server state | facts and three rules | Mob spawning, tick rates, most of the config |
 | Permissions | reading them | Declaring, granting and revoking |
 | Other mods | naming and versions | Reaching into what one declared |
 
@@ -37,10 +38,11 @@ makes, and `moontweaks.recipes.cooking.remove` takes that code where every other
 kind takes an output.
 
 Beyond the vanilla kinds, `RegisterRecipeRegistry` lets any mod declare a recipe
-kind of its own, and `RecipeRegistry` reaches only the seven the survival mod
-declares. A script therefore cannot touch a recipe kind another mod added.
-`IWorldAccessor.GetRecipeRegistry(code)` is the lookup that would answer for one,
-and it is a different lookup from the by-type one that exists.
+kind of its own, and `moontweaks.recipes.kinds`, `count` and `remove` reach any of
+them by registry code through `IWorldAccessor.GetRecipeRegistry`. A kind this mod
+has never seen is matched on what its recipes resolve to as an output, since that
+is all such a kind reliably offers — so a modded kind can be counted and thinned
+out, and a recipe cannot be added to one or have its ingredients read.
 
 ## Item and block properties
 
@@ -75,13 +77,20 @@ Unbound, in the order they are likely to be wanted:
 - The model transforms, which decide how something is held and dropped. These are
   client-rendered and so are out of reach for the same reason names are.
 
+Nothing lists them either. `moontweaks.items.count` and `moontweaks.blocks.count`
+say how many there are, and `IWorldAccessor.SearchItems` and `SearchBlocks` answer
+which codes match a wildcard — the lookup this mod uses internally and does not
+offer. A script wanting the codes of every ingot, or wanting to ask whether one
+exists before naming it, has `moontweaks.mods` to guard on and nothing finer:
+every other binding refuses an unknown code rather than answering for it.
+
 Nothing creates an item or a block. `RegisterItem` and `RegisterBlock` exist, but
 a scripted asset would need its shape, textures and name shipped to every client,
 which is the different mod that `TODO.md` describes under names and descriptions.
 
 ## Players
 
-Thirty-four functions reach where a player is and which way they face, their
+Thirty-six functions reach where a player is and which way they face, their
 health, hunger and tiredness, their mode, their spawn, whether they sleep, what
 they have eaten, what they are looking at, what they may do, what their abilities
 come to, their chat, and whatever a script chose to remember about them.
@@ -117,19 +126,38 @@ Also unbound:
 - **What they are looking at** is reached: `players.looking` for the block and
   `players.lookingAtEntity` for the creature, which hands back the identifier
   `moontweaks.entities` takes.
+- **Reading a spawn.** `players.setSpawn` and `clearSpawn` write one; nothing reads
+  one back. `IServerPlayer.GetSpawnPosition` answers, and a script that wants to
+  send somebody home has to have remembered where home was itself. The world's own
+  default spawn, which `ISaveGame.DefaultSpawn` holds, is unreached in both
+  directions.
+- **Which slot is held.** `moontweaks.inventory.setHeld` writes what is in the hand;
+  `ActiveHotbarSlotNumber` decides which hand slot that is, and is unbound. The
+  offhand slot is reached only as a numbered slot of the hotbar inventory, where
+  `OffhandHotbarSlot` names it directly.
 - **Connection facts.** `Ping`, `IpAddress`, `LanguageCode`, `ConnectionState`.
 - **Offline players past a name.** `IPlayerDataManager` answers for somebody who is
   not here; `uidOf` uses it, and the rest of what it holds is unreached.
 
 ## World
 
-Fifteen functions read a block, place one, queue a batch, commit it, break a block
-properly, exchange one, drop a stack, ask whether a chunk is loaded, find the
-surface of a column, read light, climate and wind, outline blocks on a player's
-screen, and remember something against the save game.
+Twenty-one functions read a block, place one, queue a batch, commit it, break a
+block properly, exchange one, drop a stack, ask whether a chunk is loaded, bring one
+in, find the surface of a column, read light, climate and wind, search a region for
+blocks and count what is there, ask whether a player may build somewhere, play a
+sound, throw off particles, outline blocks on a player's screen, and remember
+something against the save game.
 
 Still unreached:
 
+- **The fluid layer.** A block position holds two blocks: a solid one and a fluid
+  one. `world.blockAt` reads the solid layer and falls back to the fluid layer only
+  where the solid one is empty, and `world.setBlock` routes a block to the fluid
+  layer only when that block belongs there. So placing water in an empty place works
+  and reading water in an empty place works; asking whether a block is underwater
+  does not, and draining a place without disturbing what stands in it does not
+  either. `BlockLayersAccess` is the argument that names a layer, and every call
+  here takes its default.
 - **Entities** are reached, through `moontweaks.entities`. What is left there is
   mounting, pathing and behaviours, none of which has been asked for.
 - **Players near a place.** `moontweaks.entities.around` answers this already, since
@@ -138,26 +166,24 @@ Still unreached:
 - **Block entities past their inventory.** `moontweaks.inventory` reaches what a chest
   holds. What a firepit is burning, what a quern is grinding and everything else a
   `BlockEntity` keeps is unreached, as are `SpawnBlockEntity` and `RemoveBlockEntity`.
-- **Area scans.** `WalkBlocks` and `SearchBlocks` walk a region inside the engine.
-  A script doing the same through `blockAt` pays a call per block, which the README
-  already warns is the expensive mistake — so the engine's own scan is the fix, not
-  just a convenience. `WalkStructures` does the same for generated structures.
-- **Sound and particles.** `PlaySoundAt` and `SpawnParticles` are how a scripted
-  effect is noticed at all. Both are server-callable and reach a vanilla client, in
-  the same way `world.highlight` does.
+- **Scans past a box of blocks.** `world.findBlocks` and `countBlocks` walk a region
+  inside the engine, which is what keeps a scan off the per-block call that the
+  README warns is the expensive mistake. `WalkStructures` does the same for generated
+  structures and is unbound, as is `SearchFluidBlocks` for the layer above.
+- **An effect one player alone notices.** `world.playSound` and `spawnParticles` are
+  positional: everybody near enough sees and hears them. `PlaySoundFor` plays to one
+  player wherever they are, which is what a private cue wants.
 - **Undoing block edits.** `IBlockAccessorRevertable` records what it wrote so it
   can be put back. Everything here writes through the plain accessor, so nothing a
   script builds can be undone except by building the opposite.
-- **Loading chunks deliberately.** `world.isLoaded` says whether a chunk is there;
-  `IWorldManagerAPI.LoadChunkColumn` and `TestChunkExists` are how one is brought
-  in, and are unbound.
 - **Damaging a block short of breaking it.** `DamageBlock`.
 - **Decor.** `SetDecor`, `GetDecors` and `BreakDecor` reach the layer a block
   carries on its faces.
 - **Explosions.** `CreateExplosion`.
-- **Land claims.** `ILandClaimAPI` decides who may build where, which anything
-  editing blocks on a populated server has to respect. `TestAccess` asks, and `Add`
-  and `Remove` change them.
+- **Changing a land claim.** `world.testAccess` asks `ILandClaimAPI` who may build
+  where, which is what anything editing blocks on a populated server has to respect.
+  Listing the claims at a place, and `Add` and `Remove` which change them, are
+  unbound.
 - **Ray casting.** `RayTraceForSelection` answers what is along a line, which is
   what a reach test or a line-of-sight check needs.
 - **World facts a script cannot change.** Light level tables, sun brightness, sea
@@ -177,9 +203,15 @@ identifier outlives everything, while an entity's is good only while the entity 
 loaded. A chunk unloading takes one out of reach without saying so, which is what
 `isLoaded` exists to answer.
 
-Left unbound: mounting and dismounting, the pathfinding an entity does for itself, and
-the behaviours it is built from. Each is a domain rather than a field, and none has
-been asked for.
+Selecting is by `code`, which accepts a `*` wildcard. Items and blocks are also
+selected by `tags`, and entities are not: the game keeps entity tags in a registry of
+their own, `ICoreAPI.EntityTagRegistry`, and `Entity.Tags` carries them. Until that
+is bound, "every hostile creature" is spelled as a list of codes where the same
+question about an item is spelled as one tag.
+
+Left unbound besides: mounting and dismounting, the pathfinding an entity does for
+itself, and the behaviours it is built from. Each is a domain rather than a field,
+and none has been asked for.
 
 ## Inventory
 
@@ -196,10 +228,22 @@ Both `put` and `take` say how much they actually moved, which is rarely somethin
 caller may assume: a bag may not hold enough and a chest may not have room. A script
 charging for something reads that number rather than trusting it.
 
-What is left is the one thing `IPlayerInventoryManager` does that this does not:
-moving a stack from one place to another in a single operation, with the game deciding
-where it best fits. A script spells that as a `take` and a `put`, and has to put back
-what the second half could not place.
+What is left is two things.
+
+Moving a stack from one place to another in a single operation, with the game
+deciding where it best fits, is what `IPlayerInventoryManager.TryTransferAway` does
+and `TryTransferTo` does to a named slot. A script spells either as a `take` and a
+`put`, and has to put back what the second half could not place.
+
+What one stack carries is unreached in the reading direction. A slot answers with a
+code, a count, what would fit and what the game calls it — not with the attributes
+the stack itself holds, of which a tool's remaining durability is the one every
+server asks about. Writing them is bound: every shape naming a stack takes
+`attributes`, so a script can hand over a half-worn axe it cannot afterwards read.
+
+Nothing says a set of slots changed. `IInventory.SlotModified` is raised per
+inventory rather than through `IEventAPI`, so hearing it means subscribing to one
+container at a time, which is a shape rather than an event binding.
 
 ## Calendar
 
@@ -234,6 +278,16 @@ A command a script declares needs nothing on a player's machine: the client send
 the line as typed and the server reads it. Declaring one still happens as the server
 loads, so a new command wants a restart the way a new recipe does.
 
+The game parses two dozen kinds of argument and six are bound. What a script cannot
+ask for: a position, whether typed or taken from where the caller stands
+(`WorldPosition`, `Vec3i`); an item or block code, which the game completes from the
+registry as it is typed (`Item`, `Block`); an entity or entity type; a privilege or
+a role; a colour; a number held to a range. The asset ones are the sharpest absence,
+since naming an asset is what this mod is for.
+
+A command also carries aliases — `WithAlias` and `WithRootAlias` — and neither is
+bound, so a script's command answers to exactly one name.
+
 What is not reached: a command another mod already declared cannot be added to or
 altered. That is this mod's own rule rather than the game's —
 `IChatCommandApi.GetOrCreate` hands back a command that already exists and
@@ -263,10 +317,18 @@ seed, sea level and map size. `rules` and `setRules` read and change PvP, fire
 spread and falling blocks, written back to the server's configuration so they
 survive a restart.
 
-Unbound: `ShutDown`, `CurrentRunPhase`, `IsShuttingDown`, and the rest of
-`IServerConfig` — the password, the whitelist mode, the tick rate, the chunk radius
-and the roles. Several are settable and none are things a script should change
-casually, which is why they wait on the per-command permissions entry in `TODO.md`.
+Three rules are bound and the rules beside them are not. Whether creatures spawn at
+all is `ISaveGame.EntitySpawning`; how fast crops grow and fires spread is
+`BlockTickInterval` and `RandomBlockTicksPerChunk`; how the spawn cap scales with the
+number of players is `SpawnCapPlayerScaling`. Each is one value a server operator
+actually retunes, and each sits beside `AllowPvP` rather than anywhere harder to
+reach.
+
+Unbound besides: `ShutDown`, `CurrentRunPhase`, `IsShuttingDown`, and the rest of
+`IServerConfig` — the password, the whitelist mode, the tick rate, the chunk radius,
+the default role and the roles themselves. Several are settable and none are things a
+script should change casually, which is why they wait on the per-command permissions
+entry in `TODO.md`.
 
 ## Permissions
 
@@ -283,10 +345,11 @@ it calls itself, and lists them all. This is what lets one script serve two serv
 every other binding refuses a code the server does not have, so naming another mod's
 items is only safe inside a guard that has asked first.
 
-What it does not do is reach into what another mod declared — its recipe registries,
-its mod systems, its own settings. `IModLoader.GetModSystem` is how that would be
-done, and it couples this mod to another's internals in a way the vanilla API does
-not, which is a decision rather than an oversight.
+Another mod's recipe registries are reached, through `moontweaks.recipes.kinds` and
+its siblings. What is not reached is a mod system itself, and the settings it keeps.
+`IModLoader.GetModSystem` is how that would be done, and it couples this mod to
+another's internals in a way the vanilla API does not, which is a decision rather
+than an oversight.
 
 The survival and essentials mods are where a good deal of a server's behaviour
 actually lives: `WeatherSystemServer` overrides precipitation and spawns lightning,

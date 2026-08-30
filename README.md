@@ -502,8 +502,29 @@ point. A plain `dotnet build` embeds whichever library the last `docs.sh` wrote,
 or none at all, in which case the mod still runs scripts and says at startup that
 it cannot describe itself to an editor.
 
-`VINTAGE_STORY` overrides the client install path, which defaults to
-`~/.local/share/vintagestory`.
+`VINTAGE_STORY` names the folder holding `VintagestoryAPI.dll` — the game's install
+folder rather than its data folder. Left unset, the first of the platform's usual
+places that exists is taken: `%APPDATA%\Vintagestory` on Windows, the application
+bundle or `~/Library/Application Support/vintagestory` on macOS, and
+`~/.local/share/vintagestory` on Linux. A build that finds none of them says so in
+one line and names the variable, rather than failing as a wall of unresolved
+references.
+
+### Platforms
+
+The mod itself is portable and has nothing platform-specific in it: every path it
+touches is built from the folder the game hands it, and the two places that need a
+platform-neutral form convert deliberately.
+
+The scripts in `scripts/` are POSIX shell, so they run on Linux and macOS as they
+are. On Windows they need WSL or Git Bash, and `package.sh` additionally wants
+`zip`, which Windows does not ship. Building and testing without them is `dotnet
+build` and copying the output; the scripts are convenience rather than requirement.
+
+Develop on Linux where there is a choice. Its filesystem is case-sensitive, so a
+script folder or an asset code with the wrong casing fails there and passes quietly
+on Windows and macOS — which means a mistake made on either of those first surfaces
+on somebody's Linux server.
 
 ### Testing against a real game
 

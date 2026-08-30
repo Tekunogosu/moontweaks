@@ -234,3 +234,81 @@ public sealed class EntityPayload
     [LuaField("stack")]
     public StackPayload? Stack { get; init; }
 }
+
+/// <summary>Why something left the world.</summary>
+public enum EnumDespawnKind
+{
+    /// <summary>It was killed.</summary>
+    Death,
+
+    /// <summary>It burned up.</summary>
+    Combusted,
+
+    /// <summary>Nobody was near enough to keep it.</summary>
+    OutOfRange,
+
+    /// <summary>Somebody picked it up, which is how a dropped stack goes.</summary>
+    PickedUp,
+
+    /// <summary>Its chunk left memory. It is not gone from the world, only out of reach.</summary>
+    Unload,
+
+    /// <summary>A player left, taking their body with them.</summary>
+    Disconnect,
+
+    /// <summary>It timed out, as a dropped stack does when nobody collects it.</summary>
+    Expire,
+
+    /// <summary>Something took it out deliberately, which is what <c>despawn</c> does.</summary>
+    Removed,
+}
+
+/// <summary>What hurt something, as the game classes it.</summary>
+public enum EnumHurtKind
+{
+    /// <summary>A fall.</summary>
+    Gravity,
+
+    /// <summary>Burning.</summary>
+    Fire,
+
+    /// <summary>A blunt blow.</summary>
+    BluntAttack,
+
+    /// <summary>A cut.</summary>
+    SlashingAttack,
+
+    /// <summary>A stab.</summary>
+    PiercingAttack,
+
+    /// <summary>No air.</summary>
+    Suffocation,
+
+    /// <summary>Healing, which the game counts as damage of a kind.</summary>
+    Heal,
+
+    /// <summary>Poison.</summary>
+    Poison,
+
+    /// <summary>Starvation.</summary>
+    Hunger,
+
+    /// <summary>Being crushed.</summary>
+    Crushing,
+
+    /// <summary>Cold.</summary>
+    Frost,
+
+    /// <summary>Electricity.</summary>
+    Electricity,
+
+    /// <summary>Heat.</summary>
+    Heat,
+
+    /// <summary>An injury with no more particular cause.</summary>
+    Injury,
+
+    /// <summary>Acid.</summary>
+    Acid,
+}
+

@@ -1,0 +1,44 @@
+<Project>
+
+  <!--
+    Where Vintage Story is installed, which is the folder its assemblies are
+    referenced from. Every project here reads it, so it is decided once: MSBuild
+    imports this file for each project beneath it before reading the project itself.
+
+    VINTAGE_STORY wins wherever it is set, which is the convention the rest of the
+    modding community already uses. Failing that, the first of the platform's usual
+    places that actually exists is taken. A machine that keeps the game somewhere
+    else is not guessed at — it is reported by name, which is what the check at the
+    bottom is for.
+  -->
+  <PropertyGroup>
+    <VintageStoryDir Condition="'$(VINTAGE_STORY)' != ''">$(VINTAGE_STORY)</VintageStoryDir>
+
+    <!-- Windows: where the installer puts it. -->
+    <VintageStoryDir Condition="'$(VintageStoryDir)' == '' And Exists('$(APPDATA)\Vintagestory')"
+                     >$(APPDATA)\Vintagestory</VintageStoryDir>
+
+    <!-- macOS: the application bundle, then the same layout the Linux tarball uses,
+         which is what an unpacked copy on a Mac ends up looking like. -->
+    <VintageStoryDir Condition="'$(VintageStoryDir)' == '' And Exists('/Applications/Vintagestory.app/Contents/MacOS')"
+                     >/Applications/Vintagestory.app/Contents/MacOS</VintageStoryDir>
+    <VintageStoryDir Condition="'$(VintageStoryDir)' == '' And Exists('$(HOME)/Library/Application Support/vintagestory')"
+                     >$(HOME)/Library/Application Support/vintagestory</VintageStoryDir>
+
+    <!-- Linux: where the tarball is usually unpacked, and the fallback that names
+         something concrete in the message when nothing was found at all. -->
+    <VintageStoryDir Condition="'$(VintageStoryDir)' == ''"
+                     >$(HOME)/.local/share/vintagestory</VintageStoryDir>
+  </PropertyGroup>
+
+  <!--
+    Without this the build fails as six unresolved assembly references and several
+    hundred type errors, which says nothing about the one thing that is wrong. This
+    says it in one line, before the compiler is ever reached.
+  -->
+  <Target Name="CheckVintageStoryInstall" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(VintageStoryDir)/VintagestoryAPI.dll')"
+           Text="Vintage Story was not found at '$(VintageStoryDir)'. Set the VINTAGE_STORY environment variable to the folder holding VintagestoryAPI.dll — that is the game's install folder, not its data folder." />
+  </Target>
+
+</Project>

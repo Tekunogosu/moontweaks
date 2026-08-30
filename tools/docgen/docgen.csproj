@@ -10,11 +10,6 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <VintageStoryDir Condition="'$(VINTAGE_STORY)' != ''">$(VINTAGE_STORY)</VintageStoryDir>
-    <VintageStoryDir Condition="'$(VintageStoryDir)' == ''">$(HOME)/.local/share/vintagestory</VintageStoryDir>
-  </PropertyGroup>
-
   <ItemGroup>
     <ProjectReference Include="../../moontweaks.csproj" />
   </ItemGroup>
