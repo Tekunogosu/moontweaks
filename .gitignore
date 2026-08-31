@@ -7,4 +7,5 @@ obj/
 examples/.luarc.json
 examples/.vscode/
 examples/library/
+examples/snippets/
 scripts/deploy.sh

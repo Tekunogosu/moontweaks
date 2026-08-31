@@ -17,6 +17,18 @@ namespace MoonTweaks.World;
 /// Reading is safe wherever a script runs. Everything that writes acts on a loaded
 /// world and so belongs in a handler, as the rest of the world does.
 /// </remarks>
+/// <example>
+/// <code>
+/// local calendar = moontweaks.calendar
+/// local now = calendar.now()
+///
+/// moontweaks.log.info(("%s — day %d of %d, moon at %.2f")
+///   :format(now.pretty, now.dayOfYear, now.daysPerYear, now.moonBrightness))
+///
+/// -- Time at half speed, under a name so it can be lifted again later.
+/// calendar.setSpeed("moontweaks:slowdays", 0.5)
+/// </code>
+/// </example>
 [LuaModule("moontweaks.calendar")]
 public sealed class CalendarDomain(IWorldAccessor world)
 {

@@ -77,6 +77,11 @@ public static partial class HtmlWriter
         page.AppendLine($"<h2 class=\"module\"><code>{Escape(module.Path)}</code></h2>");
         page.AppendLine($"<p>{Markup(module.Summary)}</p>");
 
+        if (module.Example.Length > 0)
+        {
+            page.AppendLine($"<pre class=\"example\"><code>{Escape(module.Example)}</code></pre>");
+        }
+
         foreach (var function in module.Functions)
         {
             var arguments = string.Join(", ", function.Parameters.Select(p => Escape(p.Name)));
@@ -219,6 +224,11 @@ public static partial class HtmlWriter
         section { margin-top: 3rem; }
         h2 { font-size: 1.3rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--line); }
         h2 code { background: none; padding: 0; }
+        pre.example {
+          background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px;
+          padding: 0.9rem 1rem; overflow-x: auto; line-height: 1.5; margin: 1rem 0 1.5rem;
+        }
+        pre.example code { background: none; padding: 0; }
         .item { margin: 1.75rem 0; padding-left: 1rem; border-left: 3px solid var(--line); }
         .item h3 { font-size: 1rem; font-weight: 500; margin: 0 0 0.4rem; }
         .item h3 code { background: none; padding: 0; }

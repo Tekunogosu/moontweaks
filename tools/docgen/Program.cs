@@ -47,6 +47,7 @@ Write(Path.Combine(outputDir, "library", "moontweaks.lua"), LuaCatsWriter.Write(
 Write(Path.Combine(outputDir, "library", MoonTweaks.Host.AssetCodeLibrary.FILE_NAME),
     MoonTweaks.Host.AssetCodeLibrary.Render(MoonTweaks.Host.AssetCodeLibrary.SetsOf(null)));
 Write(Path.Combine(outputDir, "index.html"), HtmlWriter.Write(api));
+Write(Path.Combine(outputDir, "snippets.lua"), SnippetWriter.Write(api));
 
 Console.WriteLine($"{Members(api)} member(s) documented across "
                   + $"{api.Modules.Count} module(s), {api.Tables.Count} table(s), {api.Enums.Count} value set(s)");
@@ -72,6 +73,7 @@ static IEnumerable<string> Undocumented(ApiModel api)
     foreach (var module in api.Modules)
     {
         if (Blank(module.Summary)) yield return $"module {module.Path}";
+        if (Blank(module.Example)) yield return $"example for module {module.Path}";
         foreach (var function in module.Functions)
         {
             if (Blank(function.Summary)) yield return $"function {module.Path}.{function.Name}";

@@ -409,8 +409,16 @@ lua-language-server --check examples
 exists — and takes descriptions from the compiler's XML documentation output. It
 cannot document a function that is not bound, or omit one that is.
 
+Every module carries a worked example as well as a description, written beside the
+binding as an XML `example` element. One source reaches three places: the reference
+page renders it under the module heading, the editor library carries it into the
+hover text, and `docs.sh` gathers all of them into `examples/snippets/modules.lua`,
+where `lua-language-server` checks them against the same types an author writes
+against. A snippet that stops compiling fails the build rather than sitting wrong on
+the site.
+
 `--check` fails when any module, function, parameter, table, field, or enumerated
-value lacks a description. The two checks pair: that one fails on a binding without a
+value lacks a description, or when a module lacks an example. The two checks pair: that one fails on a binding without a
 description, `lua-language-server` on an example that disagrees with the types the
 binding produced. Both run in CI ahead of the Pages deploy, the example check against
 the library `docs.sh` has just written rather than a checked-in copy, so neither an

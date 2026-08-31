@@ -5,6 +5,17 @@ using Vintagestory.API.Common;
 namespace MoonTweaks.Host;
 
 /// <summary>Messages from scripts into the server log.</summary>
+/// <example>
+/// <code>
+/// local log = moontweaks.log
+///
+/// log.info(("starting with %d grid recipe(s)"):format(moontweaks.recipes.grid.count()))
+///
+/// if not moontweaks.mods.isEnabled("primitivesurvival") then
+///   log.warn("primitive survival is not here, so its recipes were left alone")
+/// end
+/// </code>
+/// </example>
 [LuaModule("moontweaks.log")]
 public sealed class LogDomain(ILogger logger)
 {

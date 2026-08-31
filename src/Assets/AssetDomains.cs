@@ -8,6 +8,16 @@ using Vintagestory.API.Common;
 namespace MoonTweaks.Assets;
 
 /// <summary>Properties of the items a server holds.</summary>
+/// <example>
+/// <code>
+/// local items = moontweaks.items
+///
+/// moontweaks.log.info(("%d item(s) on this server"):format(items.count()))
+///
+/// -- Only the keys written here change, and a wildcard changes a whole family at once.
+/// items.set { code = "game:knife-flint", durability = 128 }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.items")]
 public sealed class ItemDomain(MutationLog log, IWorldAccessor world)
 {
@@ -33,6 +43,18 @@ public sealed class ItemDomain(MutationLog log, IWorldAccessor world)
 }
 
 /// <summary>Properties of the blocks a server holds.</summary>
+/// <example>
+/// <code>
+/// local blocks = moontweaks.blocks
+///
+/// -- How long it takes to break, and what tier of tool has to be swung at it.
+/// blocks.set {
+///   code = "game:rock-*",
+///   resistance = 4,
+///   requiredMiningTier = 1,
+/// }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.blocks")]
 public sealed class BlockDomain(MutationLog log, IWorldAccessor world)
 {

@@ -23,10 +23,15 @@ cp "$ROOT/src/Host/Resources/luarc.json" "$ROOT/examples/.luarc.json"
 cp "$ROOT/src/Host/Resources/vscode-extensions.json" "$ROOT/examples/.vscode/extensions.json"
 cp "$OUT/library/moontweaks.lua" "$ROOT/examples/library/moontweaks.lua"
 cp "$OUT/library/codes.lua" "$ROOT/examples/library/codes.lua"
+# The module examples go where the check below reaches them, which is what keeps a
+# snippet on the reference page from drifting out of step with the bindings it shows.
+mkdir -p "$ROOT/examples/snippets"
+cp "$OUT/snippets.lua" "$ROOT/examples/snippets/modules.lua"
 echo "  examples/.luarc.json"
 echo "  examples/.vscode/extensions.json"
 echo "  examples/library/moontweaks.lua"
 echo "  examples/library/codes.lua"
+echo "  examples/snippets/modules.lua"
 
 # The examples are shipped in the mod and scaffolded against the library just
 # written, so they are checked against the types this build actually produces.

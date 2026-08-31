@@ -13,6 +13,21 @@ namespace MoonTweaks.World;
 /// These act on a loaded world, so they belong in an event handler rather than in a
 /// script's body: when scripts run, the recipes exist but the world does not.
 /// </remarks>
+/// <example>
+/// <code>
+/// local world = moontweaks.world
+/// local ground = world.surfaceAt(500, 500)
+///
+/// if ground then
+///   world.setBlock("game:cobblestone-granite", 500, ground + 1, 500)
+/// end
+///
+/// -- One call for a whole box, where walking it would cost a call per block.
+/// moontweaks.log.info(("%d ore block(s) below"):format(world.countBlocks {
+///   x = 480, y = 20, z = 480, toX = 520, toY = 80, toZ = 520, code = "game:ore-*",
+/// }))
+/// </code>
+/// </example>
 [LuaModule("moontweaks.world")]
 public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
 {

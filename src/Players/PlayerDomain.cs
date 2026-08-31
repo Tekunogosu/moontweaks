@@ -12,6 +12,20 @@ namespace MoonTweaks.Players;
 /// hands a script, rather than passed as an object, so nothing a script holds
 /// outlives the player it refers to.
 /// </summary>
+/// <example>
+/// <code>
+/// local players = moontweaks.players
+///
+/// moontweaks.events.playerJoin(function(e)
+///   local visits = players.getWorldData(e.player, "visits") or 0
+///   players.setWorldData(e.player, "visits", visits + 1)
+///   players.say(e.player, ("welcome back — visit number %d"):format(visits + 1))
+///
+///   local at = players.position(e.player)
+///   players.setSpawn(e.player, math.floor(at.x), math.floor(at.y), math.floor(at.z))
+/// end)
+/// </code>
+/// </example>
 [LuaModule("moontweaks.players")]
 public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
 {

@@ -37,6 +37,21 @@ public sealed class ModPayload(Mod mod)
 /// guard the block with <c>isEnabled</c> and the codes inside it are only ever read
 /// on a server that has them.
 /// </remarks>
+/// <example>
+/// <code>
+/// local mods = moontweaks.mods
+///
+/// -- Ask first, then name that mod's codes: a code the server does not have refuses
+/// -- the whole run, so the guard is what makes one script work on two servers.
+/// if mods.isEnabled("primitivesurvival") then
+///   moontweaks.recipes.grid.remove("primitivesurvival:trap-basket")
+/// end
+///
+/// for _, mod in ipairs(mods.all()) do
+///   moontweaks.log.info(("%s (%s)"):format(mod.name, mod.id))
+/// end
+/// </code>
+/// </example>
 [LuaModule("moontweaks.mods")]
 public sealed class ModDomain(IModLoader loader)
 {

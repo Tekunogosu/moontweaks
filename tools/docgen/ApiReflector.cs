@@ -44,6 +44,7 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
     private ModuleDoc ReadModule(Type type) => new(
         type.GetCustomAttribute<LuaModuleAttribute>()!.Path,
         docs.Summary(type),
+        docs.Example(type),
         DomainBinder.FunctionsOf(type).Select(ReadFunction).ToList());
 
     private FunctionDoc ReadFunction(MethodInfo method) => new(

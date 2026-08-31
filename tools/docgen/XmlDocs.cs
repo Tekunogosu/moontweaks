@@ -29,6 +29,16 @@ public sealed partial class XmlDocs
     /// <summary>Summary of a type, or the empty string when it has none.</summary>
     public string Summary(Type type) => SectionOf($"T:{FullNameOf(type)}", "summary");
 
+    /// <summary>
+    /// The worked example on a type, kept line for line, or the empty string when it
+    /// has none. Unlike a summary, an example is code: the whitespace inside it is
+    /// what makes it readable, so it is dedented rather than flattened.
+    /// </summary>
+    public string Example(Type type) =>
+        members.TryGetValue($"T:{FullNameOf(type)}", out var member)
+            ? Dedent(member.Element("example"))
+            : "";
+
     /// <summary>Summary of a property.</summary>
     public string Summary(PropertyInfo property) =>
         SectionOf($"P:{FullNameOf(property.DeclaringType!)}.{property.Name}", "summary");
@@ -62,6 +72,25 @@ public sealed partial class XmlDocs
         (type.FullName ?? type.Name).Replace('+', '.').Split('`')[0] is var name && type.IsGenericType
             ? name + "{" + string.Join(",", type.GetGenericArguments().Select(FullNameOf)) + "}"
             : (type.FullName ?? type.Name).Replace('+', '.');
+
+    /// <summary>
+    /// An element's text with the indentation the doc comment added taken back off,
+    /// measured from the least indented line so the shape inside it survives.
+    /// </summary>
+    private static string Dedent(XElement? element)
+    {
+        if (element is null) return "";
+
+        var lines = element.Value.Replace("\r\n", "\n").Split('\n').ToList();
+        while (lines.Count > 0 && lines[0].Trim().Length == 0) lines.RemoveAt(0);
+        while (lines.Count > 0 && lines[^1].Trim().Length == 0) lines.RemoveAt(lines.Count - 1);
+        if (lines.Count == 0) return "";
+
+        var indent = lines.Where(line => line.Trim().Length > 0)
+            .Min(line => line.Length - line.TrimStart().Length);
+
+        return string.Join("\n", lines.Select(line => line.Length >= indent ? line[indent..] : line.TrimStart()));
+    }
 
     private string SectionOf(string key, string section) =>
         members.TryGetValue(key, out var member) ? Flatten(member.Element(section)) : "";

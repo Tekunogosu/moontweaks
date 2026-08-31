@@ -10,7 +10,19 @@ public sealed record ApiModel(
     IReadOnlyList<EnumDoc> Enums);
 
 /// <summary>A dotted path scripts call functions on.</summary>
-public sealed record ModuleDoc(string Path, string Summary, IReadOnlyList<FunctionDoc> Functions);
+/// <param name="Path">What a script writes to reach it.</param>
+/// <param name="Summary">What the module is for.</param>
+/// <param name="Example">
+/// A few lines of Lua showing the module in use. Written beside the binding as an
+/// XML <c>example</c> element, so the reference, the editor library and the checked
+/// snippets are all one source.
+/// </param>
+/// <param name="Functions">What may be called on it.</param>
+public sealed record ModuleDoc(
+    string Path,
+    string Summary,
+    string Example,
+    IReadOnlyList<FunctionDoc> Functions);
 
 /// <summary>One callable function.</summary>
 public sealed record FunctionDoc(

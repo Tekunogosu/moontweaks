@@ -6,6 +6,21 @@ using Vintagestory.API.Common;
 namespace MoonTweaks.Recipes;
 
 /// <summary>Shaped and shapeless crafting grid recipes.</summary>
+/// <example>
+/// <code>
+/// local grid = moontweaks.recipes.grid
+///
+/// grid.remove("game:axe-flint")
+///
+/// grid.add {
+///   name = "moontweaks:axe-flint-bone",
+///   pattern = { "T",
+///               "B" },
+///   ingredients = { T = "game:axehead-flint", B = "game:bone" },
+///   output = "game:axe-flint",
+/// }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.recipes.grid")]
 public sealed class GridDomain(MutationLog log, IWorldAccessor world)
 {

@@ -20,6 +20,18 @@ namespace MoonTweaks.Entities;
 /// These act on a loaded world, so they belong in a handler rather than in a script's
 /// body: when scripts run, the recipes exist but the world does not.
 /// </remarks>
+/// <example>
+/// <code>
+/// local entities = moontweaks.entities
+///
+/// for _, wolf in ipairs(entities.around { x = 500, y = 110, z = 500, range = 30,
+///                                         code = "game:wolf-adult", aliveOnly = true }) do
+///   moontweaks.log.info(("%s at %.0f %.0f %.0f"):format(wolf.name, wolf.x, wolf.y, wolf.z))
+/// end
+///
+/// entities.spawn { code = "game:chicken-hen", x = 500, y = 111, z = 500, quantity = 3 }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.entities")]
 public sealed class EntityDomain(EntityAccess entities, AssetStacks stacks)
 {

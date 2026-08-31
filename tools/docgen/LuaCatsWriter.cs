@@ -80,6 +80,15 @@ public static class LuaCatsWriter
         {
             Declare(output, module.Path);
             Comment(output, module.Summary);
+            // An editor renders a doc comment as markdown, so the example arrives on
+            // hover looking like the one on the reference page rather than as prose.
+            if (module.Example.Length > 0)
+            {
+                output.AppendLine("---");
+                output.AppendLine("--- ```lua");
+                foreach (var line in module.Example.Split('\n')) output.AppendLine($"--- {line}".TrimEnd());
+                output.AppendLine("--- ```");
+            }
             output.AppendLine($"{module.Path} = {{}}");
             output.AppendLine();
 

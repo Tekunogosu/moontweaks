@@ -21,6 +21,22 @@ namespace MoonTweaks.Inventories;
 /// These act on a loaded world, so they belong in a handler rather than in a script's
 /// body: when scripts run, the recipes exist but the world does not.
 /// </remarks>
+/// <example>
+/// <code>
+/// local inventory = moontweaks.inventory
+///
+/// moontweaks.events.playerJoin(function(e)
+///   local held = inventory.held(e.player)
+///   if held then
+///     moontweaks.log.info(("%s is holding %d x %s"):format(e.playerName, held.quantity, held.code))
+///   end
+///
+///   -- Into their bags rather than into their hand, and it says how much fitted.
+///   local given = inventory.put({ player = e.player }, { code = "game:bread-spelt", quantity = 2 })
+///   moontweaks.log.info(("%d loaf/loaves fitted"):format(given))
+/// end)
+/// </code>
+/// </example>
 [LuaModule("moontweaks.inventory")]
 public sealed class InventoryDomain(
     InventoryAccess inventories, AssetStacks stacks, IWorldAccessor world)

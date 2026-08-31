@@ -19,6 +19,18 @@ namespace MoonTweaks.Recipes;
 /// matching on what a recipe's output resolved to. It cannot add one, because
 /// building a recipe means knowing its shape.
 /// </remarks>
+/// <example>
+/// <code>
+/// local recipes = moontweaks.recipes
+///
+/// for _, kind in ipairs(recipes.kinds()) do
+///   moontweaks.log.info(("%s holds %d recipe(s)"):format(kind, recipes.count(kind)))
+/// end
+///
+/// -- Any kind at all, named by the code it is registered under.
+/// recipes.remove { kind = "knappingrecipes", code = "game:knifeblade-flint" }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.recipes")]
 public sealed class RecipeKindDomain(MutationLog log, IWorldAccessor world)
 {

@@ -10,6 +10,24 @@ namespace MoonTweaks.Host;
 /// standard library it is given carries no <c>os</c>, so a script cannot time
 /// anything without being told what time it is. That is what this exists for so far.
 /// </remarks>
+/// <example>
+/// <code>
+/// local server = moontweaks.server
+/// local info = server.info()
+///
+/// moontweaks.log.info(("%s: %d of %d players, world %d blocks across")
+///   :format(info.name, info.players, info.maxPlayers, info.mapSizeX))
+///
+/// server.setRules { pvp = false }
+///
+/// -- A slice of work per tick, stopping itself by answering false.
+/// local ticks = 0
+/// server.every(0, function()
+///   ticks = ticks + 1
+///   if ticks == 20 then return false end
+/// end)
+/// </code>
+/// </example>
 [LuaModule("moontweaks.server")]
 public sealed class ServerDomain(ICoreServerAPI api, ScriptTimers timers)
 {

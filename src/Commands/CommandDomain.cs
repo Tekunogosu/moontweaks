@@ -13,6 +13,21 @@ namespace MoonTweaks.Commands;
 /// declares works for everyone already connected to that server. Like a recipe, it
 /// is declared as the server loads, so a new one still wants a restart.
 /// </remarks>
+/// <example>
+/// <code>
+/// moontweaks.commands.add {
+///   name = "home",
+///   description = "Say where you are standing",
+///   privilege = "chat",
+///   requiresPlayer = true,
+///
+///   handler = function(e)
+///     local at = moontweaks.players.position(e.player)
+///     return ("%s, you are at %.0f %.0f %.0f"):format(e.playerName, at.x, at.y, at.z)
+///   end,
+/// }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.commands")]
 public sealed class CommandDomain(ScriptCommands commands)
 {

@@ -9,6 +9,18 @@ namespace MoonTweaks.Recipes;
 // ask for; how any of it reaches the registry belongs to RegistryRecipeDomain.
 
 /// <summary>Recipes chipped from a stone laid on a knapping surface.</summary>
+/// <example>
+/// <code>
+/// local knap = moontweaks.recipes.knapping
+///
+/// knap.add {
+///   ingredient = "game:flint",
+///   pattern = { "_##_",
+///               "_##_" },
+///   output = { code = "game:knifeblade-flint", quantity = 2 },
+/// }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.recipes.knapping")]
 public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
     : RegistryRecipeDomain(log, world, registry)
@@ -50,6 +62,19 @@ public sealed class KnappingDomain(MutationLog log, IWorldAccessor world, Recipe
 }
 
 /// <summary>Recipes raised layer by layer from a lump of clay.</summary>
+/// <example>
+/// <code>
+/// local clay = moontweaks.recipes.clayforming
+///
+/// clay.add {
+///   ingredient = "game:clay-blue",
+///   pattern = { "###",
+///               "#_#",
+///               "###" },
+///   output = "game:bowl-blue-raw",
+/// }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.recipes.clayforming")]
 public sealed class ClayFormingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
     : RegistryRecipeDomain(log, world, registry)
@@ -91,6 +116,20 @@ public sealed class ClayFormingDomain(MutationLog log, IWorldAccessor world, Rec
 }
 
 /// <summary>Recipes hammered from a hot ingot on an anvil.</summary>
+/// <example>
+/// <code>
+/// local smith = moontweaks.recipes.smithing
+///
+/// -- One declaration covering every metal, through a wildcard the output names back.
+/// smith.add {
+///   ingredient = { code = "game:ingot-*", name = "metal",
+///                  allowedVariants = { "copper", "iron" } },
+///   pattern = { { "##_",
+///                 "##_" } },
+///   output = { code = "game:metalbit-{metal}", quantity = 3 },
+/// }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.recipes.smithing")]
 public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
     : RegistryRecipeDomain(log, world, registry)
@@ -143,6 +182,21 @@ public sealed class SmithingDomain(MutationLog log, IWorldAccessor world, Recipe
 }
 
 /// <summary>Recipes a barrel mixes on the spot or seals for a while.</summary>
+/// <example>
+/// <code>
+/// local barrel = moontweaks.recipes.barrel
+///
+/// -- `litres` measures a liquid and `quantity` counts things; a recipe may use both.
+/// barrel.add {
+///   code = "moontweaks:weak-brine",
+///   ingredients = {
+///     { code = "game:waterportion", litres = 4 },
+///     { code = "game:salt", quantity = 1 },
+///   },
+///   output = { code = "game:brineportion", litres = 4 },
+/// }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.recipes.barrel")]
 public sealed class BarrelDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
     : RegistryRecipeDomain(log, world, registry)
@@ -183,6 +237,20 @@ public sealed class BarrelDomain(MutationLog log, IWorldAccessor world, RecipeRe
 }
 
 /// <summary>Alloys a crucible smelts from a mix of metals.</summary>
+/// <example>
+/// <code>
+/// local alloy = moontweaks.recipes.alloy
+///
+/// -- Shares of the mix rather than counts, since a crucible pours what went into it.
+/// alloy.add {
+///   ingredients = {
+///     { code = "game:ingot-lead", minRatio = 0.45, maxRatio = 0.55 },
+///     { code = "game:ingot-zinc", minRatio = 0.45, maxRatio = 0.55 },
+///   },
+///   output = "game:ingot-leadsolder",
+/// }
+/// </code>
+/// </example>
 [LuaModule("moontweaks.recipes.alloy")]
 public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
     : RegistryRecipeDomain(log, world, registry)
@@ -230,6 +298,16 @@ public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeReg
 /// among the stacks an ingredient accepts stays a wildcard, and the pot matches
 /// against it as it cooks.
 /// </remarks>
+/// <example>
+/// <code>
+/// local cooking = moontweaks.recipes.cooking
+///
+/// -- A meal has no single product, so a cooking recipe is named by its own code
+/// -- rather than by what it makes.
+/// moontweaks.log.info(("%d cooking recipe(s)"):format(cooking.count()))
+/// cooking.remove("game:meatystew")
+/// </code>
+/// </example>
 [LuaModule("moontweaks.recipes.cooking")]
 public sealed class CookingDomain(MutationLog log, IWorldAccessor world, RecipeRegistry registry)
     : RegistryRecipeDomain(log, world, registry)

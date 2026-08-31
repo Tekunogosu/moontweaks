@@ -13,6 +13,21 @@ namespace MoonTweaks.Events;
 /// not thread safe, so the ones it raises on its chunk, spawn and physics threads
 /// are deliberately absent rather than offered and unsafe.
 /// </remarks>
+/// <example>
+/// <code>
+/// local events = moontweaks.events
+///
+/// events.playerJoin(function(e)
+///   moontweaks.players.say(e.player, "welcome back, " .. e.playerName)
+/// end)
+///
+/// events.didBreakBlock(function(e)
+///   if e.block == "game:crock-burned" then
+///     moontweaks.log.info(("%s broke a crock at %d %d %d"):format(e.playerName, e.x, e.y, e.z))
+///   end
+/// end)
+/// </code>
+/// </example>
 [LuaModule("moontweaks.events")]
 public sealed class EventDomain(ScriptEvents events)
 {
