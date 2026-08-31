@@ -3,9 +3,12 @@ name: docs
 # The reference is generated from the mod's bindings, so it is rebuilt from
 # source rather than committed. A binding without documentation fails the job, and
 # so does an example that disagrees with the types that binding produced.
+# Both names are listed because the branch this publishes from is whichever one the
+# repository calls its default; the deploy steps check that rather than a name, so a
+# push to the other one is built and checked without publishing anything.
 on:
   push:
-    branches: [main]
+    branches: [main, omega]
   pull_request:
 
 permissions:
@@ -62,15 +65,15 @@ jobs:
       - name: Check the examples against the generated types
         run: lua-language-server --check examples --checklevel Warning
 
-      # Only a push to main is published, so a pull request builds the reference
-      # and checks it without producing an artifact nothing will deploy.
+      # Only the default branch is published, so every other build checks the
+      # reference without producing an artifact nothing will deploy.
       - uses: actions/upload-pages-artifact@v3
-        if: github.ref == 'refs/heads/main'
+        if: github.ref_name == github.event.repository.default_branch
         with:
           path: docs
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref_name == github.event.repository.default_branch
     needs: build
     runs-on: ubuntu-latest
     permissions:
