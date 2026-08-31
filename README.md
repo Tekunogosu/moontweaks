@@ -394,7 +394,8 @@ generated from the bindings, never written alongside them:
 ./scripts/docs.sh --check    # fail on any undocumented binding, write nothing
 ```
 
-It writes `docs/api.json`, `docs/library/`, `docs/index.html`, and scaffolds `examples/`
+It writes `docs/api.json`, `docs/library/`, `docs/index.html`, the highlighter that
+page loads, and scaffolds `examples/`
 with the same files the mod installs into a server: the editor configuration held in
 `src/Host/Resources/`, embedded in the mod and written out verbatim, and the library
 this build produced. The repository's own scripts are therefore checked exactly where
@@ -423,6 +424,12 @@ description, `lua-language-server` on an example that disagrees with the types t
 binding produced. Both run in CI ahead of the Pages deploy, the example check against
 the library `docs.sh` has just written rather than a checked-in copy, so neither an
 undocumented binding nor a drifted example reaches `main`.
+
+The examples are coloured by highlight.js, vendored under `third_party/highlight.js`
+at a pinned version and copied into `docs/` beside the page. The site loads nothing
+from anybody else, so it works from a checkout with no network and cannot change
+underneath a reader. `third_party/highlight.js/README.md` records the version, the
+commit it came from, a digest per file, and how to move to a later one.
 
 `docs/` is generated rather than committed; a checked-in copy would be a second source
 of truth free to go stale. The `docs` workflow rebuilds it on every push to `main` and

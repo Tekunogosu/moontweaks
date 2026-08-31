@@ -9,12 +9,16 @@ using MoonTweaks.DocGen;
 if (args.Length < 4)
 {
     Console.Error.WriteLine(
-        "usage: moontweaks-docgen <assembly.dll> <assembly.xml> <out-dir> <version> [--check]");
+        "usage: moontweaks-docgen <assembly.dll> <assembly.xml> <out-dir> <version> [vendor-dir] [--check]");
     return 2;
 }
 
 var (assemblyPath, xmlPath, outputDir, version) = (args[0], args[1], args[2], args[3]);
 var checkOnly = args.Contains("--check");
+
+// Where the highlighter the page loads is kept. Optional, because a check writes
+// nothing and so needs none of it.
+var vendorDir = args.Length > 4 && !args[4].StartsWith("--", StringComparison.Ordinal) ? args[4] : null;
 
 var assembly = Assembly.LoadFrom(Path.GetFullPath(assemblyPath));
 var api = new ApiReflector(assembly, XmlDocs.Load(xmlPath)).Read(version);
@@ -48,6 +52,21 @@ Write(Path.Combine(outputDir, "library", MoonTweaks.Host.AssetCodeLibrary.FILE_N
     MoonTweaks.Host.AssetCodeLibrary.Render(MoonTweaks.Host.AssetCodeLibrary.SetsOf(null)));
 Write(Path.Combine(outputDir, "index.html"), HtmlWriter.Write(api));
 Write(Path.Combine(outputDir, "snippets.lua"), SnippetWriter.Write(api));
+
+// The highlighter travels with the page rather than being fetched from anywhere, and
+// its licence travels with the highlighter: publishing the site redistributes the
+// build, which is what the BSD terms attach to.
+if (vendorDir is not null)
+{
+    Write(Path.Combine(outputDir, HtmlWriter.SCRIPT_FILE),
+        File.ReadAllText(Path.Combine(vendorDir, "highlight.min.js")));
+    Write(Path.Combine(outputDir, HtmlWriter.STYLE_FILE),
+        HtmlWriter.StyleSheetFor(
+            File.ReadAllText(Path.Combine(vendorDir, "github.min.css")),
+            File.ReadAllText(Path.Combine(vendorDir, "github-dark.min.css"))));
+    Write(Path.Combine(outputDir, HtmlWriter.LICENCE_FILE),
+        File.ReadAllText(Path.Combine(vendorDir, "LICENSE")));
+}
 
 Console.WriteLine($"{Members(api)} member(s) documented across "
                   + $"{api.Modules.Count} module(s), {api.Tables.Count} table(s), {api.Enums.Count} value set(s)");

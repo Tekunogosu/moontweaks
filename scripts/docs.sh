@@ -11,7 +11,7 @@ dotnet build "$ROOT/tools/docgen/docgen.csproj" -c Release --nologo -v q
 dotnet "$ROOT/tools/docgen/bin/Release/moontweaks-docgen.dll" \
     "$ROOT/bin/Release/moontweaks.dll" \
     "$ROOT/bin/Release/moontweaks.xml" \
-    "$OUT" "$VERSION" "$@"
+    "$OUT" "$VERSION" "$ROOT/third_party/highlight.js" "$@"
 
 # Check mode writes nothing, so there is nothing to scaffold from.
 case " $* " in *" --check "*) exit 0 ;; esac

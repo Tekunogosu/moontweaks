@@ -12,6 +12,15 @@ public static partial class HtmlWriter
     /// <summary>Where a reader of the published site goes for everything that is not the reference.</summary>
     private const string REPOSITORY = "https://github.com/Tekunogosu/moontweaks";
 
+    /// <summary>The highlighter, copied beside the page rather than fetched from anybody.</summary>
+    public const string SCRIPT_FILE = "highlight.min.js";
+
+    /// <summary>Its two themes, one per colour scheme, gathered into one stylesheet.</summary>
+    public const string STYLE_FILE = "highlight.css";
+
+    /// <summary>Its licence, which travels with the build the page loads.</summary>
+    public const string LICENCE_FILE = "LICENSE.highlight.txt";
+
     /// <summary>Renders the whole reference.</summary>
     public static string Write(ApiModel api)
     {
@@ -22,7 +31,9 @@ public static partial class HtmlWriter
         page.AppendLine($"<title>MoonTweaks {Escape(api.Version)} API</title>");
         page.AppendLine("<meta name=\"description\" content=\"Every function, table and value "
                         + "MoonTweaks binds for Lua scripting in Vintage Story.\">");
-        page.AppendLine($"<style>{STYLESHEET}</style></head><body>");
+        page.AppendLine($"<link rel=\"stylesheet\" href=\"{STYLE_FILE}\">");
+        page.AppendLine($"<style>{STYLESHEET}</style>");
+        page.AppendLine($"<script src=\"{SCRIPT_FILE}\"></script></head><body>");
 
         WriteSidebar(page, api);
 
@@ -35,9 +46,21 @@ public static partial class HtmlWriter
         foreach (var table in api.Tables) WriteTable(page, table);
         foreach (var enumeration in api.Enums) WriteEnum(page, enumeration);
 
+        // Deferred to the end, so the blocks it colours are all parsed by the time it
+        // runs and the page needs no load event to do it.
+        page.AppendLine("<script>hljs.highlightAll();</script>");
         page.AppendLine("</main></body></html>");
         return page.ToString();
     }
+
+    /// <summary>
+    /// The highlighter's two themes as one stylesheet. The light one is the base
+    /// rather than a match on <c>prefers-color-scheme: light</c>, so a browser that
+    /// states no preference still gets colours; the dark one overrides it where a
+    /// reader has asked for dark.
+    /// </summary>
+    public static string StyleSheetFor(string light, string dark) =>
+        light + "\n@media (prefers-color-scheme: dark) {\n" + dark + "\n}\n";
 
     private static void WriteSidebar(StringBuilder page, ApiModel api)
     {
@@ -79,7 +102,8 @@ public static partial class HtmlWriter
 
         if (module.Example.Length > 0)
         {
-            page.AppendLine($"<pre class=\"example\"><code>{LuaHighlighter.Highlight(module.Example)}</code></pre>");
+            page.AppendLine("<pre class=\"example\"><code class=\"language-lua\">"
+                            + $"{Escape(module.Example)}</code></pre>");
         }
 
         foreach (var function in module.Functions)
@@ -189,16 +213,12 @@ public static partial class HtmlWriter
         :root {
           --bg: #ffffff; --fg: #1b1b1d; --muted: #5c5c66; --line: #e2e2e8;
           --accent: #2f6f4f; --code-bg: #f4f4f7; --nav-bg: #fafafc; --required: #9a3b2f;
-          --lua-comment: #646b77; --lua-string: #9a3b2f;
-          --lua-number: #7a4b12; --lua-keyword: #4c4a9a;
         }
         :root:not([data-theme="light"]) { }
         @media (prefers-color-scheme: dark) {
           :root:not([data-theme="light"]) {
             --bg: #16161a; --fg: #e6e6ea; --muted: #9a9aa5; --line: #2c2c34;
             --accent: #7fc9a2; --code-bg: #202028; --nav-bg: #1b1b21; --required: #e08b7d;
-            --lua-comment: #8b93a1; --lua-string: #e6a08d;
-            --lua-number: #d9b382; --lua-keyword: #b0abf2;
           }
         }
         * { box-sizing: border-box; }
@@ -233,10 +253,8 @@ public static partial class HtmlWriter
           padding: 0.9rem 1rem; overflow-x: auto; line-height: 1.5; margin: 1rem 0 1.5rem;
         }
         pre.example code { background: none; padding: 0; }
-        pre.example .comment { color: var(--lua-comment); font-style: italic; }
-        pre.example .string { color: var(--lua-string); }
-        pre.example .number { color: var(--lua-number); }
-        pre.example .keyword { color: var(--lua-keyword); }
+        /* The box is the page's; the colours inside it are the highlighter's. */
+        pre.example code.hljs { background: none; padding: 0; }
         .item { margin: 1.75rem 0; padding-left: 1rem; border-left: 3px solid var(--line); }
         .item h3 { font-size: 1rem; font-weight: 500; margin: 0 0 0.4rem; }
         .item h3 code { background: none; padding: 0; }
