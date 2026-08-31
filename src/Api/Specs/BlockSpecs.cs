@@ -79,6 +79,177 @@ public sealed class BlockDropSpec : AssetSpec
 }
 
 /// <summary>
+/// One sound a block makes, named by the asset that holds it. A bare string names
+/// the sound and leaves everything else as the game had it, which is what a script
+/// usually wants: how loudly and how far a sound carries is filled in per kind of
+/// sound as the game loads, and a value written over it is a value to get right.
+/// </summary>
+/// <remarks>
+/// A sound is an asset rather than an item or a block, so nothing completes the path
+/// and nothing checks it: a path the server has no sound for is silence, which is
+/// what the game does with one of its own. The <c>sounds/</c> the assets sit under is
+/// added where it is missing, exactly as the game adds it, so
+/// <c>survival:block/planks</c> and <c>survival:sounds/block/planks</c> name the same
+/// sound.
+/// </remarks>
+[LuaTable("BlockSound", Shorthand = "path")]
+public sealed class BlockSoundSpec
+{
+    /// <summary>Asset path of the sound, such as <c>survival:block/planks</c>.</summary>
+    [LuaField("path", Required = true)]
+    public string Path { get; set; } = "";
+
+    /// <summary>How far away it can be heard, in blocks.</summary>
+    [LuaField("range")]
+    public double? Range { get; set; }
+
+    /// <summary>Which volume control it plays under.</summary>
+    [LuaField("type")]
+    public EnumSoundKind? Type { get; set; }
+
+    /// <summary>How its pitch varies each time it plays. One every time when omitted.</summary>
+    [LuaField("pitch")]
+    public SpreadSpec? Pitch { get; set; }
+
+    /// <summary>How its volume varies each time it plays. One every time when omitted.</summary>
+    [LuaField("volume")]
+    public SpreadSpec? Volume { get; set; }
+}
+
+/// <summary>
+/// What a block sounds like. Only the sounds a script names change, so a block may be
+/// given a new breaking sound without restating what it sounds like underfoot.
+/// </summary>
+[LuaTable("BlockSounds")]
+public sealed class BlockSoundsSpec
+{
+    /// <summary>Walked over.</summary>
+    [LuaField("walk")]
+    public BlockSoundSpec? Walk { get; set; }
+
+    /// <summary>Stood inside, as tall grass is.</summary>
+    [LuaField("inside")]
+    public BlockSoundSpec? Inside { get; set; }
+
+    /// <summary>
+    /// Broken. The game calls this field <c>break</c>, which Lua keeps as a keyword,
+    /// so it carries the name the action goes by instead.
+    /// </summary>
+    [LuaField("breaking")]
+    public BlockSoundSpec? Breaking { get; set; }
+
+    /// <summary>Placed.</summary>
+    [LuaField("place")]
+    public BlockSoundSpec? Place { get; set; }
+
+    /// <summary>Struck while being mined, which repeats until it breaks.</summary>
+    [LuaField("hit")]
+    public BlockSoundSpec? Hit { get; set; }
+
+    /// <summary>
+    /// Given off continuously while it stands there, as a beehive hums. Distinct from
+    /// the rest in being a place's sound rather than an action's.
+    /// </summary>
+    [LuaField("ambient")]
+    public BlockSoundSpec? Ambient { get; set; }
+
+    /// <summary>
+    /// How many of the block have to stand together before the ambient sound is
+    /// played at full volume.
+    /// </summary>
+    [LuaField("ambientBlockCount")]
+    public double? AmbientBlockCount { get; set; }
+}
+
+/// <summary>
+/// A box measured within the block it belongs to, where 0 is one face and 1 is the
+/// opposite one. A full cube runs 0 to 1 in all three directions; a slab standing on
+/// the floor is <c>y2 = 0.5</c>.
+/// </summary>
+[LuaTable("Box")]
+public sealed class BoxSpec
+{
+    /// <summary>Where the box starts, east to west.</summary>
+    [LuaField("x1", Default = "0")]
+    public double X1 { get; set; }
+
+    /// <summary>Where the box starts, from the block's floor upwards.</summary>
+    [LuaField("y1", Default = "0")]
+    public double Y1 { get; set; }
+
+    /// <summary>Where the box starts, north to south.</summary>
+    [LuaField("z1", Default = "0")]
+    public double Z1 { get; set; }
+
+    /// <summary>Where the box ends, east to west.</summary>
+    [LuaField("x2", Default = "1")]
+    public double X2 { get; set; } = 1;
+
+    /// <summary>Where the box ends, from the block's floor upwards.</summary>
+    [LuaField("y2", Default = "1")]
+    public double Y2 { get; set; } = 1;
+
+    /// <summary>Where the box ends, north to south.</summary>
+    [LuaField("z2", Default = "1")]
+    public double Z2 { get; set; } = 1;
+}
+
+/// <summary>
+/// How a crop grows on farmland. Only the keys a script names change, so a crop may
+/// be made to take longer without restating what it feeds on.
+/// </summary>
+[LuaTable("CropProperties")]
+public sealed class CropSpec
+{
+    /// <summary>Which soil nutrient it feeds on.</summary>
+    [LuaField("requiredNutrient")]
+    public EnumNutrientKind? RequiredNutrient { get; set; }
+
+    /// <summary>How much of that nutrient it takes from the soil over its whole life.</summary>
+    [LuaField("nutrientConsumption")]
+    public double? NutrientConsumption { get; set; }
+
+    /// <summary>How many stages it goes through before it is ripe.</summary>
+    [LuaField("growthStages")]
+    public int? GrowthStages { get; set; }
+
+    /// <summary>How many in-game days it takes to ripen, on soil that suits it.</summary>
+    [LuaField("totalGrowthDays")]
+    public double? TotalGrowthDays { get; set; }
+
+    /// <summary>
+    /// How many in-game months it takes to ripen, which the game reads in place of
+    /// the days where a crop names one.
+    /// </summary>
+    [LuaField("totalGrowthMonths")]
+    public double? TotalGrowthMonths { get; set; }
+
+    /// <summary>Whether it may be harvested more than once rather than being pulled up.</summary>
+    [LuaField("multipleHarvests")]
+    public bool? MultipleHarvests { get; set; }
+
+    /// <summary>How many stages it falls back by when harvested, where it may be harvested again.</summary>
+    [LuaField("harvestGrowthStageLoss")]
+    public int? HarvestGrowthStageLoss { get; set; }
+
+    /// <summary>The temperature below which the cold begins to hurt it.</summary>
+    [LuaField("coldDamageBelow")]
+    public double? ColdDamageBelow { get; set; }
+
+    /// <summary>The temperature above which the heat begins to hurt it.</summary>
+    [LuaField("heatDamageAbove")]
+    public double? HeatDamageAbove { get; set; }
+
+    /// <summary>How much damage slows its growth, as a multiplier.</summary>
+    [LuaField("damageGrowthStuntMul")]
+    public double? DamageGrowthStuntMul { get; set; }
+
+    /// <summary>How much harder the cold is on it once it is ripe, as a multiplier.</summary>
+    [LuaField("coldDamageRipeMul")]
+    public double? ColdDamageRipeMul { get; set; }
+}
+
+/// <summary>
 /// Properties of a block, changed on whatever a code matches. Everything an item
 /// carries is here too, since a block is an item as far as a hand holding one is
 /// concerned; the keys below it are the ones only a block standing in the world has.
@@ -165,4 +336,29 @@ public sealed class BlockPropertiesSpec : AssetPropertiesSpec
     /// <summary>Whether rain falls through it rather than being stopped by it.</summary>
     [LuaField("rainPermeable")]
     public bool? RainPermeable { get; set; }
+
+    /// <summary>What it sounds like to walk on, break, place and stand inside.</summary>
+    [LuaField("sounds")]
+    public BlockSoundsSpec? Sounds { get; set; }
+
+    /// <summary>
+    /// The boxes something walking into it is stopped by. Replaces every box it had,
+    /// so a list says exactly what shape it is; an empty list makes it walk-through.
+    /// </summary>
+    [LuaField("collisionBoxes")]
+    public BoxSpec[]? CollisionBoxes { get; set; }
+
+    /// <summary>
+    /// The boxes a player's cursor picks it out by, which is what draws the outline
+    /// around it. Replaces every box it had; an empty list makes it unselectable.
+    /// </summary>
+    [LuaField("selectionBoxes")]
+    public BoxSpec[]? SelectionBoxes { get; set; }
+
+    /// <summary>
+    /// How it grows as a crop. Only meaningful on a block the game already farms:
+    /// this changes how a crop behaves and does not turn a block into one.
+    /// </summary>
+    [LuaField("cropProps")]
+    public CropSpec? CropProps { get; set; }
 }

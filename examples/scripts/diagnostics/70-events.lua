@@ -50,6 +50,15 @@ diag.watch("chunkUnloaded", events.chunkUnloaded, function(e)
   return ("chunk %d %d %d"):format(e.chunkX, e.chunkY, e.chunkZ)
 end)
 
+-- The same walk, one layer up: a region is a square of columns, so these fire far
+-- less often and need somebody to walk further to raise them.
+diag.watch("mapRegionLoaded", events.mapRegionLoaded, function(e)
+  return ("region %d %d, %d blocks wide"):format(e.regionX, e.regionZ, e.size)
+end)
+diag.watch("mapRegionUnloaded", events.mapRegionUnloaded, function(e)
+  return ("region %d %d"):format(e.regionX, e.regionZ)
+end)
+
 -- The suite raises the first three itself when it spawns and clears its hen, so
 -- these should be filled in by the time the world checks have finished.
 diag.watch("entitySpawn", events.entitySpawn, entity)
@@ -65,6 +74,12 @@ diag.watch("entityMounted", events.entityMounted, function(e)
 end)
 diag.watch("entityUnmounted", events.entityUnmounted, function(e)
   return ("%s got off %s"):format(e.code, tostring(e.mount))
+end)
+
+-- Somebody has to ride an animal and change pace: this is quiet until a rider walks
+-- a horse and then trots it.
+diag.watch("mountGaitChanged", events.mountGaitChanged, function(e)
+  return ("%s is now at %s"):format(e.code, tostring(e.gait))
 end)
 
 -- The whole of a player's time on the server, from connecting to disconnecting.

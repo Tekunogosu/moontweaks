@@ -41,7 +41,34 @@ public static class CollectibleProperties
         if (spec.Nutrition is { } food) Eat(asset, food, stacks, origin);
         if (spec.Grinding is { } grind) Grind(asset, grind, stacks, origin);
         if (spec.Crushing is { } crush) Crush(asset, crush, stacks, origin);
+        if (spec.TransitionableProps is { } changes) asset.TransitionableProps = Stale(changes, stacks, origin);
+        if (spec.CreativeInventoryTabs is { } tabs) asset.CreativeInventoryTabs = tabs;
+        if (spec.CreativeInventoryStacks is { } shown) asset.CreativeInventoryStacks = Shown(shown, stacks, origin);
     }
+
+    /// <summary>
+    /// How something changes once it stops being fresh, as the game holds it. A list
+    /// rather than one, because meat that both rots and cures carries two, and which
+    /// applies is decided by where it is kept.
+    /// </summary>
+    private static TransitionableProperties[] Stale(
+        TransitionableSpec[] specs, AssetStacks stacks, ScriptOrigin origin) =>
+        [.. specs.Select((spec, index) =>
+            stacks.Transitionable(spec, origin, $"transitionableProps[{index + 1}]"))];
+
+    /// <summary>
+    /// The creative entries something appears as. Each stack is resolved here rather
+    /// than when a tab is drawn: an unresolved one is a gap in the creative menu, and
+    /// the server that could have said so is long gone by then.
+    /// </summary>
+    private static CreativeTabAndStackList[] Shown(
+        CreativeStacksSpec[] specs, AssetStacks stacks, ScriptOrigin origin) =>
+        [.. specs.Select((spec, index) => new CreativeTabAndStackList
+        {
+            Tabs = spec.Tabs,
+            Stacks = [.. spec.Stacks.Select((stack, which) => Stack(
+                stack, stacks, origin, $"creativeInventoryStacks[{index + 1}].stacks[{which + 1}]"))],
+        })];
 
     /// <summary>
     /// What burning or smelting it does, merged into whatever it already said. Merged
@@ -103,10 +130,7 @@ public static class CollectibleProperties
 
         props.CrushedStack = Stack(spec.CrushedStack, stacks, origin, "crushing.crushedStack");
         if (spec.HardnessTier is { } tier) props.HardnessTier = tier;
-        if (spec.Quantity is { } spread)
-        {
-            props.Quantity = NatFloat.createUniform((float)spread.Average, (float)spread.Variance);
-        }
+        if (spec.Quantity is { } spread) props.Quantity = AssetStacks.Range(spread);
     }
 
     /// <summary>

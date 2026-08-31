@@ -15,8 +15,14 @@ namespace MoonTweaks.Api;
 public static class ValueSet
 {
     /// <summary>The counterpart of a value in another set, matched by name.</summary>
+    /// <remarks>
+    /// Matched without regard to case, because the two sets are written to different
+    /// conventions: this layer names its values as C# names them and the game spells
+    /// some of its own in capitals. Nothing is made ambiguous by it — no enumeration
+    /// on either side holds two names differing only in case.
+    /// </remarks>
     public static TOther As<TOther>(Enum named) where TOther : struct, Enum =>
-        Enum.TryParse<TOther>(named.ToString(), out var same)
+        Enum.TryParse<TOther>(named.ToString(), ignoreCase: true, out var same)
             ? same
             : throw new InvalidOperationException(
                 $"{named.GetType().Name}.{named} has no counterpart in {typeof(TOther).Name}");

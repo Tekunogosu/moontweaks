@@ -54,7 +54,7 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     public void SetBlock(
         ScriptOrigin origin,
         [LuaSuggests(SuggestionSets.ASSET_CODE)] string code, int x, int y, int z) =>
-        world.Set(world.IdOf(code, origin), x, y, z);
+        world.Set(world.IdOf(code, origin), x, y, z, origin);
 
     /// <summary>
     /// Queues a block without writing it yet. Nothing appears until <c>commit</c>,
@@ -70,12 +70,58 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     public void QueueBlock(
         ScriptOrigin origin,
         [LuaSuggests(SuggestionSets.ASSET_CODE)] string code, int x, int y, int z) =>
-        world.Queue(world.IdOf(code, origin), x, y, z);
+        world.Queue(world.IdOf(code, origin), x, y, z, origin);
 
     /// <summary>Writes everything queued, and says how many blocks that was.</summary>
+    /// <remarks>
+    /// This is also what closes one step of the history <c>undo</c> walks back
+    /// through, so a shape queued and committed is taken back in one call however
+    /// many blocks it holds. Committing with nothing queued writes nothing and
+    /// records no step.
+    /// </remarks>
     /// <param name="origin">Script line committing.</param>
     [LuaFunction("commit")]
-    public int Commit(ScriptOrigin origin) => world.Commit();
+    public int Commit(ScriptOrigin origin) => world.Commit(origin);
+
+    /// <summary>
+    /// Puts back what this script's last write changed, and says how many blocks that
+    /// was. Nothing left to undo answers zero.
+    /// </summary>
+    /// <remarks>
+    /// One step is one <c>setBlock</c>, or one <c>commit</c> however many blocks were
+    /// queued into it — so a structure built through <c>queueBlock</c> is taken back
+    /// whole, and a loop of <c>setBlock</c> is taken back one block at a time. That is
+    /// the second reason to queue.
+    ///
+    /// The history belongs to the script that wrote it. A script undoes what it wrote
+    /// and cannot reach what another script wrote underneath it, so an undo means
+    /// something an author can predict from their own file.
+    ///
+    /// What it covers is what was written: <c>setBlock</c> and <c>queueBlock</c>.
+    /// <c>breakBlock</c> and <c>exchangeBlock</c> are outside it — a break has already
+    /// scattered its drops and played its sound, and neither can be taken back by
+    /// putting the block where it stood.
+    ///
+    /// How far back it goes is the server's <c>undoHistory</c> setting, because every
+    /// step held is the blocks of that step kept in memory. Past that depth the oldest
+    /// step is dropped.
+    /// </remarks>
+    /// <param name="origin">Script line undoing.</param>
+    [LuaFunction("undo")]
+    public int Undo(ScriptOrigin origin) => world.Undo(origin);
+
+    /// <summary>
+    /// Puts back what this script's last <c>undo</c> took away, and says how many
+    /// blocks that was. Nothing to redo answers zero.
+    /// </summary>
+    /// <remarks>
+    /// Writing anything new after an undo throws away what could have been redone,
+    /// which is what every editor does and for the same reason: the history is a line
+    /// rather than a tree.
+    /// </remarks>
+    /// <param name="origin">Script line redoing.</param>
+    [LuaFunction("redo")]
+    public int Redo(ScriptOrigin origin) => world.Redo(origin);
 
     /// <summary>
     /// Drops a stack into the world, as a broken block would. A <c>velocity</c>

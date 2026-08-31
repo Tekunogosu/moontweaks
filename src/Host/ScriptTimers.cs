@@ -31,7 +31,7 @@ public sealed class TimerPayload(float seconds)
 /// </remarks>
 public sealed class ScriptTimers(ICoreServerAPI api)
 {
-    private readonly List<Action> pending = [];
+    private readonly List<(ScriptOrigin Origin, Action Begin)> pending = [];
     private bool live;
 
     /// <summary>
@@ -50,7 +50,7 @@ public sealed class ScriptTimers(ICoreServerAPI api)
     {
         Waitable(milliseconds, origin, "every");
 
-        Start(() =>
+        Start(origin, () =>
         {
             long listener = 0;
             listener = api.World.RegisterGameTickListener(
@@ -64,7 +64,7 @@ public sealed class ScriptTimers(ICoreServerAPI api)
     {
         Waitable(milliseconds, origin, "after");
 
-        Start(() => api.World.RegisterCallback(
+        Start(origin, () => api.World.RegisterCallback(
             seconds => Tick(handler, origin, seconds, null), milliseconds));
     }
 
@@ -87,12 +87,12 @@ public sealed class ScriptTimers(ICoreServerAPI api)
     /// Starts a timer now, or remembers to once the run it was asked for is known to
     /// have succeeded.
     /// </summary>
-    private void Start(Action begin)
+    private void Start(ScriptOrigin origin, Action begin)
     {
         Count++;
 
         if (live) begin();
-        else pending.Add(begin);
+        else pending.Add((origin, begin));
     }
 
     /// <summary>
@@ -121,10 +121,31 @@ public sealed class ScriptTimers(ICoreServerAPI api)
     /// Starts every timer this run asked for. Called once, by the run whose handlers
     /// are meant to be live, and never by one whose results are discarded.
     /// </summary>
-    public void Activate()
+    /// <remarks>
+    /// One timer refused costs that timer and nothing else, for the same reason a
+    /// refused subscription costs one event: the game is what refuses, and it does so
+    /// long after the script that asked finished.
+    /// </remarks>
+    /// <returns>What each timer that would not start was, for whoever is going to report them.</returns>
+    public IReadOnlyList<string> Activate()
     {
         live = true;
-        foreach (var begin in pending) begin();
+        var refused = new List<string>();
+
+        foreach (var (origin, begin) in pending)
+        {
+            try
+            {
+                begin();
+            }
+            catch (Exception failure)
+            {
+                refused.Add($"{origin}: the game would not start this timer "
+                    + $"({failure.GetType().Name}): {failure.Message}");
+            }
+        }
+
         pending.Clear();
+        return refused;
     }
 }

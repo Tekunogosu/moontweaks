@@ -46,14 +46,14 @@ public class MaterialSpec : AssetSpec
     public string[]? SkipVariants { get; set; }
 
     /// <summary>
-    /// Tags every match must carry, such as <c>tool-axe</c>. Matches on what an
-    /// asset is rather than what it is called, so one entry accepts a modded axe
+    /// Tags every match must carry, such as <c>{ "tool-axe" }</c>. Matches on what
+    /// an asset is rather than what it is called, so one entry accepts a modded axe
     /// as readily as a vanilla one. Used alone, or alongside <c>code</c> to narrow
-    /// a wildcard further.
+    /// a wildcard further. A bare list asks for every tag in it; the keys of a
+    /// <c>TagCondition</c> ask for anything richer than that.
     /// </summary>
     [LuaField("tags")]
-    [LuaSuggests(SuggestionSets.ASSET_TAG)]
-    public string[]? Tags { get; set; }
+    public TagConditionSpec? Tags { get; set; }
 
     /// <summary>
     /// Arbitrary data a match must carry to satisfy this material, written as a Lua

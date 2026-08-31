@@ -139,3 +139,63 @@ events.didBreakBlock(function(e)
     if players.isOnline(who) then players.say(who, "The chest below is empty.") end
   end)
 end)
+
+-- Moving between two sets of slots.
+--
+-- `move` is what a move should be written as. `take` and `put` can be paired to the
+-- same end and two things go wrong when they are: whatever the destination could not
+-- hold has to be put back by hand, and a script that forgets destroys it — and the
+-- two describe a stack rather than carrying it, so a worn axe arrives sharp and a
+-- labelled crock arrives blank. `move` carries the stacks themselves.
+--
+-- Getting less than was asked for is ordinary. A full destination leaves the rest
+-- exactly where it was; nothing is ever taken out and dropped.
+commands.add {
+  name = "unload",
+  description = "Move what you are carrying into the container you are looking at",
+  requiresPlayer = true,
+  args = {
+    { name = "code", type = "word" },
+  },
+  handler = function(e)
+    local at = players.looking(e.player)
+    if not at then return { error = "you are not looking at a block." } end
+
+    local from = { player = e.player, which = "backpack" }
+    local to = { x = at.x, y = at.y, z = at.z }
+
+    local carried = inventory.count(from, e.code)
+    if carried == 0 then return { error = ("you are carrying no %s."):format(e.code) } end
+
+    local ok, moved = pcall(function() return inventory.move(from, to, { code = e.code, quantity = carried }) end)
+    if not ok then return { error = tostring(moved) } end
+
+    if moved < carried then
+      return ("Moved %d of %d; the container filled up."):format(moved, carried)
+    end
+    return ("Moved all %d."):format(moved)
+  end,
+}
+
+-- The other direction, and the reason a script should never write this as take-then-
+-- put: the code may be a wildcard, so one call collects a whole family.
+commands.add {
+  name = "collect",
+  description = "Take every ingot out of the container you are looking at",
+  requiresPlayer = true,
+  handler = function(e)
+    local at = players.looking(e.player)
+    if not at then return { error = "you are not looking at a block." } end
+
+    local from = { x = at.x, y = at.y, z = at.z }
+    local to = { player = e.player, which = "backpack" }
+
+    local ok, moved = pcall(function()
+      return inventory.move(from, to, { code = "game:ingot-*", quantity = 999 })
+    end)
+    if not ok then return { error = tostring(moved) } end
+
+    if moved == 0 then return "Nothing there, or nowhere to put it." end
+    return ("Took %d ingot(s)."):format(moved)
+  end,
+}

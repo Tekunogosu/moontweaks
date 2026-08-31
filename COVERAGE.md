@@ -11,21 +11,21 @@ though nobody had looked at it.
 | Area | Reached | Missing in one line |
 | --- | --- | --- |
 | Recipes | every kind, vanilla and modded | Editing a kind this mod has never seen |
-| Item properties | 15 fields | Creative tabs, spoilage list, particles |
-| Block properties | 12 further fields | Sounds, collision boxes, crop behaviour, decor |
+| Item properties | 18 fields | Particles, held sounds |
+| Block properties | 16 further fields | Decor, particles |
 | Asset registry | counting them | Listing or testing a code from a script |
 | Players | 36 functions | Groups, richer messages, connection facts, reading a spawn |
-| World | 21 functions | The fluid layer, explosions, decor, ray casting |
+| World | 23 functions | The fluid layer, explosions, decor, ray casting |
 | Entities | 23 functions | Selecting by tag, mounting, pathing, behaviours |
-| Inventory | 12 functions | What one stack carries, moving between two places at once |
+| Inventory | 13 functions | What one stack carries |
 | Calendar | 8 functions | Nothing worth naming |
-| Events | 26 of 50 | See `TODO.md` for the classification |
+| Events | 29 of 50 | See `TODO.md` for the classification |
 | Scheduling | 2 functions | Nothing worth naming |
 | Commands | declaring one | Six argument kinds of two dozen, aliases, others' commands |
 | Storage | per player and per world | Nothing worth naming |
 | Server state | facts and three rules | Mob spawning, tick rates, most of the config |
 | Permissions | reading them | Declaring, granting and revoking |
-| Other mods | naming and versions | Reaching into what one declared |
+| Other mods | naming, versions, three of the game's own systems | Any other mod's system |
 
 ## Recipes
 
@@ -58,22 +58,28 @@ speed, drag, climbability and rain permeability.
 
 Selecting is by `code`, which accepts a `*` wildcard, or by `tags`, or by both.
 Tags select on what an asset is rather than what it is called, so one entry reaches
-a modded axe as readily as a vanilla one. **Tags are read and never written**: a
-script cannot give an asset a tag it does not carry.
+a modded axe as readily as a vanilla one. The whole of the game's condition grammar
+is reached — `allOf`, `anyOf` and `noneOf`, as names or as groups of them, spelled
+as a recipe file spells them — with one deliberate difference: a condition naming
+only `noneOf` selects what does not carry those tags, where the game's own loader
+reads it as matching nothing. **Tags are read and never written**: a script cannot
+give an asset a tag it does not carry.
+
+Beyond those: `transitionableProps` is the list of ways a thing changes once it stops
+being fresh, `creativeInventoryTabs` and `creativeInventoryStacks` are where it
+appears in creative, and a block carries `sounds`, `collisionBoxes`,
+`selectionBoxes` and `cropProps`. Every quantity written as an average and a variance
+also takes a `dist`, so a drop or a crushing yield can be made to cluster near its
+average rather than falling anywhere in its range.
 
 Unbound, in the order they are likely to be wanted:
 
-- `CreativeInventoryTabs` and `CreativeInventoryStacks` decide where something
-  appears in creative, and are a list of shapes rather than one value.
-- `TransitionableProps` decides how something spoils, dries or ripens. The shape is
-  bound already, since a cooking recipe writes one; an item carries a list of them
-  where a meal carries one, and it is the list that is unreached.
-- `BlockSounds`, which decides what a block sounds like to walk on, break and place.
-- `CollisionBoxes` and `SelectionBoxes`, which are its shape as far as anything
-  bumping into it is concerned.
-- `CropProps`, which is a domain of its own rather than a field.
-- `AllowSpawnCreatureGroups`, `Dimensions`, `ParticleProperties`,
-  `LiquidSelectable`, `HeldPriorityInteract`, `HeldSounds`.
+- `ParticleProperties` and `ParticleCollisionBoxes`, which decide what a block throws
+  off and what those particles bounce against.
+- `AllowSpawnCreatureGroups`, `Dimensions`, `LiquidSelectable`,
+  `HeldPriorityInteract`, `HeldSounds`.
+- Decor — a block laid onto the face of another, as a rug or a moulding — which is a
+  placement path rather than a property.
 - The model transforms, which decide how something is held and dropped. These are
   client-rendered and so are out of reach for the same reason names are.
 
@@ -141,12 +147,21 @@ Also unbound:
 
 ## World
 
-Twenty-one functions read a block, place one, queue a batch, commit it, break a
-block properly, exchange one, drop a stack, ask whether a chunk is loaded, bring one
-in, find the surface of a column, read light, climate and wind, search a region for
-blocks and count what is there, ask whether a player may build somewhere, play a
-sound, throw off particles, outline blocks on a player's screen, and remember
-something against the save game.
+Twenty-three functions read a block, place one, queue a batch, commit it, take that
+batch back and put it again, break a block properly, exchange one, drop a stack, ask
+whether a chunk is loaded, bring one in, find the surface of a column, read light,
+climate and wind, search a region for blocks and count what is there, ask whether a
+player may build somewhere, play a sound, throw off particles, outline blocks on a
+player's screen, and remember something against the save game.
+
+`undo` and `redo` walk the history each commit closes, and that history belongs to
+the script that wrote it: a script takes back what it wrote and cannot reach what
+another wrote underneath it. One step is one `setBlock`, or one `commit` however many
+blocks were queued into it — which is the second reason to queue rather than write
+block by block. How far back it goes is `undoHistory` in `config.json`, since every
+step held is that step's blocks kept in memory. `breakBlock` and `exchangeBlock` are
+outside it: a break has already scattered its drops and played its sound, and neither
+comes back by putting the block where it stood.
 
 Still unreached:
 
@@ -228,12 +243,12 @@ Both `put` and `take` say how much they actually moved, which is rarely somethin
 caller may assume: a bag may not hold enough and a chest may not have room. A script
 charging for something reads that number rather than trusting it.
 
-What is left is two things.
-
-Moving a stack from one place to another in a single operation, with the game
-deciding where it best fits, is what `IPlayerInventoryManager.TryTransferAway` does
-and `TryTransferTo` does to a named slot. A script spells either as a `take` and a
-`put`, and has to put back what the second half could not place.
+`move` takes a stack out of one place and puts it in another as one operation, and
+is what a move should be written as: it carries the stacks themselves rather than
+describing them, so a worn axe arrives worn, and whatever the destination could not
+hold stays exactly where it was rather than needing putting back by hand. `put` and
+`take` remain bound for the halves that are genuinely halves — charging for something
+that then ceases to exist, or handing out something that did not exist a moment ago.
 
 What one stack carries is unreached in the reading direction. A slot answers with a
 code, a count, what would fit and what the game calls it — not with the attributes
@@ -326,17 +341,20 @@ reach.
 
 Unbound besides: `ShutDown`, `CurrentRunPhase`, `IsShuttingDown`, and the rest of
 `IServerConfig` — the password, the whitelist mode, the tick rate, the chunk radius,
-the default role and the roles themselves. Several are settable and none are things a
-script should change casually, which is why they wait on the per-command permissions
-entry in `TODO.md`.
+the default role and the roles themselves. Several are settable and none are bound;
+nothing has asked for them.
 
 ## Permissions
 
 `players.hasPrivilege` and `players.privileges` read what a server has already
 decided. `IPermissionManager` also declares privileges and grants, denies and
-revokes them, per player or per group; none of that is bound, and the per-command
-permissions entry in `TODO.md` is held pending it, precisely so that what is worth
-gating is known before the gates are built.
+revokes them, per player or per group, and none of that is bound; nothing has asked
+for it.
+
+Gating is where the game already puts it. A command a script declares carries its
+own `privilege`, and the whole of `/moontweaks` is behind the one `commandPrivilege`
+in `config.json`. Beyond that, a script file is writable only by whoever owns the
+server, and what it does is theirs to get right.
 
 ## Other mods
 
@@ -346,16 +364,25 @@ every other binding refuses a code the server does not have, so naming another m
 items is only safe inside a guard that has asked first.
 
 Another mod's recipe registries are reached, through `moontweaks.recipes.kinds` and
-its siblings. What is not reached is a mod system itself, and the settings it keeps.
-`IModLoader.GetModSystem` is how that would be done, and it couples this mod to
-another's internals in a way the vanilla API does not, which is a decision rather
-than an oversight.
+its siblings.
 
-The survival and essentials mods are where a good deal of a server's behaviour
-actually lives: `WeatherSystemServer` overrides precipitation and spawns lightning,
-`SystemTemporalStability` answers how stable somewhere is, and
-`ModSystemBlockReinforcement` decides what may be broken. All three are reachable
-only through `GetModSystem`, and all three would tie this to their versions.
+Three mod systems are reached outright, through `IModLoader.GetModSystem`.
+`moontweaks.weather` reads what is falling where and holds the whole world's
+precipitation at a level; `moontweaks.stability` answers how sound a place is and
+when the next temporal storm is due; `moontweaks.reinforce` reads, adds, wears down
+and clears the protection on a block. Each answers a shape of this mod's own and each
+reports plainly on a server without the mod declaring it.
+
+That couples this mod to another's internals, which the vanilla API's own versioning
+does not cover. The types are referenced rather than reflected over, so a rename in a
+game update fails the build here rather than a script on somebody's server, and
+`MODSYSTEMS.md` lists every member each one calls — the list to walk after an update.
+The coupling is not new: the recipe kinds are the survival mod's own types, so this
+mod has never run without it.
+
+What is not reached is any *other* mod's system. Such a type cannot be referenced
+from here, so it would have to be reflected over by name, and what that binding
+should look like depends on what is being reached for.
 
 ## Deliberately out of scope
 

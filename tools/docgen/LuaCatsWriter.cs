@@ -47,19 +47,31 @@ public static class LuaCatsWriter
 
         foreach (var table in api.Tables)
         {
-            // A shape that accepts a string shorthand is a union, so its public name
-            // becomes an alias over the two and the fields hang off a private class.
-            var shape = table.Shorthand is null ? table.Name : $"{table.Name}Table";
+            // A shape that accepts a shorthand is a union, so its public name becomes
+            // an alias over the spellings and the fields hang off a private class.
+            var shorthands = new[] { table.Shorthand, table.ListShorthand }
+                .Where(field => field is not null)
+                .Select(field => field!)
+                .ToList();
+            var shape = shorthands.Count == 0 ? table.Name : $"{table.Name}Table";
 
             Comment(output, table.Summary);
-            if (table.Shorthand is not null)
+            if (shorthands.Count > 0)
             {
-                // The shorthand stands in for one field, so it is written as whatever
+                // A shorthand stands in for one field, so it is written as whatever
                 // that field is: a code field keeps the values an editor suggests for
                 // it rather than widening to a bare string.
-                var written = table.Fields.FirstOrDefault(field => field.Name == table.Shorthand)?.Type ?? "string";
-                output.AppendLine($"--- A bare string is shorthand for `{{ {table.Shorthand} = <string> }}`.");
-                output.AppendLine($"---@alias {table.Name} {shape} | {written}");
+                if (table.Shorthand is not null)
+                {
+                    output.AppendLine($"--- A bare string is shorthand for `{{ {table.Shorthand} = <string> }}`.");
+                }
+                if (table.ListShorthand is not null)
+                {
+                    output.AppendLine($"--- A bare list is shorthand for `{{ {table.ListShorthand} = <list> }}`.");
+                }
+                var written = shorthands.Select(field =>
+                    table.Fields.FirstOrDefault(candidate => candidate.Name == field)?.Type ?? "string");
+                output.AppendLine($"---@alias {table.Name} {string.Join(" | ", written.Prepend(shape))}");
                 output.AppendLine();
                 Comment(output, table.Summary);
             }

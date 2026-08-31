@@ -28,26 +28,49 @@ namespace MoonTweaks.World;
 /// drawn for somebody, and there should be one answer to what an unknown identifier
 /// means however a script arrives at asking it.
 /// </param>
-public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
+/// <param name="undoHistory">
+/// How many steps of block history each script may walk back through, which the
+/// server operator sets: every step holds the blocks that step wrote, so the depth is
+/// memory a server pays for whether or not anything is ever undone.
+/// </param>
+public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players, int undoHistory)
 {
     private readonly IWorldAccessor world = api.World;
 
     /// <summary>
-    /// Writes queued here rather than one at a time. Each single write relights and
-    /// re-sends the chunk it touched, so a script filling a shape one block at a time
-    /// pays that cost per block; queued writes pay it once at the commit.
+    /// Where a script's block writes go, one accessor per script. Writes are queued
+    /// here rather than made one at a time: each single write relights and re-sends
+    /// the chunk it touched, so a script filling a shape one block at a time pays that
+    /// cost per block, where queued writes pay it once at the commit. Each commit also
+    /// records what stood there before, which is what <see cref="Undo"/> puts back.
     /// </summary>
     /// <remarks>
+    /// One per script rather than one for the server, because an undo has to mean
+    /// something an author can predict: a script takes back what it wrote and cannot
+    /// take back what another script wrote underneath it. Scripts are the unit an
+    /// author owns, and every binding is already told which one is calling.
+    ///
     /// Asked for on first use rather than when this is built. Every run builds one of
     /// these as it binds its modules, which is while the server is still loading and
     /// before there is a world to write into; a dry run builds one too and never
-    /// queues a block in it. Most scripts never queue a block at all, and one that
-    /// does is running in a handler, by which time the world is certainly there.
+    /// writes a block through it. Most scripts never write a block at all, and one
+    /// that does is running in a handler, by which time the world is certainly there.
     /// </remarks>
-    private IBulkBlockAccessor? bulk;
+    private readonly Dictionary<string, IBlockAccessorRevertable> edits = [];
 
-    /// <inheritdoc cref="bulk"/>
-    private IBulkBlockAccessor Bulk => bulk ??= api.World.GetBlockAccessorBulkUpdate(true, true);
+    /// <inheritdoc cref="edits"/>
+    private IBlockAccessorRevertable Edits(ScriptOrigin origin)
+    {
+        if (edits.TryGetValue(origin.File, out var already)) return already;
+
+        var accessor = api.World.GetBlockAccessorRevertable(true, true);
+        // Below one the game's own history keeping walks off the end of its list, and
+        // a depth of one is what a server asking for none has actually asked for.
+        accessor.QuantityHistoryStates = System.Math.Max(1, undoHistory);
+
+        edits[origin.File] = accessor;
+        return accessor;
+    }
 
     /// <summary>
     /// What a code names, kept so the same one is looked up once however often it is
@@ -74,24 +97,87 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players)
     public string? CodeAt(int x, int y, int z) =>
         world.BlockAccessor.GetBlock(new BlockPos(x, y, z))?.Code?.ToString();
 
-    /// <summary>Puts a block somewhere, taking effect at once.</summary>
-    public void Set(int blockId, int x, int y, int z) =>
-        world.BlockAccessor.SetBlock(blockId, new BlockPos(x, y, z));
+    /// <summary>
+    /// Puts a block somewhere, taking effect at once. One step of history of its own,
+    /// which is what makes a single write undoable on the same terms a whole queue is.
+    /// </summary>
+    public void Set(int blockId, int x, int y, int z, ScriptOrigin origin)
+    {
+        var edits = Edits(origin);
+
+        edits.SetBlock(blockId, new BlockPos(x, y, z));
+        edits.Commit();
+    }
 
     /// <summary>Queues a block, to be written when <see cref="Commit"/> is called.</summary>
-    public void Queue(int blockId, int x, int y, int z) =>
-        Bulk.SetBlock(blockId, new BlockPos(x, y, z));
+    public void Queue(int blockId, int x, int y, int z, ScriptOrigin origin) =>
+        Edits(origin).SetBlock(blockId, new BlockPos(x, y, z));
 
     /// <summary>Writes everything queued, relighting and sending each chunk once.</summary>
-    public int Commit()
+    /// <remarks>
+    /// A commit with nothing queued writes nothing and records nothing. The game would
+    /// otherwise store an empty step, which costs a script one of the steps it can
+    /// walk back through and spends it undoing nothing.
+    /// </remarks>
+    public int Commit(ScriptOrigin origin)
     {
-        // Nothing was ever queued, so there is nothing to write and no reason to ask
-        // the world for an accessor to write it with.
-        if (bulk is null) return 0;
+        // Nothing was ever written by this script, so there is nothing to commit and
+        // no reason to ask the world for an accessor to commit it with.
+        if (!edits.TryGetValue(origin.File, out var accessor)) return 0;
 
-        var queued = bulk.StagedBlocks.Count;
-        bulk.Commit();
+        var queued = accessor.StagedBlocks.Count;
+        if (queued == 0) return 0;
+
+        accessor.Commit();
         return queued;
+    }
+
+    /// <summary>
+    /// Puts back what the last write by this script changed, and says how many blocks
+    /// that was. Nothing left to undo answers zero.
+    /// </summary>
+    /// <remarks>
+    /// The game records what stood at each position before it was written over, block
+    /// entity data included, so a chest put back comes back holding what it held.
+    ///
+    /// How many blocks were restored is read off the event the game raises as it
+    /// restores them, which is the only place the step being walked back is named.
+    /// </remarks>
+    public int Undo(ScriptOrigin origin) => Walk(origin, 1);
+
+    /// <summary>Puts back what the last undo took away, and says how many blocks that was.</summary>
+    public int Redo(ScriptOrigin origin) => Walk(origin, -1);
+
+    /// <summary>
+    /// Steps one place through a script's history, either way. Sole owner of both
+    /// directions, since the only thing that differs is which end it runs out at.
+    /// </summary>
+    private int Walk(ScriptOrigin origin, int direction)
+    {
+        if (!edits.TryGetValue(origin.File, out var accessor)) return 0;
+
+        // Undoing runs out at the oldest step it still holds; redoing runs out at the
+        // newest, which is where a script that has undone nothing already stands.
+        var exhausted = direction > 0
+            ? accessor.CurrentHistoryState >= accessor.AvailableHistoryStates
+            : accessor.CurrentHistoryState <= 0;
+
+        if (exhausted) return 0;
+
+        var restored = 0;
+        void Count(HistoryState state, int _) => restored = state.BlockUpdates?.Length ?? 0;
+
+        accessor.OnRestoreHistoryState += Count;
+        try
+        {
+            accessor.ChangeHistoryState(direction);
+        }
+        finally
+        {
+            accessor.OnRestoreHistoryState -= Count;
+        }
+
+        return restored;
     }
 
     /// <summary>

@@ -1,6 +1,6 @@
 -- Being told what the world did, rather than asking it.
 --
--- These six events cover everything alive that is not a player. They are unlike the
+-- These seven events cover everything alive that is not a player. They are unlike the
 -- player events in one way that changes how they are written.
 --
 -- The game raises them wherever it happens to be. Chunk generation spawns creatures
@@ -79,4 +79,12 @@ end)
 
 events.entityUnmounted(function(e)
   if e.player then players.say(e.player, "Back on your feet.") end
+end)
+
+-- The pace a mount is being ridden at, once its rider changes it. The table is the
+-- mount rather than the rider, so `id` is the horse. A rider's client reports the
+-- gait continuously and the mod raises this only on a change, so a handler here runs
+-- once per change of pace rather than once per packet.
+events.mountGaitChanged(function(e)
+  moontweaks.log.info(("%s is now at %s"):format(e.code, tostring(e.gait)))
 end)

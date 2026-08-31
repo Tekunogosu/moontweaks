@@ -1,4 +1,3 @@
-using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
@@ -66,62 +65,36 @@ public sealed class AssetStacks(IWorldAccessor world)
         TransitionableSpec spec, ScriptOrigin origin, string path) => new()
     {
         Type = ValueSet.As<EnumTransitionType>(spec.Type),
-        FreshHours = Hours(spec.FreshHours),
-        TransitionHours = Hours(spec.TransitionHours),
+        FreshHours = Range(spec.FreshHours),
+        TransitionHours = Range(spec.TransitionHours),
         TransitionedStack = Stack(spec.TransitionedStack, origin, $"{path}.transitionedStack"),
         TransitionRatio = (float)spec.TransitionRatio,
     };
 
-    /// <summary>A span of in-game hours, which the game holds as a range it draws from.</summary>
-    private static NatFloat Hours(SpreadSpec spread) =>
-        NatFloat.createUniform((float)spread.Average, (float)spread.Variance);
+    /// <summary>
+    /// A range the game draws a number from. Sole owner of that translation: a
+    /// crushing yield, a block drop and a span of hours are one shape written three
+    /// times, and a distribution added to one of them belongs to all three.
+    /// </summary>
+    public static NatFloat Range(SpreadSpec spread) => NatFloat.create(
+        ValueSet.As<EnumDistribution>(spread.Distribution),
+        (float)spread.Average,
+        (float)spread.Variance);
 
     /// <summary>
-    /// Turns a list of tag names into the condition an ingredient matches against.
-    /// One condition requiring every tag: an asset carrying only some of them does
-    /// not match.
+    /// The condition an asset is matched against, for the shapes that select by what
+    /// something is. The grammar itself belongs to <see cref="TagConditions"/>; this
+    /// is where the world hands over the registry that knows the tag names.
     /// </summary>
-    /// <remarks>
-    /// The flag reads backwards and decides which of two meanings
-    /// <c>RequiredTags</c> has. Disjunctive asks whether the tags are all contained
-    /// in the asset's; conjunctive asks only whether the two sets overlap, so a
-    /// single condition built that way accepts an asset carrying any one of them.
-    /// This is the shape the game's own converter builds for a bare tag array, so a
-    /// script's <c>tags</c> and a recipe file's mean the same thing.
-    /// </remarks>
-    /// <param name="tags">Tag names the script wrote.</param>
-    /// <param name="origin">Script line that wrote them.</param>
+    /// <param name="tags">Condition the script wrote, if it wrote one.</param>
+    /// <param name="origin">Script line that wrote it.</param>
     /// <param name="path">
     /// Where the tags themselves sit, as a failure should name them — the whole path
     /// including the key, not the shape holding it.
     /// </param>
-    public ComplexTagCondition<TagSet> Condition(string[]? tags, ScriptOrigin origin, string path)
-    {
-        if (tags is null or { Length: 0 }) return default;
-
-        var registry = world.Api.CollectibleTagRegistry;
-
-        // The registry reports which names it did not know rather than guessing, so
-        // a misspelled tag names itself instead of silently matching nothing.
-        var error = registry.TryCreateTagSet(out var required, tags);
-
-        if (error != TagRegistryError.None)
-        {
-            var unknown = tags.Where(tag =>
-                registry.TryCreateTagSet(out _, [tag]) != TagRegistryError.None).ToList();
-
-            throw new ScriptError(origin, unknown.Count > 0
-                ? $"{path} names {string.Join(", ", unknown.Select(tag => $"'{tag}'"))}, "
-                  + "which no item or block carries"
-                : $"{path} could not be read ({error})");
-        }
-
-        return new ComplexTagCondition<TagSet>
-        {
-            conditions = [new ComplexTagCondition<TagSet>.Condition { RequiredTags = required }],
-            isDisjunctive = true,
-        };
-    }
+    public ComplexTagCondition<TagSet> Condition(
+        TagConditionSpec? tags, ScriptOrigin origin, string path) =>
+        TagConditions.Build(world.Api.CollectibleTagRegistry, tags, origin, path);
 
     /// <summary>
     /// Whether an asset carries what a condition asks for. An empty condition matches

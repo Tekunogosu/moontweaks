@@ -53,6 +53,41 @@ events.didBreakBlock(function(e)
   }
 end)
 
+-- Taking it back. Every commit closes one step of history, so the tower above went
+-- up as a single step and comes down in a single call — which is the second reason to
+-- queue rather than to write block by block: a loop of `setBlock` is one step each,
+-- and undoing it walks back one block at a time.
+--
+-- The history belongs to this script. `undo` here takes back what this file wrote and
+-- cannot reach what another script built underneath it, so what a command like this
+-- does is predictable from the file it is written in.
+--
+-- How far back it goes is the server's `undoHistory` setting in `config.json`, since
+-- each step held is that step's blocks kept in memory.
+moontweaks.commands.add {
+  name = "unbuild",
+  description = "Take back the last thing this script built",
+  privilege = "controlserver",
+  handler = function()
+    local back = world.undo()
+    if back == 0 then return "There is nothing left to take back." end
+
+    return ("Put %d block(s) back as they were."):format(back)
+  end,
+}
+
+moontweaks.commands.add {
+  name = "rebuild",
+  description = "Put back what the last unbuild took away",
+  privilege = "controlserver",
+  handler = function()
+    local again = world.redo()
+    if again == 0 then return "There is nothing to put back." end
+
+    return ("Wrote %d block(s) again."):format(again)
+  end,
+}
+
 -- Reading is cheap and needs no commit: this walks down from where a player is
 -- standing until it finds something solid, and says what it landed on.
 events.didUseBlock(function(e)

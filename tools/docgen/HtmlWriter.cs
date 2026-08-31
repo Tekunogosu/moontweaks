@@ -142,6 +142,12 @@ public static partial class HtmlWriter
                             + $"<code>{{ {Escape(table.Shorthand)} = &lt;string&gt; }}</code>.</p>");
         }
 
+        if (table.ListShorthand is not null)
+        {
+            page.AppendLine($"<p class=\"note\">A bare list is shorthand for "
+                            + $"<code>{{ {Escape(table.ListShorthand)} = &lt;list&gt; }}</code>.</p>");
+        }
+
         if (table.Given)
         {
             page.AppendLine("<p class=\"note\">Handed to your handler rather than written by you.</p>");

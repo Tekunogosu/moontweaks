@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -36,28 +37,37 @@ public sealed class MoonTweaksConfig
     public string CommandPrivilege { get; set; } = Privilege.controlserver;
 
     /// <summary>
-    /// Reads the settings, writing the defaults first when a server has none. A file
-    /// that cannot be read is reported and the defaults used, so bad JSON costs a
-    /// server its settings rather than its startup.
+    /// How many steps of block history <c>world.undo</c> can walk back through, kept
+    /// per script. Each step holds every block that step wrote, so this is memory a
+    /// server pays for whether or not anything is ever undone; a script that fills a
+    /// large region is the case worth thinking about before raising it. One is the
+    /// least it can be.
+    /// </summary>
+    public int UndoHistory { get; set; } = 5;
+
+    /// <summary>
+    /// Reads the settings, writing the defaults first when a server has none. Whatever
+    /// goes wrong is reported and the defaults are used, so neither bad JSON nor a
+    /// folder that will not be written to costs a server anything but its settings.
     /// </summary>
     public static MoonTweaksConfig Load(string folder, ILogger logger)
     {
         var path = Path.Combine(folder, FILE_NAME);
 
-        if (!File.Exists(path))
+        try
         {
+            if (File.Exists(path))
+            {
+                return JsonSerializer.Deserialize<MoonTweaksConfig>(File.ReadAllText(path), Format)
+                       ?? new MoonTweaksConfig();
+            }
+
             var defaults = new MoonTweaksConfig();
             File.WriteAllText(path, JsonSerializer.Serialize(defaults, Format));
             logger.Notification("[moontweaks] wrote {0} with its defaults", FILE_NAME);
             return defaults;
         }
-
-        try
-        {
-            return JsonSerializer.Deserialize<MoonTweaksConfig>(File.ReadAllText(path), Format)
-                   ?? new MoonTweaksConfig();
-        }
-        catch (JsonException error)
+        catch (Exception error)
         {
             logger.Error("[moontweaks] {0} could not be read ({1}); using defaults", FILE_NAME, error.Message);
             return new MoonTweaksConfig();

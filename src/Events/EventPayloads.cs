@@ -175,6 +175,47 @@ public sealed class ChunkEventPayload(int chunkX, int chunkY, int chunkZ)
     public int Y { get; } = chunkY * GlobalConstants.ChunkSize;
 }
 
+/// <summary>One region of the map the server brought in or let go.</summary>
+/// <remarks>
+/// A region is a square of chunk columns holding the maps a world is generated from
+/// — where forests, ores and climate fall — so it covers far more ground than a
+/// chunk and there are correspondingly few of them. Given in both the region
+/// coordinates the game counts in and the block coordinates everything a script
+/// writes counts in.
+/// </remarks>
+/// <param name="regionX">Which region, east to west, counted in regions.</param>
+/// <param name="regionZ">Which region, north to south, counted in regions.</param>
+/// <param name="size">How wide a region is, in blocks, which the server decides.</param>
+[LuaTable("MapRegionEvent", Given = true)]
+public sealed class MapRegionEventPayload(int regionX, int regionZ, int size) : EventPayload
+{
+    /// <summary>Which region, east to west, counted in regions.</summary>
+    [LuaField("regionX")]
+    public int RegionX { get; } = regionX;
+
+    /// <summary>Which region, north to south, counted in regions.</summary>
+    [LuaField("regionZ")]
+    public int RegionZ { get; } = regionZ;
+
+    /// <summary>
+    /// The block position of the region's lowest corner, east to west, which is what
+    /// every other <c>moontweaks.world</c> function counts in.
+    /// </summary>
+    [LuaField("x")]
+    public int X { get; } = regionX * size;
+
+    /// <summary>
+    /// The block position of the region's lowest corner, north to south, which is what
+    /// every other <c>moontweaks.world</c> function counts in.
+    /// </summary>
+    [LuaField("z")]
+    public int Z { get; } = regionZ * size;
+
+    /// <summary>How wide the region is, in blocks, which is the same in both directions.</summary>
+    [LuaField("size")]
+    public int Size { get; } = size;
+}
+
 /// <summary>
 /// Something alive, or something lying on the ground, that the world did something
 /// with.
@@ -274,6 +315,21 @@ public sealed class EntityDespawnEventPayload(Entity entity, EntityDespawnData? 
     [LuaField("reason")]
     public EnumDespawnKind? Reason { get; } =
         reason is null ? null : ValueSet.As<EnumDespawnKind>(reason.Reason);
+}
+
+/// <summary>A mount whose rider changed the pace it is being ridden at.</summary>
+/// <param name="mount">The mount itself, rather than whoever is riding it.</param>
+/// <param name="gait">The pace it has changed to.</param>
+[LuaTable("MountGaitEvent", Given = true)]
+public sealed class MountGaitEventPayload(Entity mount, string? gait) : EntityEventPayload(mount)
+{
+    /// <summary>
+    /// What it is now doing, such as <c>walk</c> or <c>gallop</c>. Which paces exist
+    /// is the mount's own business, so this is whatever its rideable behaviour named
+    /// them, and nil where it named none.
+    /// </summary>
+    [LuaField("gait")]
+    public string? Gait { get; } = gait;
 }
 
 /// <summary>Something that got on or off something else.</summary>

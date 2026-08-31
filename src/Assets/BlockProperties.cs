@@ -36,6 +36,104 @@ public static class BlockProperties
         if (spec.RainPermeable is { } permeable) block.RainPermeable = permeable;
         if (spec.Light is { } light) block.LightHsv = Colour(light, origin);
         if (spec.Drops is { } drops) block.Drops = Dropped(block, drops, stacks, origin);
+        if (spec.Sounds is { } sounds) block.Sounds = Heard(block.Sounds, sounds);
+        if (spec.CollisionBoxes is { } collision) block.CollisionBoxes = Boxes(collision);
+        if (spec.SelectionBoxes is { } selection) block.SelectionBoxes = Boxes(selection);
+        if (spec.CropProps is { } crop) Grow(block, crop);
+    }
+
+    /// <summary>
+    /// What a block sounds like, merged into whatever it already said, so a script
+    /// naming a breaking sound moves that and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Copied before it is written to. A block type describes a family and the game
+    /// hands the same sounds to every variant of it, so writing through the one it
+    /// arrived with would change every block that shares it — which is not what
+    /// naming a single code asked for.
+    /// </remarks>
+    private static BlockSounds Heard(BlockSounds? already, BlockSoundsSpec spec)
+    {
+        var sounds = already?.Clone() ?? new BlockSounds();
+
+        if (spec.Walk is { } walk) sounds.Walk = Sound(sounds.Walk, walk);
+        if (spec.Inside is { } inside) sounds.Inside = Sound(sounds.Inside, inside);
+        if (spec.Breaking is { } breaking) sounds.Break = Sound(sounds.Break, breaking);
+        if (spec.Place is { } place) sounds.Place = Sound(sounds.Place, place);
+        if (spec.Hit is { } hit) sounds.Hit = Sound(sounds.Hit, hit);
+        if (spec.Ambient is { } ambient) sounds.Ambient = Asset(ambient.Path);
+        if (spec.AmbientBlockCount is { } together) sounds.AmbientBlockCount = (float)together;
+
+        return sounds;
+    }
+
+    /// <summary>
+    /// One sound, keeping whatever the block already said about how it is played.
+    /// </summary>
+    /// <remarks>
+    /// The range a sound carries decides whether it is heard at all, and the game
+    /// fills it in per kind of sound as it loads — 16 blocks for breaking, 12 for
+    /// walking. A fresh one would carry zero, so a script naming only a code would
+    /// silence the block it meant to give a voice to.
+    /// </remarks>
+    private static SoundAttributes Sound(SoundAttributes already, BlockSoundSpec spec)
+    {
+        var sound = already;
+
+        sound.Location = Asset(spec.Path);
+        if (spec.Range is { } range) sound.Range = (float)range;
+        if (spec.Type is { } kind) sound.Type = ValueSet.As<EnumSoundType>(kind);
+        if (spec.Pitch is { } pitch) sound.Pitch = AssetStacks.Range(pitch);
+        if (spec.Volume is { } volume) sound.Volume = AssetStacks.Range(volume);
+
+        return sound;
+    }
+
+    /// <summary>
+    /// One sound asset, under the folder the game keeps sounds in. Added here where a
+    /// script left it off, which is what the game's own loader does with the paths in
+    /// a block's JSON — and its own assets are written both ways.
+    /// </summary>
+    private static AssetLocation Asset(string path) =>
+        new AssetLocation(path).WithPathPrefixOnce("sounds/");
+
+    /// <summary>
+    /// The boxes a block occupies, as the game holds them. Built fresh rather than
+    /// written into: a block that has never had boxes of its own points at one array
+    /// the whole registry shares, and writing through it would reshape every block in
+    /// the game.
+    /// </summary>
+    private static Cuboidf[] Boxes(BoxSpec[] specs) =>
+    [
+        .. specs.Select(box => new Cuboidf(
+            (float)box.X1, (float)box.Y1, (float)box.Z1,
+            (float)box.X2, (float)box.Y2, (float)box.Z2)),
+    ];
+
+    /// <summary>
+    /// How a crop grows, merged into whatever it already said. A block the game does
+    /// not farm has none, and is given one rather than refused: the properties are
+    /// what a growth behaviour reads, so a block without that behaviour is unchanged
+    /// by them either way.
+    /// </summary>
+    private static void Grow(Block block, CropSpec spec)
+    {
+        var props = block.CropProps ??= new BlockCropProperties();
+
+        if (spec.RequiredNutrient is { } nutrient)
+        {
+            props.RequiredNutrient = ValueSet.As<EnumSoilNutrient>(nutrient);
+        }
+        if (spec.NutrientConsumption is { } consumption) props.NutrientConsumption = (float)consumption;
+        if (spec.GrowthStages is { } stages) props.GrowthStages = stages;
+        if (spec.TotalGrowthDays is { } days) props.TotalGrowthDays = (float)days;
+        if (spec.TotalGrowthMonths is { } months) props.TotalGrowthMonths = (float)months;
+        if (spec.MultipleHarvests is { } repeatable) props.MultipleHarvests = repeatable;
+        if (spec.HarvestGrowthStageLoss is { } loss) props.HarvestGrowthStageLoss = loss;
+        if (spec.ColdDamageBelow is { } cold) props.ColdDamageBelow = (float)cold;
+        if (spec.HeatDamageAbove is { } heat) props.HeatDamageAbove = (float)heat;
+        if (spec.DamageGrowthStuntMul is { } stunt) props.DamageGrowthStuntMul = (float)stunt;
+        if (spec.ColdDamageRipeMul is { } ripe) props.ColdDamageRipeMul = (float)ripe;
     }
 
     /// <summary>
@@ -67,9 +165,7 @@ public static class BlockProperties
         {
             Type = stacks.Resolve(spec.Code!, spec.Type, origin, path),
             Code = new AssetLocation(spec.Code),
-            Quantity = spec.Quantity is { } many
-                ? NatFloat.createUniform((float)many.Average, (float)many.Variance)
-                : NatFloat.One,
+            Quantity = spec.Quantity is { } many ? AssetStacks.Range(many) : NatFloat.One,
             LastDrop = spec.LastDrop,
             Tool = spec.Tool is { } tool ? ValueSet.As<EnumTool>(tool) : null,
             Attributes = AssetStacks.Attributes(spec.Attributes),

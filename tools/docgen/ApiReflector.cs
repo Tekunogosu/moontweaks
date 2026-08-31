@@ -119,7 +119,9 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
             .ThenBy(field => field.Name, StringComparer.Ordinal)
             .ToList();
 
-        return new TableDoc(attribute.Name, docs.Summary(type), attribute.Shorthand, attribute.Given, fields);
+        return new TableDoc(
+            attribute.Name, docs.Summary(type),
+            attribute.Shorthand, attribute.ListShorthand, attribute.Given, fields);
     }
 
     /// <summary>
@@ -223,6 +225,8 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         if (type == typeof(string[])) return "string[]";
         // Written as rows, or as a list of them when a shape has more than one layer.
         if (type == typeof(string[][])) return "string[] | string[][]";
+        // One key read two ways: the tag names, or the groups those names sit in.
+        if (type == typeof(TagJunction)) return $"{SuggestionSets.ASSET_TAG}[] | TagGroup[]";
         if (tableNames.TryGetValue(type, out var table)) return table;
         if (type.IsArray && type.GetElementType() is { } element)
         {

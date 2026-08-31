@@ -36,6 +36,17 @@ public sealed class LuaTableAttribute(string name) : Attribute
     public string? Shorthand { get; init; }
 
     /// <summary>
+    /// Field a bare Lua list is assigned to, letting <c>{ "tool-axe" }</c> stand in
+    /// for the whole table. Omitted when the shape has no such shorthand.
+    /// </summary>
+    /// <remarks>
+    /// A list and a keyed table are the same Lua type, so a shape carrying this one
+    /// is read as the shorthand only when the value the script wrote actually holds
+    /// a list. A table written with keys still binds as itself.
+    /// </remarks>
+    public string? ListShorthand { get; init; }
+
+    /// <summary>
     /// Whether the shape is handed to a script rather than written by one, as an
     /// event's table is. A given shape has no required keys and no defaults: every
     /// key is filled in before a handler sees it, and a key that may be absent says

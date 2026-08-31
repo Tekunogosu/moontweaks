@@ -130,6 +130,30 @@ diag.onPlayer("inventory.take", function(who)
   return ("took %d of the %d put in"):format(taken, placed)
 end)
 
+-- Moving carries the stack itself rather than describing it, so this checks that
+-- what arrives is what left. The two ends are the player's bag and their hotbar,
+-- which is the only pair of inventories a check can be sure exists.
+diag.onPlayer("inventory.move", function(who)
+  local from = bag(who)
+  local to = { player = who, which = "hotbar" }
+
+  local placed = inventory.put(from, { code = "game:stick", quantity = 2 })
+  assert(placed > 0, NO_ROOM)
+
+  local moved = inventory.move(from, to, { code = "game:stick", quantity = placed })
+  local back = inventory.move(to, from, { code = "game:stick", quantity = moved })
+
+  -- Whatever never made it across is still in the bag it started in, so it goes out
+  -- of there rather than being left behind by the check.
+  local left = inventory.take(from, { code = "game:stick", quantity = placed })
+
+  assert(moved > 0, "nothing moved to the hotbar; it may be full")
+  assert(back == moved, ("moved %d over and got %d back"):format(moved, back))
+  assert(left == placed, ("put %d in and took %d out"):format(placed, left))
+
+  return ("moved %d stick(s) to the hotbar and %d back"):format(moved, back)
+end)
+
 -- What is in their hand, which is its own question rather than a slot number.
 diag.onPlayer("inventory.held", function(who)
   local hand = inventory.held(who)

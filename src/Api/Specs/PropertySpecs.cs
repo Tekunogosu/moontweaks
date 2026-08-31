@@ -18,6 +18,14 @@ public sealed class SpreadSpec
     /// <summary>How far either side of the middle it reaches. Zero yields the average every time.</summary>
     [LuaField("var", Default = "0")]
     public double Variance { get; set; }
+
+    /// <summary>
+    /// How the range picks within itself. Left alone, anywhere in it is as likely as
+    /// anywhere else, which is what the game's own recipe files mean by a bare
+    /// average and variance.
+    /// </summary>
+    [LuaField("dist", Default = "\"uniform\"")]
+    public EnumSpreadKind Distribution { get; set; } = EnumSpreadKind.Uniform;
 }
 
 /// <summary>
@@ -162,6 +170,26 @@ public sealed class CrushingSpec
 }
 
 /// <summary>
+/// Where something appears in the creative inventory, and as what. A tab it is listed
+/// under is enough for most things; the stacks are for an asset that should appear
+/// there more than once, each carrying different data.
+/// </summary>
+[LuaTable("CreativeStacks")]
+public sealed class CreativeStacksSpec
+{
+    /// <summary>Tabs these stacks are listed under, such as <c>general</c> or <c>items</c>.</summary>
+    [LuaField("tabs", Required = true)]
+    public string[] Tabs { get; set; } = [];
+
+    /// <summary>
+    /// The stacks themselves, each of which appears as its own entry. A bare code
+    /// names one of something; attributes are how two entries for one asset differ.
+    /// </summary>
+    [LuaField("stacks", Required = true)]
+    public ItemStackSpec[] Stacks { get; set; } = [];
+}
+
+/// <summary>
 /// Properties of an item or a block, changed on whatever a code matches. Every key
 /// is optional and only the ones a script writes are changed, so a script says what
 /// it means to alter and nothing else moves.
@@ -179,14 +207,14 @@ public class AssetPropertiesSpec
     public string? Code { get; set; }
 
     /// <summary>
-    /// Tags everything changed must carry, such as <c>tool-axe</c>. Matches on what
-    /// an asset is rather than what it is called, so one entry reaches a modded axe
-    /// as readily as a vanilla one. Used alone, or alongside <c>code</c> to narrow a
-    /// wildcard further.
+    /// Tags everything changed must carry, such as <c>{ "tool-axe" }</c>. Matches on
+    /// what an asset is rather than what it is called, so one entry reaches a modded
+    /// axe as readily as a vanilla one. Used alone, or alongside <c>code</c> to
+    /// narrow a wildcard further. A bare list asks for every tag in it; the keys of a
+    /// <c>TagCondition</c> ask for anything richer than that.
     /// </summary>
     [LuaField("tags")]
-    [LuaSuggests(SuggestionSets.ASSET_TAG)]
-    public string[]? Tags { get; set; }
+    public TagConditionSpec? Tags { get; set; }
 
     /// <summary>How much use it takes before breaking. Only meaningful on something that wears out.</summary>
     [LuaField("durability")]
@@ -265,4 +293,28 @@ public class AssetPropertiesSpec
     /// <summary>What crushing it yields.</summary>
     [LuaField("crushing")]
     public CrushingSpec? Crushing { get; set; }
+
+    /// <summary>
+    /// How it changes once it stops being fresh. A list, because one thing may change
+    /// in more than one way — meat both rots and cures, and which happens depends on
+    /// where it is kept. Replaces every change it had, since a list has no key to
+    /// merge on.
+    /// </summary>
+    [LuaField("transitionableProps")]
+    public TransitionableSpec[]? TransitionableProps { get; set; }
+
+    /// <summary>
+    /// Tabs it is listed under in the creative inventory, such as <c>general</c>.
+    /// Replaces the whole set; an empty list takes it out of creative altogether.
+    /// </summary>
+    [LuaField("creativeInventoryTabs")]
+    public string[]? CreativeInventoryTabs { get; set; }
+
+    /// <summary>
+    /// The creative entries it appears as, where being listed under a tab is not
+    /// enough — a barrel of each liquid, say, rather than one empty barrel. Replaces
+    /// whatever it had.
+    /// </summary>
+    [LuaField("creativeInventoryStacks")]
+    public CreativeStacksSpec[]? CreativeInventoryStacks { get; set; }
 }

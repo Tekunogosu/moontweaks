@@ -54,4 +54,44 @@ blocks.set {
   lightAbsorption = 0,
 }
 
+-- What it sounds like. Only the sounds named change, so a block can be given a new
+-- breaking sound without restating what it sounds like underfoot. The game calls the
+-- breaking one `break`, which Lua keeps as a keyword, so it is `breaking` here.
+--
+-- A bare string names the sound and leaves how it is played as the game had it,
+-- which is what a script usually wants: the range the game fills in per kind of
+-- sound is what decides whether it is heard at all.
+blocks.set {
+  code = "game:glass-*",
+  sounds = {
+    breaking = "survival:block/glass",
+    place = "survival:block/glass",
+    walk = { path = "survival:walk/stone", range = 10 },
+  },
+}
+
+-- The shape of a block as far as anything walking into it is concerned. Boxes are
+-- measured within the block, 0 to 1 in each direction, so this is a slab standing on
+-- the floor of its own space. Writing either list replaces every box the block had.
+--
+-- `collisionBoxes` is what stops something moving; `selectionBoxes` is what a
+-- player's cursor picks out. They are usually the same, and a block that should be
+-- walked through but still clicked is where they differ.
+blocks.set {
+  code = "game:snowblock",
+  collisionBoxes = { { y2 = 0.5 } },
+  selectionBoxes = { { y2 = 0.5 } },
+}
+
+-- A drop that varies within a range, and how that range picks. Left alone a range is
+-- uniform, which is the game's own default; `dist` is how a yield is made to cluster
+-- near its average instead. Every quantity written as an average and a variance takes
+-- it, so crushing yields and spoilage times read the same way.
+blocks.set {
+  code = "game:looseflints-*",
+  drops = {
+    { code = "game:flint", quantity = { avg = 2, var = 1, dist = "gaussian" } },
+  },
+}
+
 moontweaks.log.info("block properties done")

@@ -5,6 +5,7 @@ using MoonTweaks.Assets;
 using MoonTweaks.Commands;
 using MoonTweaks.Entities;
 using MoonTweaks.Events;
+using MoonTweaks.GameSystems;
 using MoonTweaks.Inventories;
 using MoonTweaks.Players;
 using MoonTweaks.World;
@@ -45,7 +46,8 @@ public sealed record ScriptRun(
         RecipeRegistry registry,
         ScriptEvents events,
         ScriptCommands commands,
-        ScriptTimers timers)
+        ScriptTimers timers,
+        int undoHistory)
     {
         var log = new MutationLog();
         var scripts = ScriptLibrary.Discover(scriptsFolder);
@@ -81,7 +83,14 @@ public sealed record ScriptRun(
         host.Bind(DomainBinder.Bind(new CalendarDomain(server.World)));
         host.Bind(DomainBinder.Bind(new PlayerDomain(players, stacks)));
         host.Bind(DomainBinder.Bind(
-            new WorldDomain(new WorldAccess(server, players), stacks)));
+            new WorldDomain(new WorldAccess(server, players, undoHistory), stacks)));
+        // Everything below reaches inside another mod rather than the game's own API.
+        // One lookup shared by all three, so a server missing one of those mods is
+        // told the same thing whichever domain was asked.
+        var mods = new GameSystems.GameSystems(server);
+        host.Bind(DomainBinder.Bind(new WeatherDomain(mods)));
+        host.Bind(DomainBinder.Bind(new StabilityDomain(mods)));
+        host.Bind(DomainBinder.Bind(new ReinforceDomain(mods, players)));
 
         foreach (var script in scripts)
         {
@@ -92,6 +101,18 @@ public sealed record ScriptRun(
             catch (ScriptError error)
             {
                 return new ScriptRun(scripts, log, error, host);
+            }
+            catch (Exception failure)
+            {
+                // Everything a script can get wrong reaches here as a ScriptError, so
+                // anything else is this mod's own mistake rather than an author's. It
+                // is still reported as the run failing on that script: the alternative
+                // is a stack trace out of a startup phase, which says nothing about
+                // which of a server's scripts stopped the rest from running.
+                return new ScriptRun(scripts, log,
+                    new ScriptError(new ScriptOrigin(script.Name, 0),
+                        $"failed unexpectedly ({failure.GetType().Name}): {failure.Message}"),
+                    host);
             }
         }
 

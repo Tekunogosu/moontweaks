@@ -123,3 +123,15 @@ commands.add {
     return "fed them"
   end,
 }
+
+-- ## Picking a name
+--
+-- A script's commands are declared while the server loads, before the mods that ship
+-- with the game declare theirs. Taking a name one of them wants is not a clash this
+-- mod can refuse — it registers first and wins — and the server stops when the other
+-- one cannot have it.
+--
+-- The names already spoken for include `/weather`, `/time`, `/setblock`, `/group`,
+-- `/waypoint`, `/tutorial` and `/npc`. Prefer a name nothing else would reach for,
+-- or put everything under one command of your own and use subcommands beneath it,
+-- which is what `/moontweaks` itself does.

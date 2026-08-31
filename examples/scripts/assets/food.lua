@@ -29,4 +29,36 @@ items.set {
   },
 }
 
+-- How it changes once it stops being fresh. A list rather than one, because a thing
+-- may change in more than one way and which happens depends on where it is kept:
+-- meat left out rots, and the same meat in a barrel of brine cures. Writing the key
+-- replaces every change the item had, so the list says all of them.
+items.set {
+  code = "game:redmeat-raw",
+  transitionableProps = {
+    {
+      type = "perish",
+      freshHours = { avg = 60 },
+      transitionHours = { avg = 24 },
+      transitionedStack = { code = "game:rot" },
+      transitionRatio = 1,
+    },
+    {
+      type = "cure",
+      freshHours = { avg = 0 },
+      transitionHours = { avg = 100 },
+      transitionedStack = { code = "game:redmeat-cured" },
+      transitionRatio = 1,
+    },
+  },
+}
+
+-- Where something shows up in the creative inventory. The tabs are the plain form;
+-- `creativeInventoryStacks` is for something that should appear there more than once,
+-- each entry carrying different data.
+items.set {
+  code = "game:flint",
+  creativeInventoryTabs = { "general", "items" },
+}
+
 moontweaks.log.info("food properties done")

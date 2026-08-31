@@ -310,3 +310,85 @@ public enum EnumTransitionKind
     /// <summary>Sets hard, as hot glue does.</summary>
     Harden,
 }
+
+/// <summary>
+/// How a range picks the numbers it hands out. Every quantity written as an average
+/// and a variance reads this, so a drop, a crushing yield and a span of hours all
+/// spread the same way.
+/// </summary>
+public enum EnumSpreadKind
+{
+    /// <summary>Anywhere in the range, each value as likely as any other.</summary>
+    Uniform,
+
+    /// <summary>Nearer the average more often, falling away in a straight line.</summary>
+    Triangle,
+
+    /// <summary>Nearer the average more often, falling away on a bell curve.</summary>
+    Gaussian,
+
+    /// <summary>As <c>gaussian</c>, gathered more tightly around the average.</summary>
+    NarrowGaussian,
+
+    /// <summary>As <c>narrowgaussian</c>, tighter again.</summary>
+    VeryNarrowGaussian,
+
+    /// <summary>The ends of the range more often than the middle.</summary>
+    InverseGaussian,
+
+    /// <summary>As <c>inversegaussian</c>, favouring the ends more strongly.</summary>
+    NarrowInverseGaussian,
+
+    /// <summary>From the average upwards, the average itself being likeliest.</summary>
+    Invexp,
+
+    /// <summary>As <c>invexp</c>, dropping away faster.</summary>
+    StrongInvexp,
+
+    /// <summary>As <c>stronginvexp</c>, dropping away faster again.</summary>
+    StrongerInvexp,
+
+    /// <summary>Once anywhere in the range, and nothing at all every time after.</summary>
+    Dirac,
+}
+
+/// <summary>Which volume control a sound is played under.</summary>
+public enum EnumSoundKind
+{
+    /// <summary>An ordinary sound effect.</summary>
+    Sound,
+
+    /// <summary>Music.</summary>
+    Music,
+
+    /// <summary>Part of the background of a place.</summary>
+    Ambient,
+
+    /// <summary>Weather.</summary>
+    Weather,
+
+    /// <summary>Something alive.</summary>
+    Entity,
+
+    /// <summary>Music, unaffected by temporal instability.</summary>
+    MusicGlitchunaffected,
+
+    /// <summary>Background, unaffected by temporal instability.</summary>
+    AmbientGlitchunaffected,
+
+    /// <summary>A sound effect, unaffected by temporal instability.</summary>
+    SoundGlitchunaffected,
+}
+
+/// <summary>Which of the three soil nutrients a crop feeds on.</summary>
+public enum EnumNutrientKind
+{
+    /// <summary>Nitrogen.</summary>
+    N,
+
+    /// <summary>Phosphorus.</summary>
+    P,
+
+    /// <summary>Potassium.</summary>
+    K,
+}

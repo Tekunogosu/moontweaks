@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using MoonTweaks.Api;
 using MoonTweaks.Scripting;
@@ -86,19 +87,48 @@ public sealed class MutationLog
     }
 
     private readonly List<Applied> applied = [];
+    private readonly List<string> refused = [];
 
     /// <summary>Changes already applied, in the order they were performed.</summary>
     public IReadOnlyList<Applied> Changes => applied;
 
+    /// <summary>
+    /// Changes the game would not accept, in the order they were attempted, so a
+    /// server can be told what its scripts asked for and did not get.
+    /// </summary>
+    public IReadOnlyList<string> Refused => refused;
+
     /// <summary>Applies every recorded change, reporting each one to the log.</summary>
+    /// <remarks>
+    /// One change refused costs that change and nothing else. A change is performed
+    /// against a live registry long after the script that asked for it finished, and
+    /// letting a refusal out of here abandons every change recorded after it — which
+    /// is a server whose recipes are edited partway, with nothing in the log naming
+    /// what was skipped.
+    /// </remarks>
     public int Apply(ICoreServerAPI api, ILogger logger)
     {
         var affected = 0;
         applied.Clear();
+        refused.Clear();
 
         foreach (var mutation in pending)
         {
-            var count = mutation.Apply(api);
+            int count;
+
+            try
+            {
+                count = mutation.Apply(api);
+            }
+            catch (Exception failure)
+            {
+                var problem = $"{mutation.Origin}: {mutation.Describe()} could not be applied "
+                    + $"({failure.GetType().Name}): {failure.Message}";
+                refused.Add(problem);
+                logger.Error("[moontweaks] {0}", problem);
+                continue;
+            }
+
             affected += count;
 
             var change = new Applied(mutation.Origin, mutation.Describe(), count, mutation.Counts);

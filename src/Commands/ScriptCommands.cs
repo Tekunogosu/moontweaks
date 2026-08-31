@@ -18,6 +18,13 @@ namespace MoonTweaks.Commands;
 /// server's command list untouched. That matters more here than it does for events:
 /// the game refuses a command whose name is already taken, so a second run
 /// registering as it went would not merely duplicate the command, it would fail.
+///
+/// Two checks stand between a script and a name it cannot have, because they catch
+/// different clashes. <see cref="Declare"/> refuses a name already taken while the
+/// script that asked is still running, so an author is told the line to change.
+/// <see cref="Activate"/> catches the rest: it runs once every other mod has taken
+/// its own commands, and a clash there costs the one command rather than the mod
+/// that got there first.
 /// </remarks>
 /// <param name="api">Server whose command list these join.</param>
 /// <param name="ours">
@@ -32,7 +39,11 @@ public sealed class ScriptCommands(ICoreServerAPI api, IReadOnlyCollection<strin
     private readonly HashSet<string> already =
         new(ours ?? [], StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The names declared, in the order scripts asked for them.</summary>
+    /// <summary>
+    /// The names declared and not yet registered, in the order scripts asked for
+    /// them. What a run wanted rather than what it got: which of them the server
+    /// actually took is <see cref="Registered.Added"/>.
+    /// </summary>
     public IEnumerable<string> Names => declared.Select(command => command.Name);
 
     /// <summary>
@@ -104,37 +115,64 @@ public sealed class ScriptCommands(ICoreServerAPI api, IReadOnlyCollection<strin
         foreach (var child in children) Check(child, origin, $"{path} {child.Name}");
     }
 
+    /// <summary>What registering a run's commands actually achieved.</summary>
+    /// <param name="Added">Names now on the server, in the order scripts asked for them.</param>
+    /// <param name="Refused">
+    /// One sentence per command the game would not take, naming the script line that
+    /// asked for it.
+    /// </param>
+    public sealed record Registered(IReadOnlyList<string> Added, IReadOnlyList<string> Refused);
+
     /// <summary>
     /// Registers every command this run declared. Called once, by the run whose
     /// handlers are meant to be live, and never by one whose results are discarded.
     /// </summary>
-    public void Activate()
+    /// <remarks>
+    /// One command refused costs that command and nothing else. The game refuses a
+    /// name already taken and refuses a shape it cannot read, and either would
+    /// otherwise take down every command declared after it — which is a whole
+    /// server's scripted commands lost to one typo, and lost silently, since the
+    /// failure names only the command that caused it.
+    /// </remarks>
+    /// <returns>What took and what did not, for whoever is going to report them.</returns>
+    public Registered Activate()
     {
+        var added = new List<string>();
+        var refused = new List<string>();
+
         foreach (var spec in declared)
         {
             var origin = origins[spec];
-            var command = api.ChatCommands.Create(spec.Name.ToLowerInvariant())
-                .WithDescription(spec.Description)
-                .RequiresPrivilege(spec.Privilege);
-
-            if (spec.RequiresPlayer) command.RequiresPlayer();
-
-            Build(command, spec, origin);
 
             try
             {
-                command.Validate();
+                Register(spec, origin);
+                added.Add(spec.Name);
             }
-            catch (Exception refused)
+            catch (Exception failure)
             {
                 // The game checks a command only once it is whole, and says so with an
                 // exception that names nothing a script author would recognise.
-                throw new ScriptError(origin, $"the game refused the command '{spec.Name}': {refused.Message}");
+                refused.Add($"{origin}: the game refused the command '{spec.Name}': {failure.Message}");
             }
         }
 
         declared.Clear();
         origins.Clear();
+        return new Registered(added, refused);
+    }
+
+    /// <summary>Registers one command, whole, and lets the game check it.</summary>
+    private void Register(CommandSpec spec, ScriptOrigin origin)
+    {
+        var command = api.ChatCommands.Create(spec.Name.ToLowerInvariant())
+            .WithDescription(spec.Description)
+            .RequiresPrivilege(spec.Privilege);
+
+        if (spec.RequiresPlayer) command.RequiresPlayer();
+
+        Build(command, spec, origin);
+        command.Validate();
     }
 
     /// <summary>Fills in one command's arguments, handler and the commands under it.</summary>

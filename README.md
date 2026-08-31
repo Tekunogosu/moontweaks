@@ -257,6 +257,38 @@ must be present, and a tag no item or block carries is refused by name rather
 than quietly matching nothing. Either `code` or `tags` is required; both together
 narrow a wildcard further.
 
+A bare list is shorthand for `allOf`, and the longer spelling is the game's own —
+`allOf`, `anyOf` and `noneOf`, written as a recipe file writes them:
+
+```lua
+tags = { anyOf = { "tool-axe", "tool-pickaxe" } }        -- either kind
+tags = { allOf = { "tool" }, noneOf = { "weapon-melee" } } -- a tool, not a weapon
+tags = { noneOf = { "weapon" } }                          -- anything but a weapon
+```
+
+A junction may hold groups rather than names, and then each group is a condition
+of its own. The verbs alternate by layer, because a group is what the junction
+combines:
+
+```lua
+-- Any one group is enough: a tool that is also a weapon, or a hammer that is not.
+tags = { anyOf = { { allOf = { "tool", "weapon-melee" } },
+                   { allOf = { "tool-hammer" }, noneOf = { "weapon" } } } }
+
+-- Every group must hold, and each asks for any one of its own tags.
+tags = { allOf = { { anyOf = { "tool-knife", "tool-cleaver" } },
+                   { anyOf = { "weapon-melee", "weapon-ranged" } } } }
+```
+
+Writing the junction's own verb inside it is refused by name, as is naming both
+verbs on one layer — the same two rules the game's loader enforces. The one place
+this goes further: a condition naming only `noneOf` selects what does not carry
+those tags, where the game's loader reads it as matching nothing at all.
+
+The same `tags` key selects for `items.set`, `blocks.set` and every recipe
+selector, so a condition worked out once is written the same way wherever it is
+used.
+
 Knapping reads the same way, with one material rather than a grid of them:
 
 ```lua
@@ -281,8 +313,8 @@ those two are all refused with the row named.
 
 `examples/scripts/` holds worked scripts grouped by what they are about —
 `recipes/`, `assets/`, `players/`, `entities/`, `inventory/`, `world/`, `calendar/`,
-`server/`, `events/` and `commands/` — checked by `lua-language-server` on every
-documentation build. Three sit apart from that grouping, being about something other
+`server/`, `events/`, `commands/` and `survival/` — checked by `lua-language-server`
+on every documentation build. Three sit apart from that grouping, being about something other
 than one corner of the API: `diagnostics/` calls every bound function and says which
 ones answer on your server, `performance/` measures what they cost there, and
 `rpglevels/` is one finished feature rather than a tour — a levelling system, where
@@ -339,6 +371,7 @@ Assets     reaching items and blocks: codes, tags, stacks, properties
 Recipes    one domain and factory per recipe kind, over the shared owners below
 Players    reaching a player and the behaviours their state lives on
 Events     what the game raises while it runs, and the handlers listening
+GameSystems  what another mod declared: weather, stability, reinforcement
 ```
 
 Each layer names only the ones beneath it. Within a layer, a *system* reaches
@@ -347,6 +380,10 @@ script calls — `PlayerAccess` finds a player and their behaviours, `PlayerDoma
 lists what a script may do with one. Utilities reach nothing at all and sit apart
 from both: `ScriptJson` converts the value tree, `ValueSet` matches a declared set
 to the game's own.
+
+`GameSystems` is the one layer that reaches outside the game's own API, into the
+systems the mods shipping with the game declare. Everything it touches is listed in
+`MODSYSTEMS.md`, which is the list to walk after a game update.
 
 `ScriptRun` owns running the scripts. A server's startup and `/moontweaks check`
 both go through it, so what a check reports is what a start would do.

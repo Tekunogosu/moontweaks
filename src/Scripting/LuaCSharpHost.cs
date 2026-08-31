@@ -95,15 +95,27 @@ public sealed class LuaCSharpHost : IScriptHost
         }
         catch (LuaRuntimeException e)
         {
-            // An error this mod raised inside a bound call comes back wrapped, and it
-            // already names the line the binding read off the callstack. Rebuilding
-            // one around its message would name that line a second time, since
-            // LuaRuntimeException.Message hands back the exception it wraps.
-            if (e.GetBaseException() is ScriptError raised) throw raised;
-
-            throw new ScriptError(OriginOf(e, file.Name), MessageOf(e));
+            throw Translate(e, file.Name);
         }
     }
+
+    /// <summary>
+    /// The failure a script author should read, out of whatever the engine raised.
+    /// Sole owner of that translation: every way script code is entered — a script
+    /// run at startup, and a function the host calls back afterwards — leaves through
+    /// here, so a failure reads the same whichever of them it happened in.
+    /// </summary>
+    /// <remarks>
+    /// An error this mod raised inside a bound call comes back wrapped, and it already
+    /// names the line the binding read off the callstack. Rebuilding one around its
+    /// message would name that line a second time, since
+    /// <see cref="LuaRuntimeException.Message"/> hands back the exception it wraps.
+    /// </remarks>
+    /// <param name="failure">What the interpreter raised.</param>
+    /// <param name="ranAs">Script to blame when the failure carries no location of its own.</param>
+    private static ScriptError Translate(LuaRuntimeException failure, string ranAs) =>
+        failure.GetBaseException() as ScriptError
+        ?? new ScriptError(OriginOf(failure, ranAs), MessageOf(failure));
 
     /// <inheritdoc/>
     public void Dispose() => state.Dispose();
@@ -182,15 +194,34 @@ public sealed class LuaCSharpHost : IScriptHost
     /// has finished. The interpreter is not thread safe, so callers are responsible
     /// for arriving on the thread the game runs its events on.
     /// </summary>
-    private ScriptValue.Func Callable(LuaValue function) =>
-        new(arguments =>
+    /// <remarks>
+    /// What escapes a call is a <see cref="ScriptError"/>, the same as what escapes a
+    /// script run, so whoever called it reports a line an author can open rather than
+    /// the engine's own rendering of its callstack.
+    /// </remarks>
+    private ScriptValue.Func Callable(LuaValue function)
+    {
+        // Read now, while the function is in hand. A call made from outside a script
+        // has no line of its own to blame, so this is what a failure falls back to
+        // when the interpreter cannot say where inside the function it happened.
+        var ranAs = function.TryRead<LuaFunction>(out var declared) ? declared.Name : "<script>";
+
+        return new ScriptValue.Func(arguments =>
         {
             var supplied = new LuaValue[arguments.Count];
             for (var i = 0; i < supplied.Length; i++) supplied[i] = ToLuaValue(arguments[i]);
 
-            var results = Wait(state.CallAsync(function, supplied, CancellationToken.None));
-            return results.Length > 0 ? ToScriptValue(results[0]) : ScriptValue.Nil.Instance;
+            try
+            {
+                var results = Wait(state.CallAsync(function, supplied, CancellationToken.None));
+                return results.Length > 0 ? ToScriptValue(results[0]) : ScriptValue.Nil.Instance;
+            }
+            catch (LuaRuntimeException failure)
+            {
+                throw Translate(failure, ranAs);
+            }
         });
+    }
 
     /// <summary>
     /// A table with anything in its array part is a list; anything else is a map.

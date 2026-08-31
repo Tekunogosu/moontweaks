@@ -38,6 +38,7 @@ public sealed record ParameterDoc(string Name, string Type, string Summary);
 /// <param name="Name">Name the shape is documented under.</param>
 /// <param name="Summary">What the shape describes.</param>
 /// <param name="Shorthand">Field a bare string stands in for, when the shape has one.</param>
+/// <param name="ListShorthand">Field a bare list stands in for, when the shape has one.</param>
 /// <param name="Given">
 /// Whether the shape is handed to a script rather than written by one, as an event's
 /// table is. A given shape has no defaults: every key is filled in before a handler
@@ -48,6 +49,7 @@ public sealed record TableDoc(
     string Name,
     string Summary,
     string? Shorthand,
+    string? ListShorthand,
     bool Given,
     IReadOnlyList<FieldDoc> Fields);
 

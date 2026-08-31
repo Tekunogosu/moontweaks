@@ -208,34 +208,96 @@ public sealed class InventoryAccess(
     /// caller's hands rather than being lost, so a script that must not lose it drops
     /// the remainder on the floor.
     /// </remarks>
-    public static int Put(IInventory inventory, ItemStack stack, IWorldAccessor world)
+    public static int Put(IInventory inventory, ItemStack stack, IWorldAccessor world) =>
+        Give(inventory, new DummySlot(stack), stack.StackSize, world);
+
+    /// <summary>
+    /// Moves what it can of a stack out of one set of slots and into another, and says
+    /// how many arrived. Sole owner of a move: nothing else may take from one place
+    /// and put in another, because whatever did not fit has to go back where it came
+    /// from and there is exactly one correct way to do that.
+    /// </summary>
+    /// <remarks>
+    /// The stacks themselves move, rather than being described and rebuilt. A worn axe
+    /// arrives worn and a labelled crock arrives labelled, which taking a code out of
+    /// one place and putting a fresh one into another cannot do.
+    ///
+    /// Nothing is ever taken out and dropped: a stack is only ever removed by being
+    /// put down somewhere, so a destination that fills up leaves the rest exactly where
+    /// it was.
+    /// </remarks>
+    public static int Move(
+        IInventory from, IInventory to, string code, int quantity, IWorldAccessor world)
     {
-        var wanted = stack.StackSize;
-        var source = new DummySlot(stack);
+        var wanted = new AssetLocation(code);
+        var moved = 0;
 
-        // Two passes rather than one. A single pass in slot order fills the first
-        // empty slot it reaches, so a stack that would have merged into a part-full
-        // one further along takes a whole slot for itself instead — which is how a
-        // bag with room comes back full.
-        Fill(inventory, source, world, slot => !slot.Empty);
-        Fill(inventory, source, world, slot => slot.Empty);
+        foreach (var source in from)
+        {
+            if (moved >= quantity) break;
+            if (!Matches(source, wanted)) continue;
 
-        return wanted - (source.Itemstack?.StackSize ?? 0);
+            moved += Give(to, source, quantity - moved, world);
+        }
+
+        return moved;
+    }
+
+    /// <summary>
+    /// Offers up to a limit out of one slot to a whole inventory, and says how many
+    /// were taken. Sole owner of the order they are offered in.
+    /// </summary>
+    /// <remarks>
+    /// Two passes rather than one. A single pass in slot order fills the first empty
+    /// slot it reaches, so a stack that would have merged into a part-full one further
+    /// along takes a whole slot for itself instead — which is how a bag with room comes
+    /// back full.
+    /// </remarks>
+    private static int Give(IInventory inventory, ItemSlot source, int limit, IWorldAccessor world)
+    {
+        var before = source.StackSize;
+
+        var taken = Offer(inventory, source, world, limit, slot => !slot.Empty);
+        taken += Offer(inventory, source, world, limit - taken, slot => slot.Empty);
+
+        // Marked once rather than per slot, and only where something actually left it.
+        // A dummy slot has no inventory to tell, and answers this harmlessly.
+        if (source.StackSize != before) source.MarkDirty();
+
+        return taken;
     }
 
     /// <summary>Moves as much as will go into the slots one pass is interested in.</summary>
-    private static void Fill(
-        IInventory inventory, ItemSlot source, IWorldAccessor world, System.Func<ItemSlot, bool> wanted)
+    private static int Offer(
+        IInventory inventory,
+        ItemSlot source,
+        IWorldAccessor world,
+        int limit,
+        System.Func<ItemSlot, bool> wanted)
     {
+        var taken = 0;
+
         foreach (var slot in inventory)
         {
-            if (source.Itemstack is not { StackSize: > 0 }) return;
-            if (!wanted(slot)) continue;
+            if (taken >= limit || source.Itemstack is not { StackSize: > 0 }) break;
+
+            // A move within one inventory would otherwise offer a slot to itself,
+            // which the game answers by quietly emptying it.
+            if (slot == source || !wanted(slot)) continue;
+
+            var went = source.TryPutInto(
+                world, slot, System.Math.Min(limit - taken, source.Itemstack.StackSize));
 
             // Marked only where something actually landed, so a pass over a full bag
             // does not send every slot in it to the player again.
-            if (source.TryPutInto(world, slot, source.Itemstack.StackSize) > 0) slot.MarkDirty();
+            if (went > 0)
+            {
+                slot.MarkDirty();
+                taken += went;
+            }
         }
+
+        return taken;
     }
 
     /// <summary>Empties every slot, and says how many held anything.</summary>

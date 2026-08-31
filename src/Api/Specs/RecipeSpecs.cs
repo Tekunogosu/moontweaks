@@ -139,14 +139,14 @@ public sealed class RecipeSelectorSpec
     public string? Code { get; set; }
 
     /// <summary>
-    /// Tags the output must carry, such as <c>tool-axe</c>. Matches on what the
+    /// Tags the output must carry, such as <c>{ "tool-axe" }</c>. Matches on what the
     /// product is rather than what it is called, so one entry reaches a modded axe as
     /// readily as a vanilla one. Used alone, or alongside <c>code</c> to narrow a
-    /// wildcard further.
+    /// wildcard further. A bare list asks for every tag in it; the keys of a
+    /// <c>TagCondition</c> ask for anything richer than that.
     /// </summary>
     [LuaField("tags")]
-    [LuaSuggests(SuggestionSets.ASSET_TAG)]
-    public string[]? Tags { get; set; }
+    public TagConditionSpec? Tags { get; set; }
 }
 
 /// <summary>
@@ -255,10 +255,10 @@ public sealed class KindSelectorSpec
 
     /// <summary>
     /// Tags the output must carry. Used alone, or alongside <c>code</c> to narrow a
-    /// wildcard further.
+    /// wildcard further. A bare list asks for every tag in it; the keys of a
+    /// <c>TagCondition</c> ask for anything richer than that.
     /// </summary>
     [LuaField("tags")]
-    [LuaSuggests(SuggestionSets.ASSET_TAG)]
-    public string[]? Tags { get; set; }
+    public TagConditionSpec? Tags { get; set; }
 }
 

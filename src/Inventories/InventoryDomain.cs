@@ -149,6 +149,38 @@ public sealed class InventoryDomain(
         InventoryAccess.Put(
             inventories.Of(where, origin), stacks.Resolved(stack, origin, "stack"), world);
 
+    /// <summary>
+    /// Moves what it can of a stack from one set of slots to another, and says how
+    /// many arrived. The code may be a <c>*</c> wildcard, so a levy may be collected
+    /// in any ingot rather than one kind.
+    /// </summary>
+    /// <remarks>
+    /// This is what a move should be written as. <c>take</c> and <c>put</c> can be
+    /// paired to the same end and two things go wrong when they are. Whatever the
+    /// destination could not hold has to be put back by hand, and a script that
+    /// forgets destroys it. And the two describe a stack rather than carrying it, so
+    /// a worn axe arrives sharp and a labelled crock arrives blank; this moves the
+    /// stacks themselves, so what arrives is what left.
+    ///
+    /// Getting less than was asked for is ordinary rather than a failure. A full
+    /// destination simply leaves the rest where it was — nothing is taken out and
+    /// dropped — so a script reads what came back and decides what to do about the
+    /// difference.
+    ///
+    /// The pair are still bound, for the cases that are genuinely one half of a move:
+    /// charging somebody for something that then ceases to exist, or handing out
+    /// something that did not exist a moment ago.
+    /// </remarks>
+    /// <param name="origin">Script line moving it.</param>
+    /// <param name="from">Whose slots to take from.</param>
+    /// <param name="to">Whose slots to put it in.</param>
+    /// <param name="stack">What to move, and how much of it.</param>
+    [LuaFunction("move")]
+    public int Move(ScriptOrigin origin, WhereSpec from, WhereSpec to, ItemStackSpec stack) =>
+        InventoryAccess.Move(
+            inventories.Of(from, origin), inventories.Of(to, origin),
+            stack.Code!, stack.Quantity, world);
+
     /// <summary>Empties every slot, and says how many held anything.</summary>
     /// <param name="origin">Script line clearing them.</param>
     /// <param name="where">Whose slots to empty.</param>

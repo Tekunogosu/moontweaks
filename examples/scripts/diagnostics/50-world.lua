@@ -104,6 +104,35 @@ diag.later("world.queueBlock", function()
   return ("queued one, committed %d, put %s back"):format(written, before)
 end)
 
+-- Undo and redo walk the history each commit closes, so the pair is checked as one
+-- round trip: write a block, take it back, put it back again, and leave the spot as
+-- it was found. The history belongs to this script alone, so nothing another script
+-- wrote is touched by any of it.
+diag.later("world.undo", function()
+  local at = airAbove()
+  local before = world.blockAt(at.x, at.y, at.z) or "game:air"
+
+  world.queueBlock("game:rock-granite", at.x, at.y, at.z)
+  world.commit()
+
+  local written = world.blockAt(at.x, at.y, at.z)
+  local undone = world.undo()
+  local after = world.blockAt(at.x, at.y, at.z)
+
+  local redone = world.redo()
+  local again = world.blockAt(at.x, at.y, at.z)
+  world.setBlock(before, at.x, at.y, at.z)
+
+  diag.used("world.redo")
+  assert(written == "game:rock-granite", "the commit did not land: " .. tostring(written))
+  assert(undone > 0, "undo put nothing back")
+  assert(after == before, ("undo left %s where %s stood"):format(tostring(after), before))
+  assert(redone > 0, "redo put nothing back")
+  assert(again == "game:rock-granite", "redo left " .. tostring(again))
+
+  return ("wrote, undid %d, redid %d, put %s back"):format(undone, redone, before)
+end)
+
 diag.later("world.breakBlock", function()
   local at = airAbove()
   local before = world.blockAt(at.x, at.y, at.z) or "game:air"

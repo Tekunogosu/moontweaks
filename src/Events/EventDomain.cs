@@ -9,9 +9,10 @@ namespace MoonTweaks.Events;
 /// below names.
 /// </summary>
 /// <remarks>
-/// Only events the game raises on its main thread appear here. The interpreter is
-/// not thread safe, so the ones it raises on its chunk, spawn and physics threads
-/// are deliberately absent rather than offered and unsafe.
+/// A handler runs on the thread the server ticks on, whichever thread the game
+/// raised the event on. One that the game raises elsewhere — a creature spawned by
+/// chunk generation, a packet arriving from a rider — is therefore called on the
+/// tick after it happened, and each says so.
 /// </remarks>
 /// <example>
 /// <code>
@@ -106,7 +107,36 @@ public sealed class EventDomain(ScriptEvents events)
         ScriptOrigin origin, [LuaPayload(typeof(ChunkEventPayload))] ScriptValue.Func handler) =>
         events.OnChunkUnloaded(origin, handler);
 
-    // The six below reach things that are not players. The game raises them wherever
+    /// <summary>
+    /// Called once a region of the map has come in, whether it was read from disk or
+    /// generated. A region is a square of chunk columns holding the maps a world is
+    /// grown from, so this is raised far less often than <c>chunkColumnLoaded</c> and
+    /// covers far more ground.
+    /// </summary>
+    /// <remarks>
+    /// Called once per region rather than once per column standing on it: the game
+    /// raises its own event every time a column asks for the region beneath it, and
+    /// only the ask that brought the region in reaches a handler here.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("mapRegionLoaded")]
+    public void MapRegionLoaded(
+        ScriptOrigin origin, [LuaPayload(typeof(MapRegionEventPayload))] ScriptValue.Func handler) =>
+        events.OnMapRegionLoaded(origin, handler);
+
+    /// <summary>
+    /// Called as a region of the map is let go, which is where anything remembered
+    /// about that stretch of the world should be forgotten.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("mapRegionUnloaded")]
+    public void MapRegionUnloaded(
+        ScriptOrigin origin, [LuaPayload(typeof(MapRegionEventPayload))] ScriptValue.Func handler) =>
+        events.OnMapRegionUnloaded(origin, handler);
+
+    // The seven below reach things that are not players. The game raises them wherever
     // it happens to be — chunk generation spawns creatures on its own thread — so a
     // handler is called on the tick after the event rather than during it. What it is
     // told is what was true at the moment; what it reaches for wants checking with
@@ -188,6 +218,28 @@ public sealed class EventDomain(ScriptEvents events)
     public void EntityUnmounted(
         ScriptOrigin origin, [LuaPayload(typeof(EntityMountEventPayload))] ScriptValue.Func handler) =>
         events.OnEntityUnmounted(origin, handler);
+
+    /// <summary>
+    /// Called when a mount's rider changes the pace it is ridden at. The table
+    /// describes the mount rather than the rider, so <c>id</c> is the horse and
+    /// <c>gait</c> is what it is now doing.
+    /// </summary>
+    /// <remarks>
+    /// Raised only on a change. A rider's client reports its mount's gait several
+    /// times a second whether or not it moved, and a report saying what the last one
+    /// said goes no further, so a handler here is called once per change of pace
+    /// rather than once per packet.
+    ///
+    /// Only a mount whose rider's own client reports its position raises this at all,
+    /// which is what makes it the pace a rider chose rather than one the server
+    /// worked out. Nothing is raised for a creature the server is walking itself.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("mountGaitChanged")]
+    public void MountGaitChanged(
+        ScriptOrigin origin, [LuaPayload(typeof(MountGaitEventPayload))] ScriptValue.Func handler) =>
+        events.OnMountGaitChanged(origin, handler);
 
     /// <summary>Called when a player joins.</summary>
     /// <param name="origin">Script line adding the handler.</param>

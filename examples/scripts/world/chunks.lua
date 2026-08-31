@@ -31,10 +31,24 @@ events.chunkUnloaded(function(e)
   moontweaks.log.info(("chunk %d %d %d let go"):format(e.chunkX, e.chunkY, e.chunkZ))
 end)
 
+-- One layer up from a column: a region is the square of columns a stretch of world
+-- is grown from, so these two fire rarely and cover a lot of ground. Each fires once
+-- per region rather than once per column standing on it. `size` is how wide one is
+-- in blocks, which the server decides rather than the game, and `x` and `z` are its
+-- lowest corner in the coordinates everything else here counts in.
+events.mapRegionLoaded(function(e)
+  moontweaks.log.info(("region %d %d covers %d %d to %d %d")
+    :format(e.regionX, e.regionZ, e.x, e.z, e.x + e.size - 1, e.z + e.size - 1))
+end)
+
+events.mapRegionUnloaded(function(e)
+  moontweaks.log.info(("region %d %d let go"):format(e.regionX, e.regionZ))
+end)
+
 -- Asking for a chunk and then acting on it. `loadChunk` answers true when it was
 -- already there, so the wait is only needed when it was not.
 moontweaks.commands.add {
-  name = "peek",
+  name = "ground",
   description = "Say what the ground is like a long way east of you",
   requiresPlayer = true,
   handler = function(e)

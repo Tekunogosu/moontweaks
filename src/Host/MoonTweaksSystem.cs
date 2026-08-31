@@ -39,6 +39,8 @@ public class MoonTweaksSystem : ModSystem
     /// <summary>
     /// Commands the last successful run registered. A check re-declares them, and
     /// needs to know they are this mod's own rather than a clash with something else.
+    /// Only the names the server actually took are on it: one it refused belongs to
+    /// whoever holds it, and a check should report that as the clash it is.
     /// </summary>
     private IReadOnlyList<string> commandNames = [];
 
@@ -52,64 +54,75 @@ public class MoonTweaksSystem : ModSystem
     /// Registers the command surface. Its privilege comes from the settings file, so
     /// a server that has not chosen one keeps commands with the administrators.
     /// </summary>
+    /// <remarks>
+    /// Attempted rather than performed, because the game refuses a command whose name
+    /// is already taken and a refusal here is not this mod's alone to pay for: what
+    /// escapes a mod's start is caught by the game, which then drops the whole mod
+    /// system — so a server that happens to have another <c>/moontweaks</c> would
+    /// lose the scripts that already ran as well as the commands that describe them.
+    /// </remarks>
     public override void StartServerSide(ICoreServerAPI api)
     {
-        var folder = ScriptLibrary.PathFor();
-        var config = Settings(folder, api.Logger);
+        Attempt(api.Logger, "adding the /moontweaks command", () =>
+        {
+            var folder = ScriptLibrary.PathFor();
+            var config = Settings(folder, api.Logger);
 
-        api.ChatCommands.Create("moontweaks")
-            .WithDescription("MoonTweaks scripting tools")
-            .RequiresPrivilege(config.CommandPrivilege)
-            .BeginSubCommand("list")
-                .WithDescription("List the changes this server's scripts applied at startup")
-                .HandleWith(_ =>
-                {
-                    if (applied is not { Changes.Count: > 0 } log)
+            api.ChatCommands.Create("moontweaks")
+                .WithDescription("MoonTweaks scripting tools")
+                .RequiresPrivilege(config.CommandPrivilege)
+                .BeginSubCommand("list")
+                    .WithDescription("List the changes this server's scripts applied at startup")
+                    .HandleWith(_ => Answered(api.Logger, "list", () =>
                     {
-                        return TextCommandResult.Success("no scripts have changed anything on this server");
-                    }
+                        if (applied is not { Changes.Count: > 0 } log)
+                        {
+                            return TextCommandResult.Success("no scripts have changed anything on this server");
+                        }
 
-                    return TextCommandResult.Success(
-                        $"{log.Changes.Count} change(s) applied at startup:\n"
-                        + string.Join("\n", log.Changes));
-                })
-            .EndSubCommand()
-            .BeginSubCommand("check")
-                .WithDescription("Re-run every script and report what it would change, changing nothing")
-                .HandleWith(_ =>
-                {
-                    // A check is a dry run, so its handlers are never called and its
-                    // interpreter goes with it rather than joining the live one.
-                    using var run = ScriptRun.Execute(
-                        api, ScriptEngine.Create(ScriptEngine.DEFAULT),
-                        ScriptLibrary.ScriptsPathFor(), new RecipeRegistry(api),
-                        new ScriptEvents(api), new ScriptCommands(api, commandNames),
-                        new ScriptTimers(api));
+                        return TextCommandResult.Success(
+                            $"{log.Changes.Count} change(s) applied at startup:\n"
+                            + string.Join("\n", log.Changes)
+                            + Refusals(log));
+                    }))
+                .EndSubCommand()
+                .BeginSubCommand("check")
+                    .WithDescription("Re-run every script and report what it would change, changing nothing")
+                    .HandleWith(_ => Answered(api.Logger, "check", () =>
+                    {
+                        // A check is a dry run, so its handlers are never called and its
+                        // interpreter goes with it rather than joining the live one.
+                        using var run = ScriptRun.Execute(
+                            api, ScriptEngine.Create(ScriptEngine.DEFAULT),
+                            ScriptLibrary.ScriptsPathFor(), new RecipeRegistry(api),
+                            new ScriptEvents(api), new ScriptCommands(api, commandNames),
+                            new ScriptTimers(api), config.UndoHistory);
 
-                    if (run.Failure is { } failure) return TextCommandResult.Error(failure.Message);
-                    if (run.Scripts.Count == 0) return TextCommandResult.Success("no scripts to check");
+                        if (run.Failure is { } failure) return TextCommandResult.Error(failure.Message);
+                        if (run.Scripts.Count == 0) return TextCommandResult.Success("no scripts to check");
 
-                    var lines = string.Join("\n", run.Describe());
-                    return TextCommandResult.Success(
-                        $"{run.Scripts.Count} script(s) ran, {run.Log.Pending.Count} change(s) would be made"
-                        + (lines.Length == 0 ? "" : "\n" + lines)
-                        + "\nnothing was applied; restart the server for changes to take effect");
-                })
-            .EndSubCommand()
-            .BeginSubCommand("export")
-                .WithDescription("Rewrite the asset codes an editor suggests, from the live registries")
-                .HandleWith(_ =>
-                {
-                    // Read first and report from that, rather than from what the
-                    // write returned: a forced write always happens, so its result
-                    // would only be the same sets behind a null the type still carries.
-                    var sets = AssetCodeLibrary.SetsOf(api.World);
-                    AssetCodeLibrary.Install(folder, sets, force: true);
-                    return TextCommandResult.Success(
-                        $"wrote {EditorSupport.LIBRARY_FOLDER}/{AssetCodeLibrary.FILE_NAME} "
-                        + $"with {AssetCodeLibrary.Describe(sets)}");
-                })
-            .EndSubCommand();
+                        var lines = string.Join("\n", run.Describe());
+                        return TextCommandResult.Success(
+                            $"{run.Scripts.Count} script(s) ran, {run.Log.Pending.Count} change(s) would be made"
+                            + (lines.Length == 0 ? "" : "\n" + lines)
+                            + "\nnothing was applied; restart the server for changes to take effect");
+                    }))
+                .EndSubCommand()
+                .BeginSubCommand("export")
+                    .WithDescription("Rewrite the asset codes an editor suggests, from the live registries")
+                    .HandleWith(_ => Answered(api.Logger, "export", () =>
+                    {
+                        // Read first and report from that, rather than from what the
+                        // write returned: a forced write always happens, so its result
+                        // would only be the same sets behind a null the type still carries.
+                        var sets = AssetCodeLibrary.SetsOf(api.World);
+                        AssetCodeLibrary.Install(folder, sets, force: true);
+                        return TextCommandResult.Success(
+                            $"wrote {EditorSupport.LIBRARY_FOLDER}/{AssetCodeLibrary.FILE_NAME} "
+                            + $"with {AssetCodeLibrary.Describe(sets)}");
+                    }))
+                .EndSubCommand();
+        });
     }
 
     /// <inheritdoc/>
@@ -117,31 +130,53 @@ public class MoonTweaksSystem : ModSystem
     {
         if (api is not ICoreServerAPI server) return;
 
-        var folder = ScriptLibrary.PathFor();
-        var scriptsFolder = ScriptLibrary.ScriptsPathFor();
+        string folder;
+        string scriptsFolder;
+
+        try
+        {
+            folder = ScriptLibrary.PathFor();
+            scriptsFolder = ScriptLibrary.ScriptsPathFor();
+        }
+        catch (Exception unreachable)
+        {
+            // The scripts, the settings and the editor support all live in there, so
+            // a folder that cannot be opened leaves nothing further to attempt.
+            server.Logger.Error("[moontweaks] the {0} folder could not be opened, so no scripts ran: {1}",
+                ScriptLibrary.FOLDER_NAME, unreachable.Message);
+            return;
+        }
+
         var config = Settings(folder, server.Logger);
-        EditorSupport.Install(folder, server.Logger);
 
-        // The registries are populated by now, so the codes an author may write are
-        // exactly the ones an editor can offer.
-        if (AssetCodeLibrary.Install(folder, server.World) is { } sets)
+        // What an author writes scripts with rather than what runs them, so a folder
+        // that will not take it costs a server its editor support and nothing else.
+        Attempt(server.Logger, "writing the editor support", () =>
         {
-            server.Logger.Notification("[moontweaks] wrote {0}/{1} with {2}",
-                EditorSupport.LIBRARY_FOLDER, AssetCodeLibrary.FILE_NAME, AssetCodeLibrary.Describe(sets));
-        }
+            EditorSupport.Install(folder, server.Logger);
 
-        foreach (var misplaced in ScriptLibrary.Misplaced(folder))
-        {
-            server.Logger.Warning("[moontweaks] {0} sits beside the {1} folder rather than in it, so it does not run",
-                misplaced, ScriptLibrary.SCRIPTS_FOLDER);
-        }
+            // The registries are populated by now, so the codes an author may write are
+            // exactly the ones an editor can offer.
+            if (AssetCodeLibrary.Install(folder, server.World) is { } sets)
+            {
+                server.Logger.Notification("[moontweaks] wrote {0}/{1} with {2}",
+                    EditorSupport.LIBRARY_FOLDER, AssetCodeLibrary.FILE_NAME, AssetCodeLibrary.Describe(sets));
+            }
+
+            foreach (var misplaced in ScriptLibrary.Misplaced(folder))
+            {
+                server.Logger.Warning(
+                    "[moontweaks] {0} sits beside the {1} folder rather than in it, so it does not run",
+                    misplaced, ScriptLibrary.SCRIPTS_FOLDER);
+            }
+        });
 
         var registry = new RecipeRegistry(server);
         events = new ScriptEvents(server);
         var commands = new ScriptCommands(server);
         var timers = new ScriptTimers(server);
-        var engine = ScriptEngine.Create(ScriptEngine.DEFAULT);
-        var run = ScriptRun.Execute(server, engine, scriptsFolder, registry, events, commands, timers);
+
+        if (Executed(server, config, scriptsFolder, registry, events, commands, timers) is not { } run) return;
 
         if (run.Scripts.Count == 0)
         {
@@ -167,15 +202,14 @@ public class MoonTweaksSystem : ModSystem
         host = run.Host;
         RecipeBase.CollectiblePreSearchResultsCache.Clear();
 
-        // Taken before activating, which empties the list it was recorded in, and
-        // kept so a later check knows which names this mod put there itself.
-        commandNames = commands.Names.ToList();
         // The run succeeded and its handlers are the live ones, so this is where the
-        // game is actually subscribed to and the commands are registered. A check
-        // never reaches here, which is what keeps it from doing either twice.
-        Start(server.Logger, "event handlers", events.Activate);
-        Start(server.Logger, "commands", commands.Activate);
-        Start(server.Logger, "timers", timers.Activate);
+        // game is actually subscribed to and the timers are started. A check never
+        // reaches here, which is what keeps it from doing either twice.
+        Attempt(server.Logger, "subscribing the event handlers", () =>
+            Report(server.Logger, events.Activate()));
+        Attempt(server.Logger, "starting the timers", () =>
+            Report(server.Logger, timers.Activate()));
+        Register(server, commands);
 
         // Nothing downstream reports this: a surface takes the first recipe whose
         // identifier matches, and saves that identifier with the block, so a
@@ -195,17 +229,17 @@ public class MoonTweaksSystem : ModSystem
 
         server.Logger.Notification(
             "[moontweaks] {0} script(s) on {1}, {2} change(s), {3} affected; {4} recipes now",
-            run.Scripts.Count, ScriptEngine.DEFAULT, run.Log.Pending.Count, affected, string.Join(", ", held));
+            run.Scripts.Count, ScriptEngine.DEFAULT, run.Log.Changes.Count, affected, string.Join(", ", held));
+
+        if (run.Log.Refused.Count > 0)
+        {
+            server.Logger.Error("[moontweaks] {0} change(s) the game would not accept were skipped",
+                run.Log.Refused.Count);
+        }
 
         if (events.Count > 0)
         {
             server.Logger.Notification("[moontweaks] {0} event handler(s) listening", events.Count);
-        }
-
-        if (commandNames.Count > 0)
-        {
-            server.Logger.Notification("[moontweaks] command(s) added: {0}",
-                string.Join(", ", commandNames.Select(name => $"/{name}")));
         }
 
         if (timers.Count > 0)
@@ -215,28 +249,139 @@ public class MoonTweaksSystem : ModSystem
     }
 
     /// <summary>
+    /// Runs every script, or reports why none of them could be and answers nothing.
+    /// </summary>
+    /// <remarks>
+    /// A script that fails is the run's own answer and is reported by the caller.
+    /// This is for what happens either side of the scripts: reading the folder, and
+    /// building the interpreter to run them on.
+    /// </remarks>
+    private static ScriptRun? Executed(
+        ICoreServerAPI server,
+        MoonTweaksConfig config,
+        string scriptsFolder,
+        RecipeRegistry registry,
+        ScriptEvents events,
+        ScriptCommands commands,
+        ScriptTimers timers)
+    {
+        try
+        {
+            return ScriptRun.Execute(
+                server, ScriptEngine.Create(ScriptEngine.DEFAULT), scriptsFolder,
+                registry, events, commands, timers, config.UndoHistory);
+        }
+        catch (Exception unreadable)
+        {
+            server.Logger.Error("[moontweaks] the scripts in {0} could not be run: {1}",
+                scriptsFolder, unreadable.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Puts this run's commands on the server, once every other mod has taken its own.
+    /// </summary>
+    /// <remarks>
+    /// Deferred to the run phase the game enters after it has started every mod,
+    /// which is what decides who pays for a clash. Registered any earlier, a name a
+    /// content mod also wants would be ours first and theirs second, and the game
+    /// refuses the second — inside that mod's own start, which the game answers by
+    /// dropping the whole mod. Registered here, the clash lands in
+    /// <see cref="ScriptCommands.Activate"/>, where it costs the one command and is
+    /// reported against the script line that asked for it.
+    ///
+    /// That is also why nothing may escape: the game dispatches a run phase with no
+    /// handler of its own around it, and what gets out of one stops the server
+    /// starting rather than being logged and stepped over.
+    /// </remarks>
+    private void Register(ICoreServerAPI server, ScriptCommands commands) =>
+        server.Event.ServerRunPhase(EnumServerRunPhase.ModsAndConfigReady, () =>
+            Attempt(server.Logger, "registering the commands", () =>
+            {
+                var registered = commands.Activate();
+                // Taken from what the server accepted rather than from what the run
+                // asked for, so a later check reports a refused name as the clash it
+                // is instead of mistaking it for one of this mod's own.
+                commandNames = registered.Added;
+
+                Report(server.Logger, registered.Refused);
+
+                if (registered.Added.Count > 0)
+                {
+                    server.Logger.Notification("[moontweaks] command(s) added: {0}",
+                        string.Join(", ", registered.Added.Select(name => $"/{name}")));
+                }
+            }));
+
+    /// <summary>
     /// Carries out one of the things a successful run asked for, reporting a refusal
     /// rather than letting it out.
     /// </summary>
     /// <remarks>
-    /// Each of the three is attempted whatever the ones before it did. Only the game
-    /// can refuse a command, and it does so as the command is registered — which is
-    /// long after the script that asked for it finished, and after every recipe has
-    /// already been applied. Letting that out of here takes the mod down mid-startup
-    /// with a stack trace, leaving a server whose recipes changed, whose timers never
-    /// started, and with nothing in the log a script author could act on.
+    /// Each is attempted whatever the ones before it did. Only the game can refuse a
+    /// subscription, a timer or a command, and it does so long after the script that
+    /// asked for it finished and after every recipe has already been applied. Letting
+    /// that out of here takes the mod down mid-startup with a stack trace, leaving a
+    /// server whose recipes changed, whose timers never started, and with nothing in
+    /// the log a script author could act on.
     /// </remarks>
-    private static void Start(ILogger logger, string what, Action activate)
+    /// <param name="logger">Where a refusal is reported.</param>
+    /// <param name="what">
+    /// What was being done, as a phrase that completes "… could not be completed".
+    /// </param>
+    /// <param name="act">The work to attempt.</param>
+    private static void Attempt(ILogger logger, string what, Action act)
     {
         try
         {
-            activate();
+            act();
         }
         catch (Exception refused)
         {
-            logger.Error("[moontweaks] {0} could not be started: {1}", what, refused.Message);
+            logger.Error("[moontweaks] {0} could not be completed: {1}", what, refused.Message);
         }
     }
+
+    /// <summary>
+    /// Answers a <c>/moontweaks</c> command, telling whoever ran it when it failed.
+    /// </summary>
+    /// <remarks>
+    /// These reach the live registries and the filesystem, so any of them can fail on
+    /// a server where a script or an operator has left something in a state the
+    /// command cannot read. Somebody is standing there waiting for an answer, and an
+    /// exception out of a command handler gives them silence and puts a stack trace
+    /// somewhere only the server operator will ever look.
+    /// </remarks>
+    private static TextCommandResult Answered(
+        ILogger logger, string name, Func<TextCommandResult> answer)
+    {
+        try
+        {
+            return answer();
+        }
+        catch (Exception failure)
+        {
+            logger.Error("[moontweaks] /moontweaks {0} failed: {1}", name, failure);
+            return TextCommandResult.Error(
+                $"/moontweaks {name} failed ({failure.GetType().Name}): {failure.Message}");
+        }
+    }
+
+    /// <summary>Writes one line per thing the game would not take.</summary>
+    private static void Report(ILogger logger, IReadOnlyList<string> refused)
+    {
+        foreach (var problem in refused) logger.Error("[moontweaks] {0}", problem);
+    }
+
+    /// <summary>
+    /// What a report of applied changes says about the ones that were refused, so a
+    /// player reading the list is not shown a shorter list than their scripts asked
+    /// for with nothing to explain the difference.
+    /// </summary>
+    private static string Refusals(MutationLog log) =>
+        log.Refused.Count == 0 ? "" : $"\n{log.Refused.Count} change(s) were refused:\n"
+            + string.Join("\n", log.Refused);
 
     /// <summary>Reads the settings, or hands back the ones already read.</summary>
     private MoonTweaksConfig Settings(string folder, ILogger logger) =>

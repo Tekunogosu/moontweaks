@@ -28,14 +28,30 @@ public static class SpecBinder
             }, origin, path);
         }
 
+        if (value is ScriptValue.List && table.ListShorthand is { } listField)
+        {
+            return BindEntries(specType, new Dictionary<string, ScriptValue>
+            {
+                [listField] = value,
+            }, origin, path);
+        }
+
         if (value is not ScriptValue.Map map)
         {
-            throw new ScriptError(origin,
-                $"{path} expects a table{(table.Shorthand is null ? "" : " or a string")}, got {value.TypeName}");
+            throw new ScriptError(origin, $"{path} expects {Written(table)}, got {value.TypeName}");
         }
 
         return BindEntries(specType, map.Entries, origin, path);
     }
+
+    /// <summary>Everything one shape accepts, as a failure should offer it.</summary>
+    private static string Written(LuaTableAttribute table) => (table.Shorthand, table.ListShorthand) switch
+    {
+        (null, null) => "a table",
+        (not null, null) => "a table or a string",
+        (null, not null) => "a table or a list",
+        _ => "a table, a string or a list",
+    };
 
     /// <summary>Assigns every known key and rejects the rest.</summary>
     private static object BindEntries(
@@ -158,6 +174,18 @@ public static class SpecBinder
                 .Select((layer, index) =>
                     (string[])Convert(typeof(string[]), layer, origin, $"{path}[{index + 1}]")!)
                 .ToArray();
+        }
+
+        // A junction the game spells one way and reads two, telling them apart by what
+        // the list holds: tag names, or the groups those names sit in. Read the same
+        // way here, so a condition ported out of a recipe file keeps its spelling.
+        if (underlying == typeof(TagJunction))
+        {
+            var listed = Items(value, origin, path, "a list of tag names or of groups");
+
+            return listed is [ScriptValue.Map, ..]
+                ? new TagJunction { Groups = (TagGroupSpec[])Convert(typeof(TagGroupSpec[]), value, origin, path)! }
+                : new TagJunction { Names = (string[])Convert(typeof(string[]), value, origin, path)! };
         }
 
         // A list of table shapes, for the kinds that number their ingredients rather

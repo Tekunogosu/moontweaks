@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using MoonTweaks.Api;
@@ -20,14 +21,30 @@ namespace MoonTweaks.Events;
 /// silently — handlers for one event would be called when another happened.
 ///
 /// Subscriptions are taken out once, when the first handler for an event arrives, and
-/// the handlers are held here. Only events the game raises on its main thread are
-/// offered: the interpreter is not thread safe, and nothing here serialises calls
-/// into it.
+/// the handlers are held here. There is one interpreter for the whole server and it
+/// is not thread safe, so an event the game raises anywhere but the thread it ticks
+/// on is subscribed through <see cref="OnAnyThread"/> and delivered on the next tick
+/// of that one; <see cref="On"/> is for the events known to arrive there already.
 /// </remarks>
 public sealed class ScriptEvents(ICoreServerAPI api)
 {
     private readonly Dictionary<string, List<Handler>> handlers = [];
-    private readonly List<Action> pending = [];
+    private readonly List<(string Event, Action Subscribe)> pending = [];
+
+    /// <summary>
+    /// The pace each mount was last reported being ridden at, so a stream of reports
+    /// saying the same thing raises one event. Written from the network thread the
+    /// reports land on, which is why it is a concurrent one.
+    /// </summary>
+    private readonly ConcurrentDictionary<long, string?> gaits = new();
+
+    /// <summary>
+    /// Which map regions are in memory, so a region asked for again raises nothing.
+    /// Holds what the server holds: an entry arrives with the region and leaves with
+    /// it. Read and written on the main thread alone, which is where the game raises
+    /// both halves.
+    /// </summary>
+    private readonly HashSet<(int X, int Z)> regions = [];
 
     /// <summary>One script function listening for one event.</summary>
     private sealed record Handler(ScriptOrigin Origin, ScriptValue.Func Call);
@@ -89,6 +106,44 @@ public sealed class ScriptEvents(ICoreServerAPI api)
         On("chunkUnloaded", origin, handler, occurred =>
             api.Event.ChunkColumnUnloaded += at => occurred(new ChunkEventPayload(at.X, at.Y, at.Z)));
 
+    /// <summary>Called once a region of the map has come in.</summary>
+    /// <remarks>
+    /// Raised on the main thread: the game generates a region on the thread it
+    /// supplies chunks from and hands the event to the main one itself, so there is
+    /// nothing left here to marshal.
+    ///
+    /// What the game raises is not an arrival, though. Every chunk column asks for
+    /// the region it sits in, and the event is raised on each of those asks, so a
+    /// region already in memory raises it again for every column loaded over it.
+    /// Which regions are in memory is remembered here and only the first ask for one
+    /// goes further, which makes this the arrival its name claims — and pairs it with
+    /// the unload, which is raised once for real.
+    /// </remarks>
+    public void OnMapRegionLoaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("mapRegionLoaded", origin, handler, occurred =>
+        {
+            api.Event.MapRegionLoaded += (at, _) =>
+            {
+                if (regions.Add((at.X, at.Y))) occurred(Region(at));
+            };
+
+            // What is remembered above is forgotten here rather than in the unload
+            // binding beside it: the two are subscribed independently, and a script
+            // listening only for arrivals would otherwise remember every region the
+            // server ever read.
+            api.Event.MapRegionUnloaded += (at, _) => regions.Remove((at.X, at.Y));
+        });
+
+    /// <summary>Called as a region of the map is let go.</summary>
+    /// <remarks>
+    /// Raised once per region, where the server ticks and again as it shuts down,
+    /// both on the main thread — so a handler runs while the event is happening
+    /// rather than a tick later, which is what lets one at shutdown run at all.
+    /// </remarks>
+    public void OnMapRegionUnloaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+        On("mapRegionUnloaded", origin, handler, occurred =>
+            api.Event.MapRegionUnloaded += (at, _) => occurred(Region(at)));
+
     /// <summary>Called after a player changes which hotbar slot they are holding.</summary>
     public void OnPlayerChangeSlot(ScriptOrigin origin, ScriptValue.Func handler) =>
         On("playerChangeSlot", origin, handler, occurred =>
@@ -123,6 +178,26 @@ public sealed class ScriptEvents(ICoreServerAPI api)
         OnAnyThread("entityDespawn", origin, handler, occurred =>
             api.Event.OnEntityDespawn += (entity, reason) =>
                 occurred(new EntityDespawnEventPayload(entity, reason)));
+
+    /// <summary>Called when a mount's rider changes the pace it is ridden at.</summary>
+    /// <remarks>
+    /// Named for the change rather than for the packet the game named it after,
+    /// because the change is what this raises. A client sends its mount's gait with
+    /// every position update it sends, several times a second and whether or not
+    /// anything about it moved, so what the game raises is a stream rather than an
+    /// event; the pace each mount was last reported at is remembered here and a
+    /// report saying the same thing again goes no further.
+    ///
+    /// Remembered where the packet lands, which is a network thread rather than the
+    /// one the server ticks on. Two packets for one mount arriving at once may both
+    /// be reported, which costs a script a repeated call and nothing else.
+    /// </remarks>
+    public void OnMountGaitChanged(ScriptOrigin origin, ScriptValue.Func handler) =>
+        OnAnyThread("mountGaitChanged", origin, handler, occurred =>
+            api.Event.MountGaitReceived += (mount, gait) =>
+            {
+                if (Changed(mount.EntityId, gait)) occurred(new MountGaitEventPayload(mount, gait));
+            });
 
     /// <summary>Called when something climbs onto something else.</summary>
     public void OnEntityMounted(ScriptOrigin origin, ScriptValue.Func handler) =>
@@ -264,7 +339,7 @@ public sealed class ScriptEvents(ICoreServerAPI api)
         if (!handlers.TryGetValue(name, out var listening))
         {
             handlers[name] = listening = [];
-            pending.Add(() => subscribe(about => Raise(name, about)));
+            pending.Add((name, () => subscribe(about => Raise(name, about))));
         }
 
         listening.Add(new Handler(origin, handler));
@@ -274,10 +349,32 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// Takes out the subscriptions this run asked for. Called once, by the run whose
     /// handlers are meant to be live, and never by one whose results are discarded.
     /// </summary>
-    public void Activate()
+    /// <remarks>
+    /// One subscription refused costs that event and nothing else. Each is taken out
+    /// against the game rather than against anything checkable here, so a refusal
+    /// would otherwise silently leave every event after it unsubscribed while the
+    /// scripts that asked for them are reported as having run.
+    /// </remarks>
+    /// <returns>What each refused subscription was, for whoever is going to report them.</returns>
+    public IReadOnlyList<string> Activate()
     {
-        foreach (var subscribe in pending) subscribe();
+        var refused = new List<string>();
+
+        foreach (var (name, subscribe) in pending)
+        {
+            try
+            {
+                subscribe();
+            }
+            catch (Exception failure)
+            {
+                refused.Add($"the game refused a subscription to '{name}', "
+                    + $"so nothing listens for it ({failure.GetType().Name}): {failure.Message}");
+            }
+        }
+
         pending.Clear();
+        return refused;
     }
 
     /// <summary>
@@ -314,4 +411,25 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// <summary>Whatever stands at a position, for the events that leave it standing.</summary>
     private Block? Standing(BlockPos? at) =>
         at is null ? null : api.World.BlockAccessor.GetBlock(at);
+
+    /// <summary>
+    /// One map region, in both the coordinates it is counted in and the ones a script
+    /// writes. How wide a region is belongs to the server rather than to the game, so
+    /// it is read here rather than assumed.
+    /// </summary>
+    private MapRegionEventPayload Region(Vec2i at) =>
+        new(at.X, at.Y, api.WorldManager.RegionSize);
+
+    /// <summary>
+    /// Whether a mount is being ridden at a pace it was not last reported at, and
+    /// remembers the new one. One entry per mount reported since the server started,
+    /// which is a number of horses rather than a number of packets.
+    /// </summary>
+    private bool Changed(long mount, string? gait)
+    {
+        if (gaits.TryGetValue(mount, out var reported) && reported == gait) return false;
+
+        gaits[mount] = gait;
+        return true;
+    }
 }
