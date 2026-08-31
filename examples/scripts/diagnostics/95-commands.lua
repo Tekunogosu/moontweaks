@@ -15,8 +15,8 @@ local log       = moontweaks.log
 local players   = moontweaks.players
 local world     = moontweaks.world
 
---- Says a block of lines to the log and to whoever asked, and hands back the last
---- one, which is what the client shows in the chat line.
+--- Says a block of lines to the log and hands the same block back as one message,
+--- which is what the client shows in the chat.
 local function tell(lines)
   for _, line in ipairs(lines) do log.info("[diag] " .. line) end
   return table.concat(lines, "\n")

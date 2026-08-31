@@ -214,7 +214,9 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         if (type == typeof(float)) return "number";
         if (type == typeof(void)) return "nil";
         // Arbitrary data: the binder constrains nothing, so neither does the type.
-        if (type == typeof(MoonTweaks.Scripting.ScriptValue)) return "table";
+        // A table is what one of these usually carries, not what it accepts, and an
+        // editor that says otherwise refuses the number a script is entitled to store.
+        if (type == typeof(MoonTweaks.Scripting.ScriptValue)) return "any";
         // A handler the host calls back, given one table describing what happened.
         if (type == typeof(MoonTweaks.Scripting.ScriptValue.Func)) return "fun(event: table)";
         if (type == typeof(string[])) return "string[]";

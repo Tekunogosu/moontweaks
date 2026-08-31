@@ -15,12 +15,30 @@ local function bag(who)
   return { player = who, which = "backpack" }
 end
 
---- A slot in that bag with nothing in it, so nothing is displaced by a check.
+--- A slot in that bag a check may write into, or nothing where the bag has none.
+---
+--- Found by number rather than off `list`, which reports what is standing in the
+--- slots and leaves the empty ones out — so a bag with room shows up there as a
+--- short list, never as a hole to write into.
+---
+--- A bag with nothing worn in it is all bag slots, which take bags and nothing else,
+--- and writing a stick into one would put an item where the game never would. Asking
+--- the game to put one in first is what tells the two apart: it lands only where the
+--- slot accepts it, and taking it straight back out leaves the bag as it was.
 local function emptySlot(who)
-  for _, slot in ipairs(inventory.list(bag(who))) do
-    if not slot.code or slot.quantity == 0 then return slot.slot end
+  local where = bag(who)
+
+  if inventory.put(where, { code = "game:stick", quantity = 1 }) == 0 then return end
+  inventory.take(where, { code = "game:stick", quantity = 1 })
+
+  -- Backwards, because the slots a worn bag adds come after the ones it is worn in.
+  for slot = inventory.size(where), 1, -1 do
+    if not inventory.slot(where, slot) then return slot end
   end
 end
+
+--- What every check needing a free slot says when the bag has none.
+local NO_ROOM = "no slot in your backpack a check may write into; wear a bag with a free slot"
 
 diag.onPlayer("inventory.size", function(who)
   local slots = inventory.size(bag(who))
@@ -29,16 +47,21 @@ diag.onPlayer("inventory.size", function(who)
   return ("%d slot(s) in your backpack"):format(slots)
 end)
 
+-- Listing leaves the empty slots out, so an empty bag listing nothing is the right
+-- answer rather than a failure. What is checked is that every entry it did hand back
+-- holds something and names a slot that exists.
 diag.onPlayer("inventory.list", function(who)
   local slots = inventory.list(bag(who))
-  assert(#slots > 0, "listed nothing")
+  local size = inventory.size(bag(who))
 
-  local held = 0
   for _, slot in ipairs(slots) do
-    if slot.code and slot.quantity > 0 then held = held + 1 end
+    assert(slot.code and slot.quantity > 0,
+      ("slot %d was listed holding nothing"):format(slot.slot))
+    assert(slot.slot >= 1 and slot.slot <= size,
+      ("listed slot %d, which is outside the %d slot(s) there are"):format(slot.slot, size))
   end
 
-  return ("%d slot(s), %d of them holding something"):format(#slots, held)
+  return ("%d of %d slot(s) hold something"):format(#slots, size)
 end)
 
 diag.onPlayer("inventory.slot", function(who)
@@ -50,7 +73,7 @@ end)
 
 diag.onPlayer("inventory.setSlot", function(who)
   local where = emptySlot(who)
-  assert(where, "no empty slot in your backpack to work in; free one and try again")
+  assert(where, NO_ROOM)
 
   inventory.setSlot(bag(who), where, { code = "game:stick", quantity = 2 })
   local held = inventory.slot(bag(who), where)
@@ -62,7 +85,7 @@ end)
 
 diag.onPlayer("inventory.clearSlot", function(who)
   local where = emptySlot(who)
-  assert(where, "no empty slot in your backpack to work in")
+  assert(where, NO_ROOM)
 
   inventory.setSlot(bag(who), where, { code = "game:stick", quantity = 1 })
   local cleared = inventory.clearSlot(bag(who), where)
@@ -76,7 +99,7 @@ end)
 
 diag.onPlayer("inventory.count", function(who)
   local where = emptySlot(who)
-  assert(where, "no empty slot in your backpack to work in")
+  assert(where, NO_ROOM)
 
   local before = inventory.count(bag(who), "game:stick")
   inventory.setSlot(bag(who), where, { code = "game:stick", quantity = 3 })
@@ -94,7 +117,7 @@ diag.onPlayer("inventory.put", function(who)
   local taken = inventory.take(bag(who), { code = "game:stick", quantity = placed })
 
   diag.used("inventory.take")
-  assert(placed > 0, "nothing could be put in; is your backpack full?")
+  assert(placed > 0, "nothing could be put in; wear a bag with a free slot")
   assert(taken == placed, ("put %d in and got %d back out"):format(placed, taken))
 
   return ("put %d stick(s) in and took the same %d out"):format(placed, taken)

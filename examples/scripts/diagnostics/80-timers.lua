@@ -11,27 +11,11 @@
 
 local server = moontweaks.server
 
---- Records a check from inside a handler, where raising would only stop the timer.
-local function settle(name, fn)
-  local ok, detail = pcall(fn)
-
-  if ok then
-    diag.tally.pass = diag.tally.pass + 1
-    moontweaks.log.info(("[diag] pass %s -- %s"):format(name, tostring(detail)))
-  else
-    diag.tally.fail = diag.tally.fail + 1
-    diag.failures[#diag.failures + 1] = ("%s -- %s"):format(name, tostring(detail))
-    moontweaks.log.warn(("[diag] FAIL %s -- %s"):format(name, tostring(detail)))
-  end
-
-  diag.used(name)
-end
-
 -- Once, later. Two seconds is long enough to be plainly after the run and short
 -- enough to have happened before anybody thinks to ask for a report.
 diag.used("server.after")
 server.after(2000, function(e)
-  settle("server.after", function()
+  diag.check("server.after", function()
     assert(type(e.dt) == "number", "the handler was given no elapsed time")
     return ("fired once, %0.2fs after it was asked for"):format(e.dt)
   end)
@@ -47,7 +31,7 @@ server.every(1000, function(e)
 
   if firings < 3 then return true end
 
-  settle("server.every", function()
+  diag.check("server.every", function()
     assert(type(e.dt) == "number", "the handler was given no elapsed time")
     return ("fired %d times a second apart, then stopped by answering false"):format(firings)
   end)

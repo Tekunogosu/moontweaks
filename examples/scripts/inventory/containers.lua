@@ -79,9 +79,13 @@ commands.add {
     if not at then return { error = "you are not looking at a block." } end
 
     local where = { x = at.x, y = at.y, z = at.z }
+    -- What is there is read before it is emptied, and read is what decides whether
+    -- there is anything to do: a slot that answers with nothing has nothing to put
+    -- back into the world afterwards.
     local first = inventory.slot(where, 1)
+    if not first then return "That slot was already empty." end
 
-    if not inventory.clearSlot(where, 1) then return "That slot was already empty." end
+    if not inventory.clearSlot(where, 1) then return "That slot could not be emptied." end
 
     -- Emptying a slot destroys what was in it, so put it back into the world rather
     -- than letting it vanish.

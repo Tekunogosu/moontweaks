@@ -4,7 +4,8 @@
   "name": "MoonTweaks",
   "description": "Lua scripting for Vintage Story recipes and registries.",
   "authors": ["Theysa"],
-  "version": "0.30.0",
+  "website": "https://tekunogosu.github.io/moontweaks/",
+  "version": "0.31.1",
   "side": "Universal",
   "requiredonclient": false,
   "dependencies": {

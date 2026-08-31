@@ -9,6 +9,9 @@ namespace MoonTweaks.DocGen;
 /// <summary>Renders the API model as a self-contained page suitable for GitHub Pages.</summary>
 public static partial class HtmlWriter
 {
+    /// <summary>Where a reader of the published site goes for everything that is not the reference.</summary>
+    private const string REPOSITORY = "https://github.com/Tekunogosu/moontweaks";
+
     /// <summary>Renders the whole reference.</summary>
     public static string Write(ApiModel api)
     {
@@ -17,6 +20,8 @@ public static partial class HtmlWriter
         page.AppendLine("<html lang=\"en\"><head><meta charset=\"utf-8\">");
         page.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
         page.AppendLine($"<title>MoonTweaks {Escape(api.Version)} API</title>");
+        page.AppendLine("<meta name=\"description\" content=\"Every function, table and value "
+                        + "MoonTweaks binds for Lua scripting in Vintage Story.\">");
         page.AppendLine($"<style>{STYLESHEET}</style></head><body>");
 
         WriteSidebar(page, api);
@@ -62,6 +67,7 @@ public static partial class HtmlWriter
             page.AppendLine("</ul>");
         }
 
+        page.AppendLine($"<h2>Elsewhere</h2><ul><li><a href=\"{REPOSITORY}\">Source and guide</a></li></ul>");
         page.AppendLine("</nav>");
     }
 

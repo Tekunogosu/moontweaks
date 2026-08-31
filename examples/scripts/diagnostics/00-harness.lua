@@ -25,14 +25,15 @@ local log = moontweaks.log
 
 diag = {}
 
---- How many checks have passed, failed and been stepped over.
-diag.tally = { pass = 0, fail = 0, skip = 0 }
-
 --- Every API name a check has actually called, against which coverage is measured.
 diag.touched = {}
 
---- One entry per failure, so the report can repeat them without a second pass.
-diag.failures = {}
+--- The standing verdict on each check, by name, and the order the names were first
+--- seen in. A name recorded again replaces the verdict before it, so a check that
+--- failed against one inventory and passed against the next counts once and reads as
+--- it stands now rather than as every attempt went.
+diag.results = {}
+diag.order = {}
 
 --- Checks waiting for the world, and checks waiting for a player.
 diag.deferred = {}
@@ -52,18 +53,19 @@ function diag.used(...)
   for i = 1, select("#", ...) do diag.touched[select(i, ...)] = true end
 end
 
-local function record(name, ok, detail)
+--- Sole owner of what a run knows: every verdict reaches the report and the log
+--- through here, whether it came from a check, a skip or a handler firing later.
+---@param name string the API name the verdict is about
+---@param verdict "pass"|"fail"|"skip"
+---@param detail string what to show beside it
+function diag.record(name, verdict, detail)
   diag.used(name)
 
-  if ok then
-    diag.tally.pass = diag.tally.pass + 1
-    log.info(("[diag] pass %s -- %s"):format(name, detail))
-    return
-  end
+  if not diag.results[name] then diag.order[#diag.order + 1] = name end
+  diag.results[name] = { verdict = verdict, detail = detail }
 
-  diag.tally.fail = diag.tally.fail + 1
-  diag.failures[#diag.failures + 1] = ("%s -- %s"):format(name, detail)
-  log.warn(("[diag] FAIL %s -- %s"):format(name, detail))
+  local line = ("[diag] %s %s -- %s"):format(verdict == "fail" and "FAIL" or verdict, name, detail)
+  if verdict == "fail" then log.warn(line) else log.info(line) end
 end
 
 --- Calls one bound function and says whether it answered. The check passes unless it
@@ -71,16 +73,37 @@ end
 --- what it returns is what the log shows beside the result.
 function diag.check(name, fn)
   local ok, detail = pcall(fn)
-  record(name, ok, tostring(detail))
+  diag.record(name, ok and "pass" or "fail", tostring(detail))
 end
 
 --- Names a function this server cannot exercise, and why. A skip counts as covered:
 --- the suite reached it and made a decision about it, which is the opposite of the
 --- silence an unmentioned function leaves.
 function diag.skip(name, why)
-  diag.used(name)
-  diag.tally.skip = diag.tally.skip + 1
-  log.info(("[diag] skip %s -- %s"):format(name, why))
+  diag.record(name, "skip", why)
+end
+
+--- How many checks stand passed, failed and stepped over, counting each name once.
+function diag.tally()
+  local counts = { pass = 0, fail = 0, skip = 0 }
+
+  for _, result in pairs(diag.results) do
+    counts[result.verdict] = counts[result.verdict] + 1
+  end
+
+  return counts
+end
+
+--- The checks standing failed, in the order they were first run.
+function diag.failures()
+  local out = {}
+
+  for _, name in ipairs(diag.order) do
+    local result = diag.results[name]
+    if result.verdict == "fail" then out[#out + 1] = ("%s -- %s"):format(name, result.detail) end
+  end
+
+  return out
 end
 
 --- Queues a check for the moment the world is up, which is where the calendar, the
@@ -99,7 +122,7 @@ end
 function diag.run(queue, argument)
   for _, entry in ipairs(queue) do
     local ok, detail = pcall(entry.run, argument)
-    record(entry.name, ok, tostring(detail))
+    diag.record(entry.name, ok and "pass" or "fail", tostring(detail))
   end
 end
 
@@ -223,13 +246,15 @@ function diag.lines()
 
   local missing = diag.untouched()
   local covered = #diag.surface - #missing
+  local counts = diag.tally()
+  local failures = diag.failures()
 
-  say(("%d passed, %d failed, %d skipped"):format(diag.tally.pass, diag.tally.fail, diag.tally.skip))
+  say(("%d passed, %d failed, %d skipped"):format(counts.pass, counts.fail, counts.skip))
   say(("%d of %d bound functions exercised"):format(covered, #diag.surface))
 
-  if #diag.failures > 0 then
-    say(("%d failure(s):"):format(#diag.failures))
-    for _, failure in ipairs(diag.failures) do say("  " .. failure) end
+  if #failures > 0 then
+    say(("%d failure(s):"):format(#failures))
+    for _, failure in ipairs(failures) do say("  " .. failure) end
   end
 
   if #missing > 0 then

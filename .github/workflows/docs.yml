@@ -10,8 +10,12 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
+
+# One deploy at a time, and a queued one waits rather than cancelling the running
+# one: a half-published site is worse than a late one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -58,7 +62,10 @@ jobs:
       - name: Check the examples against the generated types
         run: lua-language-server --check examples --checklevel Warning
 
+      # Only a push to main is published, so a pull request builds the reference
+      # and checks it without producing an artifact nothing will deploy.
       - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
         with:
           path: docs
 
@@ -66,6 +73,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

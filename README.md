@@ -1,13 +1,17 @@
 # MoonTweaks
 
+**[API reference](https://tekunogosu.github.io/moontweaks/)** — every function, table
+and value a script can reach, generated from the bindings themselves.
+
 MoonTweaks brings Lua scripting to Vintage Story! *Most* of the C# api has been implemented which gives you a lot of 
 flexibility. Add new recipes, modify existing ones, create new commands, modify player data, set new spawn points.. you 
 really can do pretty much anything you can think of. A good use is adding recipe compatibilities between mods, that's
 what I use it for, and some QoL recipes like Firewood -> sticks and respawn at beds (both are in the examples).
 
 A proper C# mod is still required if you want to add new assets as
-this runs entirely on the server (can be used in singleplayer without issue). This also means that creating new UIs on 
-the client is not available (at least yet, I may add it to a client side mod in the future if there is demand for it).
+this runs entirely on the server (can be used in singleplayer without issue). This also means that creating new UIs on
+the client is not available yet. `CLIENTSIDE.md` holds a design for reaching them from a
+client-side companion mod; it is a proposal rather than committed work.
 
 Now, Lua *IS* slower than writing a full C#. It's really designed for smaller customizations. While you could write a full
 mod in Lua with MoonTweaks, it's not recommended. That being said, a lot of work went into making it run as performant
@@ -21,6 +25,142 @@ you have a script you would like to contribute, please open a PR or an issue and
 Note: AI was used in the creation of this project. As such, there may be bugs that have been missed. I try to create 
 extensive testing suites and manually check every functionality for correctness, but things will always slip through the 
 cracks.
+
+## Installing
+
+Put `moontweaks-<version>.zip` in the `Mods` folder of the install that will run it: a
+client's for singleplayer, a dedicated server's for multiplayer. Releases are on
+[GitHub](https://github.com/Tekunogosu/moontweaks/releases), and `./scripts/package.sh`
+builds the same zip from source.
+
+Players joining a MoonTweaks server need nothing installed, because recipes reach them
+through the game's own registry sync.
+
+Start the game once after installing. That first start writes the folder the next
+section sets an editor up against.
+
+## Editor setup
+
+Scripts are written against a type library the mod generates from its own bindings, so
+an editor completes every function, checks its arguments and shows its documentation as
+you type. Any editor driving `lua-language-server` reads the same configuration; the
+steps below are Neovim and VS Code.
+
+### 1. Run the game once with the mod installed
+
+The mod builds its own folder the first time it loads, in singleplayer or on a server:
+
+```
+<dataPath>/ModConfig/moontweaks/
+  scripts/                    your scripts
+  library/moontweaks.lua      types for every binding this build carries
+  library/codes.lua           every asset code this install holds
+  examples/<topic>/           worked scripts, grouped by what they are about
+  .luarc.json                 language server configuration
+  .vscode/extensions.json     recommends the Lua extension to VS Code
+  config.json                 settings, written with their defaults
+```
+
+`<dataPath>` is `%APPDATA%\VintagestoryData` on Windows, `~/.config/VintagestoryData`
+on Linux and `~/Library/Application Support/VintagestoryData` on macOS. A dedicated
+server uses whatever path it was started with.
+
+Later starts keep the folder current on their own: the library is rewritten when the
+bindings it describes have changed, and the examples when they differ from the build,
+so updating the mod repeats none of this. `.luarc.json`, `.vscode/extensions.json` and
+`config.json` are written once and are yours from then on.
+
+### 2. Install the language server
+
+**Neovim** needs `lua-language-server` on the system and the stock `lua_ls` setup.
+Nothing MoonTweaks-specific goes in your configuration:
+
+```lua
+-- Neovim 0.11 or newer, with nvim-lspconfig installed
+vim.lsp.enable("lua_ls")
+
+-- Earlier versions
+require("lspconfig").lua_ls.setup {}
+```
+
+`:MasonInstall lua-language-server` installs the server itself where a system package
+manager does not carry it.
+
+**VS Code** and VSCodium need the `sumneko.lua` extension, which is that same
+identifier on both the Marketplace and Open VSX. `.vscode/extensions.json` offers it
+the first time the folder is opened, so accepting that prompt is the whole step.
+
+### 3. Open the MoonTweaks folder, not `scripts/`
+
+Open `<dataPath>/ModConfig/moontweaks/` as the project folder. `.luarc.json` points the
+language server at `library/` by a relative path, so the workspace root has to be the
+folder holding both. VS Code roots at whatever folder was opened and so needs this one
+exactly; Neovim resolves either, because `lua_ls` walks up for `.luarc.json` ahead of
+`.git`.
+
+That file also names the Lua version the interpreter reports and disables the standard
+libraries it never opens, so the editor's idea of the language is the server's rather
+than stock Lua's. [What a script may and may not do](#what-a-script-may-and-may-not-do)
+lists them.
+
+### 4. Write in `scripts/`, copy out of `examples/`
+
+Copy an example into `scripts/` before changing it. Everything under `examples/` is
+rewritten to match the build on the next start, so an edit made there does not survive
+one, and nothing in that folder runs.
+
+Open a script and the editor should complete `moontweaks.` into the modules the
+reference lists. If it completes nothing, the workspace root is the usual cause: check
+that `.luarc.json` sits beside the folder you opened rather than above it.
+
+### Asset codes
+
+`library/codes.lua` declares one alias per registry the game keeps and a script writes
+as a bare string — every asset code, every tag those assets carry, and every character
+trait — so an editor offers them inside the string rather than leaving you to guess:
+
+```lua
+output = "game:axe-|"          -- suggestions appear here
+ingredient = { code = "game:|" }
+tags = { "tool-|" }
+requiresTrait = "cloth|"
+```
+
+It is generated from the running game rather than shipped, so it covers whatever mods
+the install loads, and `/moontweaks export` rewrites it without a restart after a mod
+is added. The aliases widen `string` rather than closing over the values they list, so
+an editor suggests a code without rejecting one the file does not list — which matters,
+because a code may reach the game after the file was written.
+
+Expect the list to cost roughly 50 microseconds per code, all of it the editor's rather
+than the server's: around 300ms for a vanilla install's 7,000-odd codes, and
+proportionally more on a heavily modded one.
+
+### What the editor cannot catch
+
+Two mistakes reach the server. A misspelled field in a table literal is the first:
+`lua-language-server` does not report unknown keys at any severity. The binder catches
+it as the server loads, naming the file, the line and the nearest field it knows:
+
+```
+[moontweaks] 99-broken.lua:1: moontweaks.recipes.grid.add argument 'recipe'
+             has no field 'ingredents'; did you mean 'ingredients'?
+```
+
+A code compared inside a handler is the second. A code written into a spec is refused
+by name if the server does not have it, at the moment the script is read. A code
+compared against later is only a Lua string, so a wrong one never matches and the
+handler quietly does nothing:
+
+```lua
+if e.block == "game:crock-burned" then   -- no such block; this is never true
+```
+
+Nothing can catch that at load, because the comparison has not happened yet. What the
+editor reaches instead is the table itself: every event names the shape it hands over,
+so `e` completes its own keys and `e.block` is typed as an asset code like every other
+code in the API, offering what the server actually holds. Log `e.block` and go and
+break the thing if you want to know for certain what it is called.
 
 ## Writing scripts
 
@@ -142,7 +282,12 @@ those two are all refused with the row named.
 `examples/scripts/` holds worked scripts grouped by what they are about —
 `recipes/`, `assets/`, `players/`, `entities/`, `inventory/`, `world/`, `calendar/`,
 `server/`, `events/` and `commands/` — checked by `lua-language-server` on every
-documentation build.
+documentation build. Three sit apart from that grouping, being about something other
+than one corner of the API: `diagnostics/` calls every bound function and says which
+ones answer on your server, `performance/` measures what they cost there, and
+`rpglevels/` is one finished feature rather than a tour — a levelling system, where
+players earn experience for what they kill and are handed something every fifth
+level.
 
 ## How it works
 
@@ -152,9 +297,9 @@ resolved, so scripts see concrete recipes rather than templates. That is why
 `remove("game:axe-flint")` matches one recipe and not the family declaration it
 came from.
 
-**Only the server runs scripts.** Recipes are server-authoritative and sync to
-clients through the normal registry sync, so players joining a MoonTweaks server
-need nothing installed.
+**Only the server runs scripts.** Recipes are server-authoritative, so what a script
+changes reaches a client through the same registry sync the game already performs for
+its own.
 
 **Changes are recorded, not applied.** `grid.add` builds, expands and resolves
 the recipe on the line that declares it, then appends the resolved recipes to a
@@ -240,15 +385,24 @@ quantity there would be a field that could never mean anything.
 
 ## The API reference
 
-The reference is generated from the bindings, never written alongside them:
+The reference is published at
+**[tekunogosu.github.io/moontweaks](https://tekunogosu.github.io/moontweaks/)** and
+generated from the bindings, never written alongside them:
 
 ```sh
 ./scripts/docs.sh            # the reference, the library, and a scaffolded examples/
 ./scripts/docs.sh --check    # fail on any undocumented binding, write nothing
 ```
 
-It writes `docs/api.json`, `docs/library/`, `docs/index.html`, and scaffolds
-`examples/` with the same files the mod installs into a server.
+It writes `docs/api.json`, `docs/library/`, `docs/index.html`, and scaffolds `examples/`
+with the same files the mod installs into a server: the editor configuration held in
+`src/Host/Resources/`, embedded in the mod and written out verbatim, and the library
+this build produced. The repository's own scripts are therefore checked exactly where
+an author's are:
+
+```sh
+lua-language-server --check examples
+```
 
 `ApiReflector` enumerates the surface through `DomainBinder.FunctionsOf` and
 `SpecBinder.FieldsOf` — the same helpers the interpreter uses to decide what
@@ -256,197 +410,80 @@ exists — and takes descriptions from the compiler's XML documentation output. 
 cannot document a function that is not bound, or omit one that is.
 
 `--check` fails when any module, function, parameter, table, field, or enumerated
-value lacks a description. It runs in CI ahead of the Pages deploy, so an
-undocumented binding cannot reach `main`.
+value lacks a description. The two checks pair: that one fails on a binding without a
+description, `lua-language-server` on an example that disagrees with the types the
+binding produced. Both run in CI ahead of the Pages deploy, the example check against
+the library `docs.sh` has just written rather than a checked-in copy, so neither an
+undocumented binding nor a drifted example reaches `main`.
 
-`docs/` is generated rather than committed; a checked-in copy would be a second
-source of truth free to go stale.
+`docs/` is generated rather than committed; a checked-in copy would be a second source
+of truth free to go stale. The `docs` workflow rebuilds it on every push to `main` and
+publishes what it built, so the site describes the current source rather than whichever
+build last remembered to write it.
 
-## Editor setup
+## Performance
 
-Starting a server once is the whole setup. The mod scaffolds its own folder:
+Every call a script makes crosses from the interpreter into C#, and that crossing is
+the unit of cost — not the work on the far side, which for most bindings is a field
+read. Scripts and handlers run on the server's main thread, so the limit that bites
+first is not how much a script can do but how long it holds the tick while doing it.
 
-```
-<dataPath>/ModConfig/moontweaks/
-  .luarc.json                 language server configuration
-  .vscode/extensions.json     recommends the Lua extension to VS Code
-  config.json                 settings, written with their defaults
-  library/moontweaks.lua      LuaCATS annotations for this build's bindings
-  library/codes.lua           every asset code this server's registries hold
-  examples/<topic>/           worked scripts grouped by topic, to copy and edit
-  scripts/                    your scripts
-```
+### What one operation costs
 
-Three rules keep that folder current without a server writing to disk on every
-start. `library/moontweaks.lua` carries a fingerprint of the bindings it was
-generated from, in a comment on its fourth line; a server compares that one line
-against the build it is running and rewrites the file only when the two disagree.
-`LibraryHeader` owns that format for both the generator that writes it and the
-server that reads it. The examples carry no such marker, so they are compared
-outright and rewritten only when their contents differ, which is what keeps a
-folder's examples in step as recipe kinds are added. `.luarc.json` and
-`.vscode/extensions.json` are written only when absent, since from then on they
-are the author's files.
+Taken by `examples/scripts/performance/` on one machine, on an empty server. **These
+are rough figures.** They move with the hardware, with what the server is doing at the
+time, and with how many players are in range of the work. Take your own with `/perf`
+rather than planning against these.
 
-### Asset codes
+| Operation | Roughly |
+| --- | --- |
+| A line of Lua — arithmetic, a table write | 20–30 ns |
+| A call to a Lua function | ~100 ns |
+| A call into MoonTweaks | 110–210 ns |
+| A call handing back a table, such as `server.info` | 1.3 µs |
+| Reading one block with `blockAt` | 0.4–0.5 µs |
+| Staging one block with `queueBlock` | 0.4 µs |
+| Writing one block, staged and committed | 2 µs |
+| Writing one block with `setBlock` | 2–2.5 µs |
+| Scanning a region with `countBlocks`, per block | 20–30 ns |
 
-`library/codes.lua` declares one alias per registry the game keeps and a script
-writes as a bare string — every asset code, every tag those assets carry, and
-every character trait — so an editor offers them inside a string rather than
-leaving an author to guess:
+A handler is handed its event as a table before its first line runs, which is the
+same work the `server.info` row measures. Events that fire per block or per entity
+are the ones where that matters.
 
-```lua
-output = "game:axe-|"          -- suggestions appear here
-ingredient = { code = "game:|" }
-tags = { "tool-|" }
-requiresTrait = "cloth|"
-```
+### The budget is the tick
 
-It is generated from the running game rather than shipped, so it covers whatever
-mods a server loads, and it is rewritten only when what it lists changes.
-`/moontweaks export` regenerates it without a restart, for after a mod is added.
+The server ticks about every 33ms and logs `Server overloaded` for any tick over
+500ms. Half a second of main thread is roughly **two million calls** or **two hundred
+thousand block writes** — and every one of them is time the server is answering
+nobody. A handler that stays under a few milliseconds is invisible; one that runs for
+a second is a freeze players feel, even though nothing has crashed.
 
-`AssetCodeLibrary.SetsOf` is the sole owner of what the file contains: a registry
-worth suggesting becomes one entry there and one `SuggestionSets` constant for a
-`[LuaSuggests]` annotation to name, and needs nothing else.
+Past that, split the work across ticks with `moontweaks.server.every` and budget each
+slice by **time rather than by count**: a count has to be guessed against hardware the
+script knows nothing about, where a deadline measures it as it goes.
+`examples/scripts/world/house-builder.lua` does exactly that: `/build spread` fills
+25ms of each tick and hands the rest back, however large the job it was given.
 
-The aliases widen `string` rather than closing over the values they list. An
-editor therefore suggests them without rejecting anything absent from the list,
-which matters because a code may reach the game after the file was written.
+### Three things that matter more than the figures
 
-Expect the suggestion list to cost roughly 50 microseconds per code, all of which
-is the editor's, not the server's: around 300ms for a vanilla install's 7,000-odd
-codes, and proportionally more on a heavily modded one.
+**Fewer calls beat faster calls.** `countBlocks` scans a region at some 25ns a block;
+the same region walked with `blockAt` costs around 450ns a block, near twenty times
+more. Where a
+binding takes a region, a stack or a list, one call for the lot is the whole
+optimisation.
 
-An editor reports a required field left out before a server ever reads the
-script. It cannot report a *misspelled* one:
-`lua-language-server` does not check for unknown keys in a table literal, at any
-severity. The binder catches those when a server loads, naming the file, the line
-and the nearest field it knows:
+**Stage bulk writes.** `queueBlock` costs a fifth of `setBlock` and defers the chunk
+work to one `commit`. On an empty server the finished cost per block is close either
+way, because the lighting is the same work whichever route asked for it. The
+difference is what a populated server pays: an immediate write re-sends the chunk it
+touched to every player in range, once per call, where a commit does it once per
+chunk. `/perf world` measures both where the players are.
 
-```
-[moontweaks] 99-broken.lua:1: moontweaks.recipes.grid.add argument 'recipe'
-             has no field 'ingredents'; did you mean 'ingredients'?
-```
-
-**Copy an example into `scripts/` before changing it.** Nothing under `examples/`
-runs, and a server restores anything edited there, because that folder mirrors the
-build rather than belonging to the author — a build that no longer ships an example
-deletes the copy a server had, so a renamed one leaves nothing behind. Every example
-ships from `examples/scripts/` in this repository, so each one is a script the
-documentation build type-checks rather than prose that can rot.
-
-`scripts/` is walked to any depth and run in path order, so the same grouping works
-there: a folder gathers related scripts and one numeric prefix orders the folder as
-a whole.
-
-Open `<dataPath>/ModConfig/moontweaks/` as the project folder, not `scripts/`.
-Neovim resolves either, because `lua_ls` roots a workspace by walking up for
-`.luarc.json` ahead of `.git`; VS Code roots at the folder it was opened on and
-so needs the one holding the configuration.
-
-**Neovim** needs `lua-language-server` installed and the stock `lua_ls` setup;
-nothing MoonTweaks-specific goes in your configuration. **VS Code** and VSCodium
-need the `sumneko.lua` extension, which `.vscode/extensions.json` offers on first
-open and which is the same identifier on both the Marketplace and Open VSX. Any
-other editor driving `lua-language-server` reads the same `.luarc.json`, so
-nothing here is specific to those two.
-
-That configuration names the Lua version the interpreter reports, 5.2, and disables
-the standard libraries it never opens: `coroutine`, `debug`, `io`, `os`, `package`
-and `utf8`. `dofile`, `loadfile`, `load` and `loadstring` come with the basic
-library and are taken back out, each being a way to reach code or files the bindings
-never offered; an editor still offers those four although a script cannot call them.
-`pcall`, `error` and `setmetatable` are available.
-
-`src/Host/Resources/` holds those files, embedded in the mod and written out
-verbatim. `./scripts/docs.sh` scaffolds `examples/` from the same resources and
-the same library, so the repository's own scripts are checked exactly as a
-server's are:
-
-```sh
-lua-language-server --check examples
-```
-
-It pairs with `./scripts/docs.sh --check`: the first fails on an example that
-disagrees with the generated types, the second on a binding without a
-description. Both run in CI, the example check against the library `docs.sh` has
-just written rather than a checked-in copy, so an example cannot drift from the
-bindings it demonstrates.
-
-### Codes inside a handler are not checked
-
-A code written into a spec is refused by name if the server does not have it, at
-the moment the script is read. A code compared inside a handler is only a Lua
-string, so a wrong one never matches and the handler quietly does nothing:
-
-```lua
-if e.block == "game:crock-burned" then   -- no such block; this is never true
-```
-
-Nothing can catch that at load, because the comparison has not happened yet. What
-the editor reaches instead is the table itself: every event names the shape it
-hands over, so `e` completes its own keys and `e.block` is typed as an asset code
-like every other code in the API, offering what the server actually holds. The
-string is still only suggested — the aliases widen `string` rather than closing
-it — so a wrong one is accepted here as it is anywhere else. Log `e.block` and go
-and break the thing if you want to know for certain what it is called.
-
-### What a script costs
-
-A call from a script into the mod costs roughly **480ns**, against about 3ns for
-the same method called from C#. That figure settles at scale and only there: the
-same measurement over twenty thousand calls reads 850ns, which is the millisecond
-clock rounding rather than the calls.
-
-The interpreter costs about as much again. Placing a block through `queueBlock`
-takes around **2.6µs**, of which the crossing is a fifth; roughly **1µs** is the
-Lua loop that decided which block to place, and the rest is marshalling and the
-staging itself. That ratio is what makes a bulk call worth more than a faster
-binder: the way to place blocks faster is to place more of them per call.
-
-That fixes the scale of what a handler can sensibly do. A thousand calls cost
-under a millisecond, which is nothing; a hundred thousand cost a tenth of a
-second on the main thread, which players feel. Anything shaped like a loop over a
-region should ask how many calls it makes before it asks anything else.
-
-Block writes cost more than a bare call, and the difference is not where it
-looks. Staging a block costs around **2.6µs** and committing it under **0.5µs**,
-so a shape goes up at roughly **330,000 blocks a second**: nearly two million
-blocks in about six seconds. Most of that is the calls rather than the engine —
-staging is five times the commit. Staging costs the same per block whether the
-batch is eighty thousand or two million, so there is nothing to gain by keeping
-one small; the commit, by contrast, gets cheaper per block the more is queued
-into it.
-
-`setBlock` relights and re-sends the chunk it touched before the next call runs,
-where `queueBlock` stages writes for a `commit` that pays that once per chunk.
-The gap widens with the size of the job, because only the staged half improves
-with scale: around three times slower over a thousand blocks, **four and a half
-times** over fifty thousand. Those were measured with one player standing beside
-the work, and the resend is per player in range, so a populated server multiplies
-the slower half and not the other.
-
-**The ceiling is not throughput, it is the pause.** Scripts run on the main
-thread, so a handler holds the whole server for as long as it runs, and the game
-logs `Server overloaded` for any tick over 500ms. Two million blocks in one
-handler is a six-second freeze — nothing crashes, memory holds, players simply
-stop being served. That budget is the real limit: about **170,000 blocks**, or
-**800,000 calls**, before one command costs a visible stall.
-
-Past that, split the work across ticks with `moontweaks.server.every` rather than
-trying to make it faster. The same two million blocks spread over a tick budget
-finishes in about seven seconds with the server answering throughout, against six
-seconds of answering nothing. Budget the slice by **time rather than by count**:
-a count has to be guessed against hardware the script knows nothing about, where
-a deadline measures it as it goes. Twenty-five milliseconds of a thirty-three
-millisecond tick fills each one without ever running long.
-
-`examples/scripts/world/house-builder.lua` is where these numbers come from, and
-`/build bench` and `/build calls` measure them again on whatever the server is
-actually running on. Measure before optimising: the first run of anything in a
-session reads about three times slow while the code is still being compiled, so
-only a large run says anything true.
+**Measure before optimising.** .NET compiles a method properly only after watching it
+run, so the first pass of anything reads several times slow. The suite takes every
+figure twice and keeps the second, which is why its numbers settle and a hand-rolled
+timing loop's often do not.
 
 ## Commands
 
@@ -606,26 +643,11 @@ rather than present and refusing, so a script has no clock of its own — which 
 what `moontweaks.server.elapsedMs` exists to answer — and no way to reach a file.
 `dofile`, `loadfile`, `load` and `loadstring` come with the basic library and are
 taken back out, each being a way to compile or load code the bindings never offered.
+An editor still offers those four, since they are the standard library's rather than
+this mod's to withdraw; a script that calls one fails on the line that does.
 
 `pcall`, `error` and `setmetatable` are available. The reported version is Lua 5.2,
 so `//` is not integer division and `goto` is not a keyword.
-
-## Layout
-
-```
-src/            the mod
-tools/docgen/   reference generator
-tools/luabench/ script engine measurement, run by scripts/bench.sh
-scripts/        build, docs, install and testbed entry points
-examples/       worked scripts grouped by topic, shipped with the mod
-TODO.md         work that is decided but not yet done
-LICENSE         MIT, covering this project
-THIRD-PARTY-NOTICES.md   what the shipped assembly carries besides this project
-```
-
-`examples/` doubles as a MoonTweaks folder: `docs.sh` scaffolds it with the same
-library and editor files a server gets, so the examples are checked exactly where
-an author's scripts would be, and ship from there into every install.
 
 ## Licence
 

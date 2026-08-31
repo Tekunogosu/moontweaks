@@ -95,7 +95,11 @@ moontweaks.commands.add {
       return "Whatever you marked is no longer loaded. It may still exist; it is out of reach."
     end
 
+    -- Loaded a moment ago and gone now is a real answer rather than an impossible
+    -- one: anything can die or despawn between two calls.
     local it = entities.get(marked)
+    if not it then return "Whatever you marked is no longer there." end
+
     local at = players.position(e.player)
     local away = math.sqrt((it.x - at.x) ^ 2 + (it.z - at.z) ^ 2)
 
