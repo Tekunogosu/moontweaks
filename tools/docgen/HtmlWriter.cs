@@ -79,7 +79,7 @@ public static partial class HtmlWriter
 
         if (module.Example.Length > 0)
         {
-            page.AppendLine($"<pre class=\"example\"><code>{Escape(module.Example)}</code></pre>");
+            page.AppendLine($"<pre class=\"example\"><code>{LuaHighlighter.Highlight(module.Example)}</code></pre>");
         }
 
         foreach (var function in module.Functions)
@@ -189,12 +189,16 @@ public static partial class HtmlWriter
         :root {
           --bg: #ffffff; --fg: #1b1b1d; --muted: #5c5c66; --line: #e2e2e8;
           --accent: #2f6f4f; --code-bg: #f4f4f7; --nav-bg: #fafafc; --required: #9a3b2f;
+          --lua-comment: #646b77; --lua-string: #9a3b2f;
+          --lua-number: #7a4b12; --lua-keyword: #4c4a9a;
         }
         :root:not([data-theme="light"]) { }
         @media (prefers-color-scheme: dark) {
           :root:not([data-theme="light"]) {
             --bg: #16161a; --fg: #e6e6ea; --muted: #9a9aa5; --line: #2c2c34;
             --accent: #7fc9a2; --code-bg: #202028; --nav-bg: #1b1b21; --required: #e08b7d;
+            --lua-comment: #8b93a1; --lua-string: #e6a08d;
+            --lua-number: #d9b382; --lua-keyword: #b0abf2;
           }
         }
         * { box-sizing: border-box; }
@@ -229,6 +233,10 @@ public static partial class HtmlWriter
           padding: 0.9rem 1rem; overflow-x: auto; line-height: 1.5; margin: 1rem 0 1.5rem;
         }
         pre.example code { background: none; padding: 0; }
+        pre.example .comment { color: var(--lua-comment); font-style: italic; }
+        pre.example .string { color: var(--lua-string); }
+        pre.example .number { color: var(--lua-number); }
+        pre.example .keyword { color: var(--lua-keyword); }
         .item { margin: 1.75rem 0; padding-left: 1rem; border-left: 3px solid var(--line); }
         .item h3 { font-size: 1rem; font-weight: 500; margin: 0 0 0.4rem; }
         .item h3 code { background: none; padding: 0; }
