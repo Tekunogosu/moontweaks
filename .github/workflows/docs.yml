@@ -60,6 +60,13 @@ jobs:
       - run: ./scripts/docs.sh --check
       - run: ./scripts/docs.sh
 
+      # docs.sh writes the diagnostics checklist from the bindings. The generated
+      # file is committed, so a binding added without regenerating it would leave the
+      # suite measuring coverage against a list that no longer names every function.
+      # Regenerating here would hide that; comparing is what surfaces it.
+      - name: Check the diagnostics checklist is current
+        run: git diff --exit-code examples/scripts/diagnostics/01-surface.lua
+
       # docs.sh scaffolds examples/ with this build's library, so the check runs
       # against the types this commit generates rather than a checked-in copy.
       - name: Check the examples against the generated types

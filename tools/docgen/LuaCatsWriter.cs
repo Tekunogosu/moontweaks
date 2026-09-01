@@ -109,7 +109,13 @@ public static class LuaCatsWriter
                 Comment(output, function.Summary);
                 foreach (var parameter in function.Parameters)
                 {
-                    output.AppendLine($"---@param {parameter.Name} {parameter.Type} {parameter.Summary}");
+                    // A nilable type on a parameter is a parameter that may be left
+                    // out, which LuaCATS spells on the name rather than on the type.
+                    var optional = parameter.Type.EndsWith('?');
+                    var name = optional ? parameter.Name + "?" : parameter.Name;
+                    var type = optional ? parameter.Type[..^1] : parameter.Type;
+
+                    output.AppendLine($"---@param {name} {type} {parameter.Summary}");
                 }
                 if (function.Returns != "nil") output.AppendLine($"---@return {function.Returns}");
 

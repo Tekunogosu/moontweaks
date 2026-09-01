@@ -52,6 +52,7 @@ Write(Path.Combine(outputDir, "library", MoonTweaks.Host.AssetCodeLibrary.FILE_N
     MoonTweaks.Host.AssetCodeLibrary.Render(MoonTweaks.Host.AssetCodeLibrary.SetsOf(null)));
 Write(Path.Combine(outputDir, "index.html"), HtmlWriter.Write(api));
 Write(Path.Combine(outputDir, "snippets.lua"), SnippetWriter.Write(api));
+Write(Path.Combine(outputDir, "surface.lua"), SurfaceWriter.Write(api));
 
 // The highlighter travels with the page rather than being fetched from anywhere, and
 // its licence travels with the highlighter: publishing the site redistributes the

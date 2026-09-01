@@ -52,6 +52,61 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
         players.Find(player, origin).ClearSpawnPosition();
 
     /// <summary>
+    /// Where a player would respawn if they died now, as a table of <c>x</c>, <c>y</c>
+    /// and <c>z</c>, or nil where the game cannot work one out. A player who has never
+    /// set one of their own is told where the server would put them anyway.
+    /// </summary>
+    /// <remarks>
+    /// The game holds a spawn in four places and hands back the first that has one:
+    /// the spawn a player's role forces on them, their own — which <c>setSpawn</c>
+    /// writes — their role's default, and last the world's. The position alone does
+    /// not say which of the four answered it.
+    ///
+    /// It is the centre of the block rather than its corner, so a spawn set at 100
+    /// reads back as 100.5. Floor it to get the block back.
+    ///
+    /// The world's own spawn is a centre in a second sense: the server scatters
+    /// arrivals across the radius its configuration names, so somebody sent to this
+    /// position lands where the game would only roughly have put them.
+    ///
+    /// A spawn may be granted a limited number of uses, and reading one here spends
+    /// none of them.
+    /// </remarks>
+    /// <param name="origin">Script line asking.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    [LuaFunction("spawn")]
+    public VectorPayload? Spawn(ScriptOrigin origin, string player)
+    {
+        // Reading is not respawning. The true form counts this as a use, which spends
+        // one of a limited spawn's and clears the spawn outright when they run out.
+        var at = players.Find(player, origin).GetSpawnPosition(false);
+
+        // Declared non-nullable and is null anyway: the game fills in a spawn missing
+        // its height from the terrain map, and answers with nothing when the column it
+        // would read has never been generated.
+        return at is null ? null : new VectorPayload(at.X, at.Y, at.Z);
+    }
+
+    /// <summary>
+    /// Disconnects a player, telling them why. They may come straight back: this ends
+    /// the session rather than the welcome, so anything meant to keep them out has to
+    /// turn them away again when they return.
+    /// </summary>
+    /// <remarks>
+    /// The message reaches them as the reason their connection ended, rather than as
+    /// chat, so it is the last thing the server says to them and is worth writing as
+    /// such. Nothing here is undoable and nothing asks first — a handler that kicks on
+    /// a condition it gets wrong empties the server, so the condition wants checking
+    /// before this is reached for.
+    /// </remarks>
+    /// <param name="origin">Script line disconnecting them.</param>
+    /// <param name="player">Identifier of the player, as an event gives it.</param>
+    /// <param name="reason">What to tell them as they go.</param>
+    [LuaFunction("kick")]
+    public void Kick(ScriptOrigin origin, string player, string reason) =>
+        players.Find(player, origin).Disconnect(reason);
+
+    /// <summary>
     /// Sends one player a message in their chat.
     /// </summary>
     /// <param name="origin">Script line sending the message.</param>

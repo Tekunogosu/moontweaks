@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using MoonTweaks.Scripting;
 
 namespace MoonTweaks.Api;
 
@@ -26,4 +28,33 @@ public static class ValueSet
             ? same
             : throw new InvalidOperationException(
                 $"{named.GetType().Name}.{named} has no counterpart in {typeof(TOther).Name}");
+
+    /// <summary>
+    /// The value of <paramref name="set"/> a script named, or a failure naming what it
+    /// could have written instead. Sole owner of reading a value set out of a script,
+    /// so a name written into a spec and a name returned from a handler are read the
+    /// same way and refused with the same sentence.
+    /// </summary>
+    /// <param name="set">Value set the name has to belong to.</param>
+    /// <param name="named">What the script wrote.</param>
+    /// <param name="origin">Script line that wrote it.</param>
+    /// <param name="path">What to call it in a failure, as the script author knows it.</param>
+    public static object Named(Type set, string named, ScriptOrigin origin, string path)
+    {
+        var match = Enum.GetNames(set)
+            .FirstOrDefault(candidate => candidate.Equals(named, StringComparison.OrdinalIgnoreCase));
+
+        if (match is null)
+        {
+            var allowed = string.Join(", ", Enum.GetNames(set).Select(name => $"'{name.ToLowerInvariant()}'"));
+            throw new ScriptError(origin, $"{path} must be one of {allowed}, got '{named}'");
+        }
+
+        return Enum.Parse(set, match);
+    }
+
+    /// <summary>The value of <typeparamref name="TSet"/> a script named.</summary>
+    public static TSet Named<TSet>(string named, ScriptOrigin origin, string path)
+        where TSet : struct, Enum =>
+        (TSet)Named(typeof(TSet), named, origin, path);
 }

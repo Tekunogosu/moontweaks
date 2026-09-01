@@ -32,6 +32,66 @@ namespace MoonTweaks.Events;
 [LuaModule("moontweaks.events")]
 public sealed class EventDomain(ScriptEvents events)
 {
+    /// <summary>
+    /// Called before the server lets somebody act on a place, and answered by what the
+    /// handler returns: one of the same words <c>world.testAccess</c> reads back, or
+    /// nothing to leave the decision alone.
+    /// </summary>
+    /// <remarks>
+    /// The one event a handler decides rather than watches. It is asked for every
+    /// block a player breaks and every block they use, after the land claim check and
+    /// with that check's answer on <c>e.allowed</c>, so a handler is the last word
+    /// rather than the first. Answering <c>"granted"</c> therefore overrides a claim
+    /// and opens somebody's land to whoever asked — a handler meaning only to refuse
+    /// should return nothing wherever it does not mean to refuse.
+    ///
+    /// The server asks this constantly, so a handler here is on a hot path in a way no
+    /// other event is: keep it to arithmetic and a table lookup, and read nothing that
+    /// searches the world.
+    ///
+    /// Another mod may ask the same question from a thread the server does not tick
+    /// on, and a script cannot answer there. Those asks are left to the server and
+    /// reported once, so a protection written here holds for players and may not hold
+    /// against another mod reaching past them.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time somebody is tested, and answers.</param>
+    [LuaFunction("testBlockAccess")]
+    public void TestBlockAccess(
+        ScriptOrigin origin,
+        [LuaPayload(typeof(AccessTestEventPayload), Returns = "EnumAccessResponse|nil")]
+        ScriptValue.Func handler) =>
+        events.OnTestBlockAccess(origin, handler);
+
+    /// <summary>
+    /// Called before anybody sees what a player said, and answered by what the handler
+    /// returns: a string to say something else instead, <c>false</c> to say nothing at
+    /// all, <c>true</c> to say it after all, or nothing to leave it alone.
+    /// </summary>
+    /// <remarks>
+    /// This is how chat is filtered, prefixed, muted or routed somewhere else. The
+    /// message a handler is given is what the handler before it left rather than what
+    /// was typed, and the last answer stands — the game's own rule, followed exactly.
+    ///
+    /// That rule has a sharp edge worth planning around. Answering <c>true</c> puts
+    /// back a message an earlier handler swallowed, so a script that mutes players can
+    /// be undone by a later script that knows nothing about muting. Scripts run in
+    /// name order, so anything that must have the last word belongs in a file that
+    /// sorts last, and a handler that does not mean to interfere should return nothing
+    /// rather than <c>true</c>.
+    ///
+    /// The message reaches the group named on the event, so a handler that means to
+    /// send it somewhere else swallows it and calls <c>moontweaks.groups.say</c>.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time somebody says something, and answers.</param>
+    [LuaFunction("playerChat")]
+    public void PlayerChat(
+        ScriptOrigin origin,
+        [LuaPayload(typeof(ChatEventPayload), Returns = "string|boolean|nil")]
+        ScriptValue.Func handler) =>
+        events.OnPlayerChat(origin, handler);
+
     /// <summary>Called after a player uses a block, which is left standing.</summary>
     /// <param name="origin">Script line adding the handler.</param>
     /// <param name="handler">Called each time it happens.</param>

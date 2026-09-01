@@ -1,0 +1,339 @@
+<!--
+  MoonTweaks — ModDB description body. Paste into the mod page's description editor.
+
+  ModDB allows inline styles only, so every colour is written out. Search and replace
+  to retheme:
+    panel   #171326    card    #1e1930    raised  #251f3a    code    #12101d
+    border  #342c4d    strong  #4b3f70
+    purple  #b98cff    green   #5fd39a    plum bg #251a2e    plum bdr #6b4a80
+    ink     #f3effc    body    #d6cfe8    muted   #9c93b4
+  The ModDB page background is light, so text outside a dark panel is left black and
+  everything inside one names its own colour.
+
+  Everything sits in one max-width wrapper so the page centres itself instead of
+  stretching across an ultrawide monitor. Change the 1100px below to widen or narrow it.
+
+  The Lua examples are highlighted with inline spans, because ModDB's Prism build has
+  no Lua component -- class="language-lua" would do nothing. Token colours:
+    base    #cfc6e0    keyword #b98cff    string  #8fd6a8
+    number  #e8c07d    comment #8b8099    punct   #9c93b4
+
+  Copy this file's text straight into the editor. Pasting from a browser tab that has
+  Dark Reader running injects data-darkreader-* attributes into every element.
+-->
+  <div style="max-width: 1100px; margin: 0 auto;">
+<div style="padding: 34px 26px; margin: 10px 0 26px 0; background-color: #171326; border: 1px solid #4b3f70; border-radius: 16px; text-align: center;">
+<h1 style="margin: 0; color: #f3effc; font-size: 44px; letter-spacing: 1px;"><span style="color: #b96ad9;">Moon</span><span style="color: #bfedd2;">Tweaks</span></h1>
+<p style="margin: 8px 0 20px 0; color: #5fd39a; font-size: 18px;">Tweak your Vintage Story server in Lua.</p>
+<p style="max-width: 720px; margin: 0 auto 14px auto; color: #d6cfe8; font-size: 15px; line-height: 1.7;">Change recipes, retune items and blocks, add commands, react to what players do &mdash; by dropping a text file in a folder and restarting. No C# project, no compiler, no toolchain.</p>
+<p style="max-width: 720px; margin: 0 auto 18px auto; color: #d6cfe8; font-size: 15px; line-height: 1.7;">Built for server owners who want to customize their servers with ease.</p>
+<p style="margin: 0 0 20px 0; color: #9c93b4; font-size: 14px;">Server-side only&nbsp; &middot;&nbsp; Singleplayer compatible&nbsp; &middot;&nbsp; MIT licensed</p>
+<p style="margin: 0;"><span style="display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 6px; border: 1px solid #4b3f70; background-color: #251f3a; color: #d7bcff; font-size: 13px;">Recipes</span> <span style="display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 6px; border: 1px solid #4b3f70; background-color: #251f3a; color: #d7bcff; font-size: 13px;">Items &amp; blocks</span> <span style="display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 6px; border: 1px solid #4b3f70; background-color: #251f3a; color: #d7bcff; font-size: 13px;">Players</span> <span style="display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 6px; border: 1px solid #4b3f70; background-color: #251f3a; color: #d7bcff; font-size: 13px;">World</span> <span style="display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 6px; border: 1px solid #4b3f70; background-color: #251f3a; color: #d7bcff; font-size: 13px;">Entities</span> <span style="display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 6px; border: 1px solid #4b3f70; background-color: #251f3a; color: #d7bcff; font-size: 13px;">Inventory</span> <span style="display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 6px; border: 1px solid #4b3f70; background-color: #251f3a; color: #d7bcff; font-size: 13px;">Events</span> <span style="display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 6px; border: 1px solid #4b3f70; background-color: #251f3a; color: #d7bcff; font-size: 13px;">Commands</span> <span style="display: inline-block; padding: 5px 10px; margin: 3px; border-radius: 6px; border: 1px solid #4b3f70; background-color: #251f3a; color: #d7bcff; font-size: 13px;">Calendar</span></p>
+</div>
+<div style="margin: 26px 0 14px 0; padding: 13px 20px; background-color: #1e1930; border-left: 6px solid #5fd39a; border-radius: 0 12px 12px 0;">
+<h2 style="margin: 0; color: #f3effc; font-size: 23px;">Why use it?</h2>
+</div>
+<table style="width: 100%; border-collapse: separate; border-spacing: 11px;">
+<tbody>
+<tr>
+<td style="width: 33%; vertical-align: top; padding: 16px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;">
+<h3 style="margin: 0 0 8px 0; color: #f3effc; font-size: 17px;">Bridge two mods</h3>
+<p style="margin: 0; color: #d6cfe8;">Add the recipe that lets one mod's output feed another mod's machine. A script can check which mods are actually loaded first, so one file serves several servers.</p>
+</td>
+<td style="width: 33%; vertical-align: top; padding: 16px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;">
+<h3 style="margin: 0 0 8px 0; color: #f3effc; font-size: 17px;">Create quality-of-life recipes</h3>
+<p style="margin: 0; color: #d6cfe8;">Firewood back into sticks, a cheaper ladder, the recipe your pack forgot. Add, remove or replace any grid, knapping, clay, smithing, barrel, alloy or cooking recipe.</p>
+</td>
+<td style="width: 33%; vertical-align: top; padding: 16px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;">
+<h3 style="margin: 0 0 8px 0; color: #f3effc; font-size: 17px;">Rebalance on your terms</h3>
+<p style="margin: 0; color: #d6cfe8;">Tool durability, stack sizes, mining speed, block drops, food nutrition, burn times. Retune one item by name, or every axe at once by tag.</p>
+</td>
+</tr>
+<tr>
+<td style="vertical-align: top; padding: 16px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;">
+<h3 style="margin: 0 0 8px 0; color: #f3effc; font-size: 17px;">Set house rules</h3>
+<p style="margin: 0; color: #d6cfe8;">Set spawns, heal players on respawn, hand out a starter kit on first join, announce the temporal storm, keep a score across the whole world.</p>
+</td>
+<td style="vertical-align: top; padding: 16px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;">
+<h3 style="margin: 0 0 8px 0; color: #f3effc; font-size: 17px;">Create your own commands</h3>
+<p style="margin: 0; color: #d6cfe8;">Declare a command with subcommands, typed arguments and a required privilege. The game completes it as it is typed, and players need nothing installed to run it.</p>
+</td>
+<td style="vertical-align: top; padding: 16px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;">
+<h3 style="margin: 0 0 8px 0; color: #f3effc; font-size: 17px;">Design whole features</h3>
+<p style="margin: 0; color: #d6cfe8;">The examples include a working levelling system &mdash; experience for what you kill, a reward every fifth level. Copy it and make it yours.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<div style="margin: 26px 0 14px 0; padding: 13px 20px; background-color: #1e1930; border-left: 6px solid #5fd39a; border-radius: 0 12px 12px 0;">
+<h2 style="margin: 0; color: #f3effc; font-size: 23px;">Getting started</h2>
+</div>
+<table style="width: 100%; border-collapse: separate; border-spacing: 11px;">
+<tbody>
+<tr>
+<td style="width: 52px; vertical-align: top; text-align: center; padding: 10px 0; background-color: #251f3a; border: 1px solid #5fd39a; border-radius: 10px; color: #5fd39a; font-size: 20px; font-weight: bold;">1</td>
+<td style="vertical-align: middle; padding: 14px 18px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px; color: #d6cfe8;">Drop the zip in the <strong style="color: #f3effc;">Mods</strong> folder of whatever runs the world, server or singleplayer.</td>
+</tr>
+<tr>
+<td style="vertical-align: top; text-align: center; padding: 10px 0; background-color: #251f3a; border: 1px solid #5fd39a; border-radius: 10px; color: #5fd39a; font-size: 20px; font-weight: bold;">2</td>
+<td style="vertical-align: middle; padding: 14px 18px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px; color: #d6cfe8;">Start it once. <strong><span style="color: #b96ad9;">Moon</span><span style="color: #2dc26b;">Tweaks</span></strong> creates its own folder in your <strong>ModConfig</strong> folder with all necessary files to create your own scripts.</td>
+</tr>
+<tr>
+<td style="vertical-align: top; text-align: center; padding: 10px 0; background-color: #251f3a; border: 1px solid #5fd39a; border-radius: 10px; color: #5fd39a; font-size: 20px; font-weight: bold;">3</td>
+<td style="vertical-align: middle; padding: 14px 18px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px; color: #d6cfe8;">Copy an example into <strong style="color: #f3effc;">scripts/</strong> and change it, or write your own. Scripts run in name order, and folders group them.</td>
+</tr>
+<tr>
+<td style="vertical-align: top; text-align: center; padding: 10px 0; background-color: #251f3a; border: 1px solid #5fd39a; border-radius: 10px; color: #5fd39a; font-size: 20px; font-weight: bold;">4</td>
+<td style="vertical-align: middle; padding: 14px 18px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px; color: #d6cfe8;">Restart, then run <strong style="color: #f3effc;">/moontweaks list</strong> to see exactly what your scripts changed.</td>
+</tr>
+</tbody>
+</table>
+<table style="width: 100%; border-collapse: separate; border-spacing: 11px;">
+<tbody>
+<tr>
+<td style="width: 49.5313%; vertical-align: top; padding: 18px; background-color: #171326; border: 1px solid #342c4d; border-radius: 12px;">
+<p style="margin: 0 0 10px 0; color: #5fd39a;"><strong><span style="color: #b96ad9;">Moon</span>Tweaks directory structure</strong></p>
+<pre style="margin: 0; padding: 14px 16px; background-color: #12101d; border: 1px solid #342c4d; border-radius: 10px; color: #d7bcff; overflow-x: auto; font-size: 13px; line-height: 1.6;">ModConfig/moontweaks/
+  scripts/     your scripts go here
+  examples/    example scripts sorted by topic
+  library/     editor files used for autocomplete
+  config.json  MoonTweaks settings</pre>
+</td>
+<td style="width: 49.4464%; vertical-align: top; padding: 18px; background-color: #171326; border: 1px solid #342c4d; border-radius: 12px; color: #d6cfe8;">
+<h3 style="margin: 0 0 8px 0; color: #5fd39a; font-size: 17px;">Editor autocomplete from the start</h3>
+<p style="margin: 0 0 10px 0;">The mod writes a type library from its own bindings, plus a list of every item, block, tag and trait code your install actually holds &mdash; including modded ones.</p>
+<p style="margin: 0;">Any editor running <span style="padding: 2px 6px; background-color: #12101d; border: 1px solid #342c4d; border-radius: 5px; color: #a8e8c8; font-family: monospace;">lua-language-server</span> then completes every function, checks the arguments, and suggests codes inside the quotes as you type. In VS Code it is one prompt; the config file is already written.</p>
+<p style="margin: 0;">&nbsp;</p>
+<p style="margin: 0;">Point your editor to <strong>ModConfig/moontweaks/</strong> and your editor will pick up the rest.</p>
+<p style="margin: 0;">&nbsp;</p>
+<p style="margin: 0;"><strong>Note: </strong>Only files for nvim and vscode are present. If you have a config you would like to add for a different editor, open a PR or create a new issue on github to have it included</p>
+</td>
+</tr>
+</tbody>
+</table>
+<table style="width: 100%; border-collapse: separate; border-spacing: 11px;">
+<tbody>
+<tr>
+<td style="width: 50%; vertical-align: top; padding: 18px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 12px; color: #d6cfe8;">
+<h3 style="margin: 0 0 8px 0; color: #5fd39a; font-size: 17px;">Try it before you restart</h3>
+<p style="margin: 0;"><span style="padding: 2px 6px; background-color: #12101d; border: 1px solid #342c4d; border-radius: 5px; color: #a8e8c8; font-family: monospace;">/moontweaks check</span> runs every script again on the live server and tells you what it would change, or which line broke &mdash; then throws the result away. Nothing is applied and nobody is disturbed, so you can get a script right while people are playing.</p>
+<p style="margin: 0;">&nbsp;</p>
+<p style="margin: 0;">Unfortunately, due to the way resources are applied, there is no way to hot-reload the scripts, you must restart for changes to take effect.</p>
+</td>
+<td style="width: 50%; vertical-align: top; padding: 18px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 12px; color: #d6cfe8;">
+<h3 style="margin: 0 0 8px 0; color: #5fd39a; font-size: 17px;">A mistake never half-applies</h3>
+<p style="margin: 0 0 10px 0;">Changes are collected as your scripts run and committed only once every one of them has succeeded. A script that fails on line 40 applies nothing at all, and the log names the file, the line, the call and the argument:</p>
+<pre style="margin: 0; padding: 12px 14px; background-color: #12101d; border: 1px solid #342c4d; border-radius: 10px; color: #d7bcff; overflow-x: auto; font-size: 12px; line-height: 1.5;">99-broken.lua:1: recipes.grid.add argument
+'recipe' has no field 'ingredents';
+did you mean 'ingredients'?
+no changes were applied</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<div style="margin: 26px 0 14px 0; padding: 13px 20px; background-color: #1e1930; border-left: 6px solid #5fd39a; border-radius: 0 12px 12px 0;">
+<h2 style="margin: 0; color: #f3effc; font-size: 23px;">What a script looks like</h2>
+<p style="margin: 3px 0 0 0; color: #9c93b4; font-size: 14px;">These examples ship with the mod and are located in your <strong>ModConfig/moontweaks/examples</strong>/ folder</p>
+</div>
+<table style="width: 100%; border-collapse: separate; border-spacing: 11px;">
+<tbody>
+<tr>
+<td style="width: 50%; vertical-align: top; padding: 18px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 12px;">
+<h3 style="margin: 0 0 6px 0; color: #f3effc; font-size: 17px;">Firewood into sticks</h3>
+<p style="margin: 0 0 12px 0; color: #9c93b4;">Any axe beside firewood gives four sticks and costs one durability. Matched on the axe <em>tag</em> rather than a specific code, so a modded axe qualifies too.</p>
+<div style="border: 1px solid #342c4d; border-radius: 10px; overflow: hidden;">
+<div style="padding: 7px 14px; background-color: #251f3a; color: #9c93b4; font-family: monospace; font-size: 12px;">scripts/10-sticks.lua</div>
+<pre style="margin: 0; padding: 14px 16px; background-color: #12101d; color: #cfc6e0; overflow-x: auto; font-size: 13px; line-height: 1.55;"><code><span style="color: #b98cff;">local</span> grid <span style="color: #9c93b4;">=</span> moontweaks<span style="color: #9c93b4;">.</span>recipes<span style="color: #9c93b4;">.</span>grid
+
+grid<span style="color: #9c93b4;">.</span>add <span style="color: #9c93b4;">{</span>
+  name <span style="color: #9c93b4;">=</span> <span style="color: #8fd6a8;">"moontweaks:sticks-from-firewood"</span><span style="color: #9c93b4;">,</span>
+  pattern <span style="color: #9c93b4;">=</span> <span style="color: #9c93b4;">{</span> <span style="color: #8fd6a8;">"AF"</span> <span style="color: #9c93b4;">},</span>
+  ingredients <span style="color: #9c93b4;">=</span> <span style="color: #9c93b4;">{</span>
+    A <span style="color: #9c93b4;">=</span> <span style="color: #9c93b4;">{</span> tags <span style="color: #9c93b4;">=</span> <span style="color: #9c93b4;">{</span> <span style="color: #8fd6a8;">"tool-axe"</span> <span style="color: #9c93b4;">},</span>
+          isTool <span style="color: #9c93b4;">=</span> <span style="color: #b98cff;">true</span><span style="color: #9c93b4;">,</span>
+          toolDurabilityCost <span style="color: #9c93b4;">=</span> <span style="color: #e8c07d;">1</span> <span style="color: #9c93b4;">},</span>
+    F <span style="color: #9c93b4;">=</span> <span style="color: #8fd6a8;">"game:firewood"</span><span style="color: #9c93b4;">,</span>
+  <span style="color: #9c93b4;">},</span>
+  output <span style="color: #9c93b4;">=</span> <span style="color: #9c93b4;">{</span> code <span style="color: #9c93b4;">=</span> <span style="color: #8fd6a8;">"game:stick"</span><span style="color: #9c93b4;">,</span> quantity <span style="color: #9c93b4;">=</span> <span style="color: #e8c07d;">4</span> <span style="color: #9c93b4;">},</span>
+<span style="color: #9c93b4;">}</span></code></pre>
+</div>
+</td>
+<td style="width: 50%; vertical-align: top; padding: 18px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 12px;">
+<h3 style="margin: 0 0 6px 0; color: #f3effc; font-size: 17px;">Sleep here, respawn here</h3>
+<p style="margin: 0 0 12px 0; color: #9c93b4;">Using a bed sets that location as your spawn point.&nbsp;</p>
+<p style="margin: 0 0 12px 0; color: #9c93b4;">&nbsp;</p>
+<div style="border: 1px solid #342c4d; border-radius: 10px; overflow: hidden;">
+<div style="padding: 7px 14px; background-color: #251f3a; color: #9c93b4; font-family: monospace; font-size: 12px;">scripts/20-beds.lua</div>
+<pre style="margin: 0; padding: 14px 16px; background-color: #12101d; color: #cfc6e0; overflow-x: auto; font-size: 13px; line-height: 1.55;"><code><span style="color: #b98cff;">local</span> events  <span style="color: #9c93b4;">=</span> moontweaks<span style="color: #9c93b4;">.</span>events
+<span style="color: #b98cff;">local</span> players <span style="color: #9c93b4;">=</span> moontweaks<span style="color: #9c93b4;">.</span>players
+
+events<span style="color: #9c93b4;">.</span>didUseBlock<span style="color: #9c93b4;">(</span><span style="color: #b98cff;">function</span><span style="color: #9c93b4;">(</span>e<span style="color: #9c93b4;">)</span>
+  <span style="color: #b98cff;">if</span> e<span style="color: #9c93b4;">.</span>block <span style="color: #b98cff;">and</span> e<span style="color: #9c93b4;">.</span>block<span style="color: #9c93b4;">:</span>find<span style="color: #9c93b4;">("</span>bed<span style="color: #8fd6a8;">") then
+    players.setSpawn(e.player, e.x, e.y, e.z)
+    players.say(e.player,
+      "</span>Your spawn is now this bed<span style="color: #9c93b4;">.")</span>
+  <span style="color: #b98cff;">end</span>
+<span style="color: #b98cff;">end</span><span style="color: #9c93b4;">)</span></code></pre>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<div style="margin: 26px 0 14px 0; padding: 13px 20px; background-color: #1e1930; border-left: 6px solid #5fd39a; border-radius: 0 12px 12px 0;">
+<h2 style="margin: 0; color: #f3effc; font-size: 23px;">What it can do</h2>
+<p style="margin: 3px 0 0 0; color: #9c93b4; font-size: 14px;">The full reference can be found here:&nbsp; <a style="color: #a8e8c8;" href="https://tekunogosu.github.io/moontweaks/">https://tekunogosu.github.io/moontweaks</a></p>
+</div>
+<table style="width: 100%; border-collapse: separate; border-spacing: 9px;">
+<tbody>
+<tr>
+<td style="width: 33%; vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Recipes</strong><br /><span style="color: #d6cfe8;">Add, remove and count every kind: grid, knapping, clay forming, smithing, barrel, alloy and cooking. Kinds other mods invent can be counted and thinned out too.</span></td>
+<td style="width: 33%; vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Items &amp; blocks</strong><br /><span style="color: #d6cfe8;">20 item properties and 16 more that only blocks have &mdash; durability, stack size, tool tier, mining speed, drops, light, walk speed, nutrition, burn time and the rest. Declare tags of your own and put them on whatever should carry them.</span></td>
+<td style="width: 33%; vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Picking targets</strong><br /><span style="color: #d6cfe8;">Name a code, use a <span style="font-family: monospace; color: #a8e8c8;">*</span> wildcard, or select by tag &mdash;"every axe", "every tool that is not a weapon" &mdash; in the game's own condition grammar.</span></td>
+</tr>
+<tr>
+<td style="vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Players</strong><br /><span style="color: #d6cfe8;">Position, health, hunger, tiredness, game mode, spawn point &mdash; read and written &mdash; what they are looking at, chat and chat groups, privileges, per-player stats such as walk speed, data saved with them, and disconnecting them.</span></td>
+<td style="vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">World</strong><br /><span style="color: #d6cfe8;">Read, place, break and swap blocks; queue a large batch and commit it at once; undo it again; search a region; read light, climate and wind; move the world spawn; play sounds and particles. Read the land claims anywhere, and add or remove one.</span></td>
+<td style="vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Entities</strong><br /><span style="color: #d6cfe8;">Find creatures and dropped stacks by code, tag or radius, spawn and despawn them, hurt, heal, rename, set alight, and remember things against one.</span></td>
+</tr>
+<tr>
+<td style="vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Inventory</strong><br /><span style="color: #d6cfe8;">Read and write any set of slots &mdash; a player's bags, a chest, a creature's inventory, the held slot. See how worn each thing is. Moves report how much actually fitted.</span></td>
+<td style="vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Events</strong><br /><span style="color: #d6cfe8;">30 of them: join, leave, death, respawn, game mode change, blocks used, broken and placed, entity spawn and death, chunk load, save game events and more. One of them is asked rather than told: a script can refuse what a player is about to build, break or open.</span></td>
+<td style="vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Commands</strong><br /><span style="color: #d6cfe8;">Your own <span style="font-family: monospace; color: #a8e8c8;">/command</span>, with subcommands, six argument types the game parses and completes for you, and a privilege to sit behind.</span></td>
+</tr>
+<tr>
+<td style="vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Calendar</strong><br /><span style="color: #d6cfe8;">Read the date, season, hemisphere and moon phase. Move time forward, change how fast it passes, or hold the world at one point in the year.</span></td>
+<td style="vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Server</strong><br /><span style="color: #d6cfe8;">Read name, uptime, player count, seed, sea level and map size. Turn PvP, fire spread, falling blocks and creature spawning on or off, retune how fast the world grows, and declare a privilege for your own commands.</span></td>
+<td style="vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-top: 3px solid #5fd39a; border-radius: 10px;"><strong style="color: #5fd39a;">Other mods</strong><br /><span style="color: #d6cfe8;">Check whether a mod is loaded and at what version. Weather, temporal stability and block reinforcement are reachable from the base game using this system.</span></td>
+</tr>
+</tbody>
+</table>
+<div style="margin: 26px 0 14px 0; padding: 13px 20px; background-color: #251a2e; border-left: 6px solid #b98cff; border-radius: 0 12px 12px 0;">
+<h2 style="margin: 0; color: #f3effc; font-size: 23px;">What it cannot do</h2>
+<p style="margin: 3px 0 0 0; color: #c4a9d6; font-size: 14px;">Worth reading before you plan around it.</p>
+</div>
+<table style="width: 100%; border-collapse: separate; border-spacing: 11px; height: 294.8px;">
+<tbody>
+<tr style="height: 68.4px;">
+<td style="width: 52px; vertical-align: top; text-align: center; padding: 9px 0px; background-color: #2f2140; border: 1px solid #6b4a80; border-radius: 10px; color: #d7bcff; font-size: 18px; font-weight: bold; height: 68.4px;">&times;</td>
+<td style="vertical-align: middle; padding: 14px 18px; background-color: #251a2e; border: 1px solid #6b4a80; border-radius: 10px; color: #e4d5ee; height: 68.4px;"><strong style="color: #f3effc;">Nothing on the client.</strong> No custom GUIs, HUDs, rendering, item names or descriptions. MoonTweaks is server-side only, and those things live on the player's machine. If there is a call for it, I will create a client version as well.&nbsp;</td>
+</tr>
+<tr style="height: 68.4px;">
+<td style="vertical-align: top; text-align: center; padding: 9px 0px; background-color: #2f2140; border: 1px solid #6b4a80; border-radius: 10px; color: #d7bcff; font-size: 18px; font-weight: bold; height: 68.4px;">&times;</td>
+<td style="vertical-align: middle; padding: 14px 18px; background-color: #251a2e; border: 1px solid #6b4a80; border-radius: 10px; color: #e4d5ee; height: 68.4px;"><strong style="color: #f3effc;">No new items, blocks or creatures.</strong> A new asset needs its model, textures and name delivered to every player, which is a C# mod. MoonTweaks reshapes what your server already has.</td>
+</tr>
+<tr style="height: 70.4px;">
+<td style="vertical-align: top; text-align: center; padding: 9px 0px; background-color: #2f2140; border: 1px solid #6b4a80; border-radius: 10px; color: #d7bcff; font-size: 18px; font-weight: bold; height: 70.4px;">&times;</td>
+<td style="vertical-align: middle; padding: 14px 18px; background-color: #251a2e; border: 1px solid #6b4a80; border-radius: 10px; color: #e4d5ee; height: 70.4px;">
+<p><strong style="color: #f3effc;">No live reload.</strong> The game builds its asset packet once at startup, so a changed recipe only reaches players after a restart. Use</p>
+<p><span style="padding: 2px 6px; background-color: #12101d; border: 1px solid #6b4a80; border-radius: 5px; color: #d7bcff; font-family: monospace;">/moontweaks check</span> to check your scripts during runtime.</p>
+</td>
+</tr>
+<tr style="height: 87.6px;">
+<td style="vertical-align: top; text-align: center; padding: 9px 0px; background-color: #2f2140; border: 1px solid #6b4a80; border-radius: 10px; color: #d7bcff; font-size: 18px; font-weight: bold; height: 87.6px;">&times;</td>
+<td style="vertical-align: middle; padding: 14px 18px; background-color: #251a2e; border: 1px solid #6b4a80; border-radius: 10px; color: #e4d5ee; height: 87.6px;"><strong style="color: #f3effc;">Smaller gaps.</strong> Worldgen, explosions, ray casting and decor are out of reach. A script can declare a privilege and read who holds one, but never grant it, and it can select creatures by tag without being able to give one a new tag.</td>
+</tr>
+</tbody>
+</table>
+<details style="margin: 14px 0; border: 1px solid #342c4d; border-radius: 12px; background-color: #171326;">
+<summary style="cursor: pointer; padding: 14px 18px; color: #5fd39a; font-weight: bold;">Which parts of Lua are available</summary>
+<div style="padding: 4px 18px 16px 18px; color: #d6cfe8;">
+<p>Scripts use <strong>Lua 5.2</strong>, every number is a double and <span style="font-family: monospace; color: #a8e8c8;">goto</span> is not a keyword.</p>
+<p><strong style="color: #f3effc;">Available:</strong> the basic library, <span style="font-family: monospace; color: #a8e8c8;">string</span>, <span style="font-family: monospace; color: #a8e8c8;">table</span>, <span style="font-family: monospace; color: #a8e8c8;">math</span> and <span style="font-family: monospace; color: #a8e8c8;">bit32</span>.</p>
+<p><strong style="color: #f3effc;">Absent:</strong> <span style="font-family: monospace; color: #a8e8c8;">io</span>, <span style="font-family: monospace; color: #a8e8c8;">os</span>, <span style="font-family: monospace; color: #a8e8c8;">coroutine</span>, <span style="font-family: monospace; color: #a8e8c8;">debug</span>, <span style="font-family: monospace; color: #a8e8c8;">package</span> and <span style="font-family: monospace; color: #a8e8c8;">utf8</span>, along with <span style="font-family: monospace; color: #a8e8c8;">require</span>, <span style="font-family: monospace; color: #a8e8c8;">load</span>, <span style="font-family: monospace; color: #a8e8c8;">loadstring</span>, <span style="font-family: monospace; color: #a8e8c8;">dofile</span> and <span style="font-family: monospace; color: #a8e8c8;">loadfile</span>. A script cannot reach a file, cannot pull in another script, and has no clock of its own &mdash; the mod provides one.</p>
+<p style="margin-bottom: 0;">Every script shares one environment, so a global set by one is visible to the next. <span style="font-family: monospace; color: #a8e8c8;">local</span> keeps a name to the file that declared it.</p>
+</div>
+</details>
+<div style="margin: 26px 0 14px 0; padding: 13px 20px; background-color: #1e1930; border-left: 6px solid #5fd39a; border-radius: 0 12px 12px 0;">
+<h2 style="margin: 0; color: #f3effc; font-size: 23px;">Performance</h2>
+<p style="margin: 3px 0 0 0; color: #9c93b4; font-size: 14px;">Lua is slower than C#, and here are the numbers.</p>
+</div>
+<div style="padding: 24px; background-color: #171326; border: 1px solid #4b3f70; border-radius: 16px;">
+<table style="width: 100%; border-collapse: separate; border-spacing: 16px 0;">
+<tbody>
+<tr>
+<td style="width: 40%; vertical-align: middle; padding: 20px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 12px; text-align: center;">
+<p style="margin: 0; color: #f3effc; font-size: 46px; font-weight: bold; line-height: 1.1;">~7,000</p>
+<p style="margin: 6px 0 0 0; color: #9c93b4; font-size: 14px;">calls fit in a millisecond, and the server ticks every 33 ms</p>
+</td>
+<td style="width: 60%; vertical-align: middle; color: #d6cfe8;">
+<p style="margin: 0 0 10px 0;">Every call crosses from Lua into C#, and that crossing is the unit of cost. Scripts run on the server's main thread, so what matters is not how much a script does but how long it holds the tick while doing it.</p>
+<p style="margin: 0;">The figures below were taken on one machine, on an empty server, and are <strong style="color: #f3effc;">rough</strong>. A performance suite ships with the examples: copy it into <span style="font-family: monospace; color: #a8e8c8;">scripts/</span> and it measures your own server, and adds a <span style="font-family: monospace; color: #a8e8c8;">/perf</span> command to take the readings again.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<table style="width: 100%; margin-top: 16px; border-collapse: collapse; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 12px;">
+<tbody>
+<tr>
+<td style="padding: 9px 16px; color: #d6cfe8; border-bottom: 1px solid #342c4d; width: 85.5116%;">A line of Lua &mdash; arithmetic, a table write</td>
+<td style="width: 14.4884%; padding: 9px 16px; color: #f3effc; text-align: right; font-family: monospace; border-bottom: 1px solid #342c4d;">20&ndash;30 ns</td>
+</tr>
+<tr>
+<td style="padding: 9px 16px; color: #d6cfe8; border-bottom: 1px solid #342c4d; width: 85.5116%;">A call to a Lua function</td>
+<td style="padding: 9px 16px; color: #f3effc; text-align: right; font-family: monospace; border-bottom: 1px solid #342c4d; width: 14.4884%;">~100 ns</td>
+</tr>
+<tr>
+<td style="padding: 9px 16px; color: #d6cfe8; border-bottom: 1px solid #342c4d; width: 85.5116%;">A call into MoonTweaks</td>
+<td style="padding-top: 9px; padding-right: 16px; padding-bottom: 9px; color: #f3effc; text-align: right; font-family: monospace; border-bottom: 1px solid #342c4d; width: 14.4884%;">110&ndash;210 ns</td>
+</tr>
+<tr>
+<td style="padding: 9px 16px; color: #d6cfe8; border-bottom: 1px solid #342c4d; width: 85.5116%;">A call handing back a table, such as server info</td>
+<td style="padding: 9px 16px; color: #f3effc; text-align: right; font-family: monospace; border-bottom: 1px solid #342c4d; width: 14.4884%;">1.3 &micro;s</td>
+</tr>
+<tr>
+<td style="padding: 9px 16px; color: #d6cfe8; border-bottom: 1px solid #342c4d; width: 85.5116%;">Reading one block</td>
+<td style="padding-top: 9px; padding-right: 16px; padding-bottom: 9px; color: #f3effc; text-align: right; font-family: monospace; border-bottom: 1px solid #342c4d; width: 14.4884%;">0.4&ndash;0.5 &micro;s</td>
+</tr>
+<tr>
+<td style="padding: 9px 16px; color: #d6cfe8; border-bottom: 1px solid #342c4d; width: 85.5116%;">Queueing one block for a batch write</td>
+<td style="padding: 9px 16px; color: #f3effc; text-align: right; font-family: monospace; border-bottom: 1px solid #342c4d; width: 14.4884%;">0.4 &micro;s</td>
+</tr>
+<tr>
+<td style="padding: 9px 16px; color: #d6cfe8; border-bottom: 1px solid #342c4d; width: 85.5116%;">Writing one block</td>
+<td style="padding: 9px 16px; color: #f3effc; text-align: right; font-family: monospace; border-bottom: 1px solid #342c4d; width: 14.4884%;">2&ndash;2.5 &micro;s</td>
+</tr>
+<tr>
+<td style="padding: 9px 16px; color: #d6cfe8; width: 85.5116%;">Scanning a region, per block</td>
+<td style="padding: 9px 16px; color: #f3effc; text-align: right; font-family: monospace; width: 14.4884%;">20&ndash;30 ns</td>
+</tr>
+</tbody>
+</table>
+<div style="margin-top: 16px; padding: 15px 18px; background-color: #251f3a; border-left: 4px solid #5fd39a; border-radius: 0 10px 10px 0; color: #d6cfe8;"><strong style="color: #f3effc;">The budget is a slice of a tick.</strong> The server ticks about every 33 ms, and every handler, every other mod and the world itself share that tick. So the figure to aim at is not the 500 ms at which the server starts complaining about a slow tick &mdash; that is the disaster mark, not a budget. A handler that finishes in a millisecond or two is invisible to players. One that needs longer belongs in <span style="font-family: monospace; color: #a8e8c8;">server.every</span>, doing a slice per tick.</div>
+<table style="width: 100%; margin-top: 8px; border-collapse: separate; border-spacing: 9px;">
+<tbody>
+<tr>
+<td style="width: 33%; vertical-align: top; padding: 14px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px;"><strong style="color: #5fd39a;">Fewer calls, not faster ones</strong><br /><span style="color: #d6cfe8;">Scanning a region in one call costs about 25 ns a block; walking it block by block costs around 450. Where a function takes a whole region or list, hand it the lot.</span></td>
+<td style="width: 33%; vertical-align: top; padding: 14px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px;"><strong style="color: #5fd39a;">Queue bulk edits</strong><br /><span style="color: #d6cfe8;">An immediate write re-sends the chunk to every player in range, once per block. A committed batch does it once per chunk.</span></td>
+<td style="width: 33%; vertical-align: top; padding: 14px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px;"><strong style="color: #5fd39a;">Split big jobs by time</strong><br /><span style="color: #d6cfe8;">Spread work across ticks and give each slice a deadline in milliseconds rather than a guessed block count. The example builder fills 25 ms and hands the rest back.</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div style="margin: 26px 0 14px 0; padding: 13px 20px; background-color: #1e1930; border-left: 6px solid #5fd39a; border-radius: 0 12px 12px 0;">
+<h2 style="margin: 0; color: #f3effc; font-size: 23px;">Commands</h2>
+<p style="margin: 3px 0 0 0; color: #9c93b4; font-size: 14px;">Administrators hold these by default; the required privilege is one line in <strong style="color: #d6cfe8;">config.json</strong>.</p>
+</div>
+<table style="width: 100%; border-collapse: separate; border-spacing: 9px;">
+<tbody>
+<tr>
+<td style="width: 33%; vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px;"><strong style="color: #a8e8c8; font-family: monospace;">/moontweaks list</strong><br /><span style="color: #d6cfe8;">What your scripts changed when the server started.</span></td>
+<td style="width: 33%; vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px;"><strong style="color: #a8e8c8; font-family: monospace;">/moontweaks check</strong><br /><span style="color: #d6cfe8;">Run every script again and report what it would change, applying nothing.</span></td>
+<td style="width: 33%; vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px;"><strong style="color: #a8e8c8; font-family: monospace;">/moontweaks export</strong><br /><span style="color: #d6cfe8;">Refresh the editor's code list after adding a mod. (This happens automatically upon a restart)</span></td>
+</tr>
+</tbody>
+</table>
+<div style="margin: 26px 0 14px 0; padding: 13px 20px; background-color: #1e1930; border-left: 6px solid #5fd39a; border-radius: 0 12px 12px 0;">
+<h2 style="margin: 0; color: #f3effc; font-size: 23px;">&nbsp;</h2>
+</div>
+<table style="width: 100%; border-collapse: separate; border-spacing: 9px;">
+<tbody>
+<tr>
+<td style="width: 33%; vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px;"><strong style="color: #f3effc;">Built on Lua-CSharp</strong><br /><span style="color: #d6cfe8;">The interpreter is <a style="color: #a8e8c8;" href="https://github.com/nuskey8/Lua-CSharp">Lua-CSharp</a>, shipped with the mod under the MIT licence.</span></td>
+<td style="width: 33%; vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px;"><strong style="color: #f3effc;">Share your scripts</strong><br /><span style="color: #d6cfe8;">Written something useful? Open a PR or an issue and it can go in as an example for everyone else.</span></td>
+<td style="width: 33%; vertical-align: top; padding: 15px; background-color: #1e1930; border: 1px solid #342c4d; border-radius: 10px;"><strong style="color: #f3effc;">Something broken or slow?</strong><br /><span style="color: #d6cfe8;">Open an issue with your script attached. Performance problems count as bugs here.</span></td>
+</tr>
+</tbody>
+</table>
+<div style="margin: 9px 0; padding: 15px 18px; background-color: #251a2e; border-left: 4px solid #b98cff; border-radius: 0 10px 10px 0; color: #e4d5ee;"><strong style="color: #f3effc;">AI disclosure.</strong> AI was used in the creation of this project. The test suites are extensive and every function is checked by hand, but things slip through, please report what you find.</div>
+<p style="text-align: center; margin-top: 20px; color: #000000;">MIT licensed &nbsp;&middot;&nbsp; <a href="https://github.com/Tekunogosu/moontweaks">Source and issues on GitHub</a> &nbsp;&middot;&nbsp; <a href="https://tekunogosu.github.io/moontweaks/">API reference</a></p>
+</div>

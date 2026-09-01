@@ -92,6 +92,95 @@ public class BlockEventPayload(IServerPlayer player, BlockPos? at, Block? block)
 }
 
 /// <summary>
+/// Something a player said, before anybody has seen it. A handler is asked before the
+/// message is delivered and what it answers decides what is delivered, or whether
+/// anything is.
+/// </summary>
+/// <param name="player">Player who said it.</param>
+/// <param name="group">Channel they said it in.</param>
+/// <param name="message">
+/// What will be delivered as this handler is asked, which is what the handler before
+/// it left rather than necessarily what was typed.
+/// </param>
+/// <param name="consumed">Whether anybody is currently going to see it.</param>
+[LuaTable("ChatEvent", Given = true)]
+public sealed class ChatEventPayload(IServerPlayer player, int group, string message, bool consumed)
+    : PlayerEventPayload(player)
+{
+    /// <summary>
+    /// Channel it was said in. Zero is general chat; anything else is a group, and is
+    /// the number <c>moontweaks.groups.of</c> reports beside that group's name.
+    /// </summary>
+    [LuaField("group")]
+    public int Group { get; } = group;
+
+    /// <summary>
+    /// What will be said. Handlers are asked in turn and each is given what the one
+    /// before it left, so this is the message as it stands rather than as it was
+    /// typed.
+    /// </summary>
+    [LuaField("message")]
+    public string Message { get; } = message;
+
+    /// <summary>
+    /// Whether anybody is still going to see it. False once a handler has swallowed
+    /// it, which a later handler may undo by answering <c>true</c>.
+    /// </summary>
+    [LuaField("delivered")]
+    public bool Delivered { get; } = !consumed;
+}
+
+/// <summary>
+/// Somebody about to act on a place, and what the server has decided so far. A
+/// handler is asked before the act happens and its answer is what decides it.
+/// </summary>
+/// <param name="player">Player asking to act.</param>
+/// <param name="at">Where they want to act.</param>
+/// <param name="what">What they want to do there.</param>
+/// <param name="allowed">
+/// What the server has decided so far: the land claim check, and every handler asked
+/// before this one. A handler answering nothing leaves this standing.
+/// </param>
+/// <param name="claimant">Who is holding the place, where anybody is.</param>
+[LuaTable("AccessTestEvent", Given = true)]
+public sealed class AccessTestEventPayload(
+    IServerPlayer player, BlockPos? at, EnumAccessKind what, EnumAccessResponse allowed, string? claimant)
+    : PlayerEventPayload(player)
+{
+    /// <summary>Which block they want to act on, east to west.</summary>
+    [LuaField("x")]
+    public int X { get; } = at?.X ?? 0;
+
+    /// <summary>Which block, from the world's floor upwards.</summary>
+    [LuaField("y")]
+    public int Y { get; } = at?.Y ?? 0;
+
+    /// <summary>Which block, north to south.</summary>
+    [LuaField("z")]
+    public int Z { get; } = at?.Z ?? 0;
+
+    /// <summary>What they are asking to do there.</summary>
+    [LuaField("what")]
+    public EnumAccessKind What { get; } = what;
+
+    /// <summary>
+    /// What the answer is at the moment this handler is asked, which is the claim
+    /// check and every handler already asked. Read it rather than assuming a refusal
+    /// is this handler's to make: answering <c>granted</c> here overrides a land
+    /// claim.
+    /// </summary>
+    [LuaField("allowed")]
+    public EnumAccessResponse Allowed { get; } = allowed;
+
+    /// <summary>
+    /// Name of whoever is holding the place, where a claim is what stopped it. Nil
+    /// where nothing is holding it or where the game could not say who.
+    /// </summary>
+    [LuaField("claimant")]
+    public string? Claimant { get; } = claimant;
+}
+
+/// <summary>
 /// A block a player put down, and what stood there before it.
 /// </summary>
 /// <param name="player">Player who placed it.</param>

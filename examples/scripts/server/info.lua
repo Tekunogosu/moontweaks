@@ -56,3 +56,43 @@ events.playerReady(function(e)
     players.say(e.player, "Combat between players is off on this server.")
   end
 end)
+
+-- ## The rest of the rules
+--
+-- `rules` and `setRules` read and write the same set, and only the keys a script
+-- writes change. Three of them are the server's own settings, saved back to its
+-- configuration; `entitySpawning` belongs to the world instead, so a server running
+-- two worlds may have it on in one and off in the other.
+local before = server.rules()
+
+moontweaks.log.info(("spawning %s, block ticks every %dms, %d per chunk, cap scaling %.1f")
+  :format(tostring(before.entitySpawning), before.blockTickInterval,
+    before.randomBlockTicksPerChunk, before.spawnCapPlayerScaling))
+
+commands.add {
+  name = "quietworld",
+  description = "Stop creatures spawning and slow the world down",
+  privilege = "controlserver",
+  args = { { name = "on", type = "bool" } },
+  handler = function(e)
+    if e.args.on then
+      server.setRules {
+        entitySpawning = false,
+        blockTickInterval = 3000,
+        randomBlockTicksPerChunk = 5,
+      }
+
+      return "Creatures will stop appearing and the world will grow slowly."
+    end
+
+    -- Put back what was read at startup rather than guessing at defaults: the values
+    -- this server actually loads are the only ones worth restoring.
+    server.setRules {
+      entitySpawning = before.entitySpawning,
+      blockTickInterval = before.blockTickInterval,
+      randomBlockTicksPerChunk = before.randomBlockTicksPerChunk,
+    }
+
+    return "Back to how this server was configured."
+  end,
+}

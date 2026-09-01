@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using MoonTweaks.Api;
+using MoonTweaks.Assets;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
@@ -82,25 +84,31 @@ public sealed class EntityAccess(ICoreServerAPI api)
     /// Everything in a box that the search asked for, nearest first so that taking
     /// the first of them is taking the closest.
     /// </summary>
-    public IReadOnlyList<Entity> Around(AreaSpec area)
+    public IReadOnlyList<Entity> Around(AreaSpec area, ScriptOrigin origin)
     {
         var middle = new Vec3d(area.X, area.Y, area.Z);
         var wanted = area.Code is null ? null : new AssetLocation(area.Code);
+
+        // Built once for the search rather than once per candidate: the names are
+        // looked up in the registry, and a box may hold hundreds of creatures.
+        var carrying = TagConditions.Build(api.EntityTagRegistry, area.Tags, origin, "tags");
 
         return [.. api.World
             .GetEntitiesAround(
                 middle,
                 (float)area.Range,
                 (float)(area.Height ?? area.Range),
-                entity => Wanted(entity, area, wanted))
+                entity => Wanted(entity, area, wanted, carrying))
             .OrderBy(entity => entity.Pos.SquareDistanceTo(middle))];
     }
 
     /// <summary>Whether one entity is the sort a search asked for.</summary>
-    private static bool Wanted(Entity entity, AreaSpec area, AssetLocation? wanted)
+    private static bool Wanted(
+        Entity entity, AreaSpec area, AssetLocation? wanted, ComplexTagCondition<TagSetFast> carrying)
     {
         if (area.SkipPlayers && entity is EntityPlayer) return false;
         if (area.AliveOnly && !entity.Alive) return false;
+        if (!carrying.IsEmpty && !carrying.Matches(entity.Tags)) return false;
 
         return wanted is null || (entity.Code is { } code && WildcardUtil.Match(wanted, code));
     }

@@ -216,6 +216,23 @@ public class AssetPropertiesSpec
     [LuaField("tags")]
     public TagConditionSpec? Tags { get; set; }
 
+    /// <summary>
+    /// Tags to put on everything changed, on top of whatever it already carries. Each
+    /// has to be a name the server knows: one of the game's own, or one
+    /// <c>moontweaks.tags.add</c> declared earlier in this run. A name already carried
+    /// is not carried twice.
+    /// </summary>
+    [LuaField("addTags")]
+    public string[]? AddTags { get; set; }
+
+    /// <summary>
+    /// Tags to put on everything changed, in place of whatever it already carries.
+    /// Read <c>addTags</c> for the usual case: replacing takes away the tags the game
+    /// gave an asset, and those are what the game's own recipes select it by.
+    /// </summary>
+    [LuaField("setTags")]
+    public string[]? SetTags { get; set; }
+
     /// <summary>How much use it takes before breaking. Only meaningful on something that wears out.</summary>
     [LuaField("durability")]
     public int? Durability { get; set; }

@@ -46,8 +46,18 @@ diag.check("server.rules", function()
   local rules = server.rules()
   assert(type(rules) == "table", "expected a table")
 
-  return ("pvp %s, fire spread %s, falling blocks %s")
-    :format(tostring(rules.pvp), tostring(rules.fireSpread), tostring(rules.fallingBlocks))
+  -- Every key the setter takes has to come back from the reader, or a script cannot
+  -- put back what it moved.
+  for _, key in ipairs({
+    "pvp", "fireSpread", "fallingBlocks",
+    "entitySpawning", "blockTickInterval", "randomBlockTicksPerChunk", "spawnCapPlayerScaling",
+  }) do
+    assert(rules[key] ~= nil, ("rules() answered nothing for '%s'"):format(key))
+  end
+
+  return ("pvp %s, fire spread %s, falling blocks %s, spawning %s, block ticks every %dms")
+    :format(tostring(rules.pvp), tostring(rules.fireSpread), tostring(rules.fallingBlocks),
+      tostring(rules.entitySpawning), rules.blockTickInterval)
 end)
 
 diag.check("server.setRules", function()
@@ -55,6 +65,36 @@ diag.check("server.setRules", function()
     function() return server.rules().pvp end,
     function(value) server.setRules { pvp = value } end,
     not server.rules().pvp)
+end)
+
+-- The rule kept with the world rather than with the server. Round-tripped separately
+-- because it is written somewhere else and a check that only moved `pvp` would not
+-- notice if that path were wrong.
+diag.check("server.setRules (world rule)", function()
+  return diag.roundTrip(
+    function() return server.rules().entitySpawning end,
+    function(value) server.setRules { entitySpawning = value } end,
+    not server.rules().entitySpawning)
+end)
+
+-- And a number rather than a flag, so the conversion out of Lua's one number type is
+-- exercised too.
+diag.check("server.setRules (numbers)", function()
+  return diag.roundTrip(
+    function() return server.rules().blockTickInterval end,
+    function(value) server.setRules { blockTickInterval = value } end,
+    server.rules().blockTickInterval + 100)
+end)
+
+-- Declaring a privilege, which nothing at startup can then ask after: reading one
+-- back needs a player, and nobody is connected while the assets load. So the check is
+-- that the call is accepted; `/diag player` is where a privilege is read.
+--
+-- The declaration lasts as long as the server runs and no longer, so declaring one
+-- here leaves nothing behind for the next start to trip over.
+diag.check("server.addPrivilege", function()
+  server.addPrivilege("moontweaks.diagnostics", "Granted by the MoonTweaks diagnostics suite")
+  return "declared moontweaks.diagnostics for this run"
 end)
 
 -- What else is loaded beside this mod. A server with only the game's own mods still

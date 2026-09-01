@@ -90,7 +90,14 @@ public static class SpecBinder
     /// </summary>
     public static object? Convert(Type target, ScriptValue value, ScriptOrigin origin, string path)
     {
-        var underlying = Nullable.GetUnderlyingType(target) ?? target;
+        var underlying = Nullable.GetUnderlyingType(target);
+
+        // An argument nobody supplied arrives as nil, and a target that admits nil is
+        // how a binding says the argument was optional. A target that does not admit
+        // it falls through and is refused below, naming the type it wanted.
+        if (underlying is not null && value is ScriptValue.Nil) return null;
+
+        underlying ??= target;
 
         // A function the host will call back later, which no other target accepts.
         if (underlying == typeof(ScriptValue.Func))
@@ -127,14 +134,7 @@ public static class SpecBinder
         if (underlying.IsEnum)
         {
             if (value is not ScriptValue.Str name) throw Expected(origin, path, "a string", value);
-            var match = Enum.GetNames(underlying)
-                .FirstOrDefault(candidate => candidate.Equals(name.Value, StringComparison.OrdinalIgnoreCase));
-            if (match is null)
-            {
-                var allowed = string.Join(", ", Enum.GetNames(underlying).Select(n => $"'{n.ToLowerInvariant()}'"));
-                throw new ScriptError(origin, $"{path} must be one of {allowed}, got '{name.Value}'");
-            }
-            return Enum.Parse(underlying, match);
+            return ValueSet.Named(underlying, name.Value, origin, path);
         }
 
         // A list of values from a closed set, so a misspelling is refused by the same
@@ -152,7 +152,12 @@ public static class SpecBinder
 
         if (underlying == typeof(string[]))
         {
-            return Items(value, origin, path, "a list of strings")
+            // One name is written as itself rather than as a list holding it, the way
+            // a single-layer shape is written as its rows. A list of one is what a
+            // script would otherwise have to spell to say the commonest thing.
+            if (value is ScriptValue.Str only) return new[] { only.Value };
+
+            return Items(value, origin, path, "a string or a list of strings")
                 .Select((item, index) => item is ScriptValue.Str s
                     ? s.Value
                     : throw Expected(origin, $"{path}[{index + 1}]", "a string", item))

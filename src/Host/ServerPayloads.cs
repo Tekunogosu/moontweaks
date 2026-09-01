@@ -78,4 +78,36 @@ public sealed class RulesSpec
     /// <summary>Whether sand and gravel fall when what held them up is taken away.</summary>
     [LuaField("fallingBlocks")]
     public bool? FallingBlocks { get; set; }
+
+    /// <summary>
+    /// Whether creatures spawn at all. Turning it off leaves what is already alive
+    /// alive: it stops the world adding more rather than clearing what it added.
+    /// </summary>
+    /// <remarks>
+    /// Kept with the world rather than with the server, unlike every other rule here,
+    /// so a server running two worlds may have it on in one and off in the other.
+    /// </remarks>
+    [LuaField("entitySpawning")]
+    public bool? EntitySpawning { get; set; }
+
+    /// <summary>
+    /// Milliseconds between the rounds of block ticks that grow crops, spread fire and
+    /// ripen fruit. Larger slows all of that down together and costs the server less.
+    /// </summary>
+    [LuaField("blockTickInterval")]
+    public int? BlockTickInterval { get; set; }
+
+    /// <summary>
+    /// How many blocks in each loaded chunk are picked for a tick each round. This and
+    /// <c>blockTickInterval</c> decide together how fast a world grows.
+    /// </summary>
+    [LuaField("randomBlockTicksPerChunk")]
+    public int? RandomBlockTicksPerChunk { get; set; }
+
+    /// <summary>
+    /// How much the creature cap rises with each player on the server. Zero holds the
+    /// cap where it is however many turn up.
+    /// </summary>
+    [LuaField("spawnCapPlayerScaling")]
+    public double? SpawnCapPlayerScaling { get; set; }
 }

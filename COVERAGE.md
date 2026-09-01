@@ -11,20 +11,22 @@ though nobody had looked at it.
 | Area | Reached | Missing in one line |
 | --- | --- | --- |
 | Recipes | every kind, vanilla and modded | Editing a kind this mod has never seen |
-| Item properties | 18 fields | Particles, held sounds |
+| Item properties | 20 fields | Particles, held sounds |
 | Block properties | 16 further fields | Decor, particles |
-| Asset registry | counting them | Listing or testing a code from a script |
-| Players | 36 functions | Groups, richer messages, connection facts, reading a spawn |
-| World | 23 functions | The fluid layer, explosions, decor, ray casting |
-| Entities | 23 functions | Selecting by tag, mounting, pathing, behaviours |
-| Inventory | 13 functions | What one stack carries |
+| Asset registry | counting them, declaring tags | Listing or testing a code from a script |
+| Players | 38 functions | Richer messages, connection facts |
+| World | 25 functions | The fluid layer, explosions, decor, ray casting |
+| Land claims | reading, adding and removing them | Editing one that already stands |
+| Chat groups | reading, making, joining and speaking into them | Telling a client its tab exists |
+| Entities | 23 functions | Giving one a tag, mounting, pathing, behaviours |
+| Inventory | 13 functions | What one stack carries besides its wear |
 | Calendar | 8 functions | Nothing worth naming |
-| Events | 29 of 50 | See `TODO.md` for the classification |
+| Events | 31 of 50 | See `TODO.md` for the classification |
 | Scheduling | 2 functions | Nothing worth naming |
 | Commands | declaring one | Six argument kinds of two dozen, aliases, others' commands |
 | Storage | per player and per world | Nothing worth naming |
-| Server state | facts and three rules | Mob spawning, tick rates, most of the config |
-| Permissions | reading them | Declaring, granting and revoking |
+| Server state | facts, seven rules, declaring a privilege | Most of the config |
+| Permissions | reading and declaring them | Granting and revoking |
 | Other mods | naming, versions, three of the game's own systems | Any other mod's system |
 
 ## Recipes
@@ -62,8 +64,17 @@ a modded axe as readily as a vanilla one. The whole of the game's condition gram
 is reached — `allOf`, `anyOf` and `noneOf`, as names or as groups of them, spelled
 as a recipe file spells them — with one deliberate difference: a condition naming
 only `noneOf` selects what does not carry those tags, where the game's own loader
-reads it as matching nothing. **Tags are read and never written**: a script cannot
-give an asset a tag it does not carry.
+reads it as matching nothing.
+
+Tags are written as well as read. `moontweaks.tags.add` declares names this server
+has not got, and `addTags` and `setTags` on either setter put them on whatever the
+selector reached — so a rule can be written once against a name and what carries that
+name decided somewhere else. Declaring works only from a script's body: the server
+locks its tag registry immediately after the phase scripts run in, and a handler
+asking is told exactly that. Nothing reaches a player's machine for it, because the
+server sends its whole tag table in the assets packet and each client registers the
+names in handle order, so a declared tag is one every client knows by the same
+handle.
 
 Beyond those: `transitionableProps` is the list of ways a thing changes once it stops
 being fresh, `creativeInventoryTabs` and `creativeInventoryStacks` are where it
@@ -96,10 +107,12 @@ which is the different mod that `TODO.md` describes under names and descriptions
 
 ## Players
 
-Thirty-six functions reach where a player is and which way they face, their
-health, hunger and tiredness, their mode, their spawn, whether they sleep, what
-they have eaten, what they are looking at, what they may do, what their abilities
-come to, their chat, and whatever a script chose to remember about them.
+Thirty-eight functions reach where a player is and which way they face, their
+health, hunger and tiredness, their mode, their spawn — read and written both —
+whether they sleep, what they have eaten, what they are looking at, what they may
+do, what their abilities come to, their chat, and whatever a script chose to
+remember about them. `kick` ends a session, telling them why; it does not keep them
+out, so anything lasting has to turn them away again when they come back.
 
 `players.all` lists who is online, which is the only source of a player identifier
 that is not an event, and `players.uidOf` turns a name somebody typed into one —
@@ -119,24 +132,30 @@ Also unbound:
   fitted. What `IPlayerInventoryManager` still keeps to itself is moving a stack from
   one place to another in a single call: a script does it as a `take` and a `put`, and
   has to put back what the second half could not place.
-- **Granting privileges.** Reading them is bound; `IPermissionManager` also declares,
-  grants, denies and revokes them, and none of that is. `SetRole` is deliberately
-  excluded: a script that can set roles can grant itself anything.
+- **Granting privileges.** Reading them is bound, and declaring one is
+  `moontweaks.server.addPrivilege`. What `IPermissionManager` grants, denies and
+  revokes is not, and `SetRole` is deliberately excluded: a script that can set roles
+  can grant itself anything.
+- **Whitelisting and banning.** Neither is in the server API at all.
+  `ICoreServerAPI.PlayerData` is typed `IPlayerDataManager`, which only looks players
+  up; the object behind it is `PlayerDataManager` in VintagestoryLib, where
+  `WhitelistPlayer` and `UnWhitelistPlayer` are public and `BanPlayer` is `internal`.
+  Reaching either means casting past the interface the game published, which is a
+  coupling this mod has taken on only for the three mod systems `MODSYSTEMS.md`
+  tracks. Nothing has asked.
 - **Richer messages.** `SendIngameError` and `SendIngameDiscovery` render against
   the client's own language files, and `SendLocalisedMessage` renders in the
   player's own language. `players.warn` gets the error styling without the lookup,
   which is as far as a server with no client half can go.
-- **Groups.** `Groups` and `GetGroup` name the chat groups a player belongs to,
-  which is what messaging anything other than general chat needs. `IGroupManager`
-  creates and removes them.
+- **Groups.** Reached, through `moontweaks.groups` rather than here.
 - **What they are looking at** is reached: `players.looking` for the block and
   `players.lookingAtEntity` for the creature, which hands back the identifier
   `moontweaks.entities` takes.
-- **Reading a spawn.** `players.setSpawn` and `clearSpawn` write one; nothing reads
-  one back. `IServerPlayer.GetSpawnPosition` answers, and a script that wants to
-  send somebody home has to have remembered where home was itself. The world's own
-  default spawn, which `ISaveGame.DefaultSpawn` holds, is unreached in both
-  directions.
+- **Writing the world's own spawn.** `players.spawn` reads where somebody would
+  wake up and `moontweaks.world.spawn` reads where the world puts anyone with no
+  spawn of their own, so nothing has to remember where home was any more. Moving the
+  world's own, which `ISaveGame.DefaultSpawn` sets, stays unbound: it decides where
+  every new arrival starts, and nothing has asked.
 - **Which slot is held.** `moontweaks.inventory.setHeld` writes what is in the hand;
   `ActiveHotbarSlotNumber` decides which hand slot that is, and is unbound. The
   offhand slot is reached only as a numbered slot of the hotbar inventory, where
@@ -147,12 +166,13 @@ Also unbound:
 
 ## World
 
-Twenty-three functions read a block, place one, queue a batch, commit it, take that
+Twenty-five functions read a block, place one, queue a batch, commit it, take that
 batch back and put it again, break a block properly, exchange one, drop a stack, ask
 whether a chunk is loaded, bring one in, find the surface of a column, read light,
-climate and wind, search a region for blocks and count what is there, ask whether a
-player may build somewhere, play a sound, throw off particles, outline blocks on a
-player's screen, and remember something against the save game.
+climate and wind, read and move where the world puts an arrival, search a region for blocks
+and count what is there, ask whether a player may build somewhere, play a sound,
+throw off particles, outline blocks on a player's screen, and remember something
+against the save game.
 
 `undo` and `redo` walk the history each commit closes, and that history belongs to
 the script that wrote it: a script takes back what it wrote and cannot reach what
@@ -195,15 +215,72 @@ Still unreached:
 - **Decor.** `SetDecor`, `GetDecors` and `BreakDecor` reach the layer a block
   carries on its faces.
 - **Explosions.** `CreateExplosion`.
-- **Changing a land claim.** `world.testAccess` asks `ILandClaimAPI` who may build
-  where, which is what anything editing blocks on a populated server has to respect.
-  Listing the claims at a place, and `Add` and `Remove` which change them, are
-  unbound.
+- **Editing a land claim that already stands.** `moontweaks.claims` reads them,
+  adds one and removes one. Changing one in place — moving its boxes, letting another
+  player in, retitling it — is not bound: the game has no operation for it either,
+  and does it by removing the claim and adding the replacement, which a script can
+  already do.
 - **Ray casting.** `RayTraceForSelection` answers what is along a line, which is
   what a reach test or a line-of-sight check needs.
 - **World facts a script cannot change.** Light level tables, sun brightness, sea
   level as a setting rather than a reading, and the world configuration that
   `classExclusiveRecipes` is read from.
+
+## Chat groups
+
+`moontweaks.groups` reads which groups a player belongs to, finds one by name, makes
+one, puts players in and takes them out, changes who may walk in, takes a group away,
+and says something in one. A group is the game's own channel, so this is what reaches
+some players and not others where `players.announce` reaches everybody and
+`players.say` reaches one.
+
+A group is named by its name rather than by its number. The game assigns the number as
+a group is added and then offers no way to look one up by it, so the number is
+something a script is told rather than something it uses; no two groups may share a
+name, which is what makes the name a handle. Names are letters, numbers and
+underscores, and both that and uniqueness are refused here by name rather than later.
+
+A group a script makes is the same object the game's own `/group` command makes, so
+the two are interchangeable. `joinPolicy` decides one thing and one thing only:
+whether `/group join` lets a player in. It does not gate `groups.join`, which is the
+server putting somebody there rather than them asking.
+
+One thing does not reach the player. The game tells a client about a group as it joins
+somebody to one, through `SendPlayerGroup` on a server system that is not on the
+published API, so somebody a script joins may have no tab for the group until they
+next connect. Messages reach them either way: `SendMessageToGroup` delivers by
+membership, which is written at once.
+
+## Land claims
+
+`moontweaks.claims` reads the claims covering a block, lists one player's in the order
+the game numbers them, adds one and takes one back. A claim is the game's own
+protection, saved with the world and broadcast to every client by the server itself,
+so land a script claims is protected and drawn for players who have installed nothing.
+
+A claim carries no identifier, and `ILandClaimAPI.Remove` takes the object. So a
+script names one the way the game's own `/land` commands do: by its owner and its
+number among that owner's claims, counting from zero, which is the number `/land list`
+shows that player. The number is a position, so removing one moves every later claim
+of that owner down — the same behaviour `/land free` has, and what
+`examples/scripts/world/claims.lua` works downwards to avoid.
+
+Nothing here applies the checks the game applies when a *player* claims land: their
+allowance, how many claims they may hold, or whether the box overlaps somebody else's.
+A script claiming land is the server acting rather than a player asking, the same way
+`world.setBlock` builds without consulting a claim. `claims.at` is what a script asks
+first if it means to behave like a player.
+
+Two things sit beside this and answer different questions. `world.testAccess` asks
+whether one player may act somewhere, and is the whole answer rather than the claim
+half of it: it runs the claim check and then every mod's `OnTestBlockAccess` handler,
+so it already accounts for protections this mod knows nothing about.
+`moontweaks.reinforce` reaches the survival mod's separate protection on a single
+block.
+
+`events.testBlockAccess` is the other side of that: a script's handler is asked the
+same question and its answer is the decision. It is the one bound event whose return
+value is read, and the only one that can override a land claim in either direction.
 
 ## Entities
 
@@ -218,11 +295,17 @@ identifier outlives everything, while an entity's is good only while the entity 
 loaded. A chunk unloading takes one out of reach without saying so, which is what
 `isLoaded` exists to answer.
 
-Selecting is by `code`, which accepts a `*` wildcard. Items and blocks are also
-selected by `tags`, and entities are not: the game keeps entity tags in a registry of
-their own, `ICoreAPI.EntityTagRegistry`, and `Entity.Tags` carries them. Until that
-is bound, "every hostile creature" is spelled as a list of codes where the same
-question about an item is spelled as one tag.
+Selecting is by `code`, which accepts a `*` wildcard, or by `tags`, or by both — the
+same condition grammar items and blocks take, read against `ICoreAPI.EntityTagRegistry`
+rather than the collectible one. The two registries are separate and a name in one
+says nothing about the other, so `library/codes.lua` lists the creature names under
+`EntityTag`. Vanilla carries `animal`, `predator`, `huntable`, `humanoid`,
+`habitat-land` and a dozen more.
+
+What is not bound is giving a creature a tag. `EntityProperties.Tags` is what an
+entity copies its own from as it is created, so writing one means reaching the entity
+types the way `items.set` reaches the item registry, which is a mutation path rather
+than a binding.
 
 Left unbound besides: mounting and dismounting, the pathfinding an entity does for
 itself, and the behaviours it is built from. Each is a domain rather than a field,
@@ -330,14 +413,15 @@ that has not come up.
 players it allows and how many are here, its uptime, total play time, world name,
 seed, sea level and map size. `rules` and `setRules` read and change PvP, fire
 spread and falling blocks, written back to the server's configuration so they
-survive a restart.
+survive a restart. `addPrivilege` declares a privilege for as long as the server
+runs, which is what lets a script's own command require a name of its own; the
+Permissions section below says why declaring is bound where granting is not.
 
-Three rules are bound and the rules beside them are not. Whether creatures spawn at
-all is `ISaveGame.EntitySpawning`; how fast crops grow and fires spread is
-`BlockTickInterval` and `RandomBlockTicksPerChunk`; how the spawn cap scales with the
-number of players is `SpawnCapPlayerScaling`. Each is one value a server operator
-actually retunes, and each sits beside `AllowPvP` rather than anywhere harder to
-reach.
+Seven rules are bound. Six are the server's own settings and are written back to its
+configuration; `entitySpawning` is `ISaveGame.EntitySpawning` and belongs to the world
+instead, so a server running two worlds may have it on in one and off in the other.
+Reading answers every key the setter takes, which is what lets a script put back what
+it moved.
 
 Unbound besides: `ShutDown`, `CurrentRunPhase`, `IsShuttingDown`, and the rest of
 `IServerConfig` — the password, the whitelist mode, the tick rate, the chunk radius,
@@ -347,9 +431,16 @@ nothing has asked for them.
 ## Permissions
 
 `players.hasPrivilege` and `players.privileges` read what a server has already
-decided. `IPermissionManager` also declares privileges and grants, denies and
-revokes them, per player or per group, and none of that is bound; nothing has asked
-for it.
+decided, and `moontweaks.server.addPrivilege` declares one, so that a command may
+require a name this server would not otherwise know. Declaring is not granting:
+administrators and the console hold a new privilege as it is declared and everybody
+else gets it from a role in `serverconfig.json`, and the declaration lasts only as
+long as the server runs.
+
+What `IPermissionManager` grants, denies and revokes, per player or per group, stays
+unbound, as does `SetRole`. The line is drawn there rather than at the module: a
+script that can grant a privilege can grant itself any of them, where one that can
+only declare a name has added nothing it did not already have.
 
 Gating is where the game already puts it. A command a script declares carries its
 own `privilege`, and the whole of `/moontweaks` is behind the one `commandPrivilege`

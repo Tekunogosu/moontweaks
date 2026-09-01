@@ -5,6 +5,7 @@ using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
@@ -32,6 +33,19 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     private readonly List<(string Event, Action Subscribe)> pending = [];
 
     /// <summary>
+    /// The thread the server ticks on, remembered as the subscriptions are taken out.
+    /// An event that must be answered where it was asked cannot be marshalled onto
+    /// this thread — the answer would arrive after the decision — so an answering
+    /// event compares against this and declines to run a script anywhere else.
+    /// </summary>
+    /// <remarks>
+    /// Read from <see cref="Activate"/> rather than from the constructor: both run
+    /// while the server is loading and on the thread it ticks on, and the later of the
+    /// two is the one that cannot be reached from anywhere else.
+    /// </remarks>
+    private int mainThread;
+
+    /// <summary>
     /// The pace each mount was last reported being ridden at, so a stream of reports
     /// saying the same thing raises one event. Written from the network thread the
     /// reports land on, which is why it is a concurrent one.
@@ -46,11 +60,30 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// </summary>
     private readonly HashSet<(int X, int Z)> regions = [];
 
+    /// <summary>
+    /// Answering events already reported as having been asked from another thread, so
+    /// a check the server makes constantly says so once rather than filling the log.
+    /// </summary>
+    private readonly HashSet<string> offThread = [];
+
     /// <summary>One script function listening for one event.</summary>
     private sealed record Handler(ScriptOrigin Origin, ScriptValue.Func Call);
 
     /// <summary>Hands one occurrence of an event to whoever is listening for it.</summary>
     private delegate void Occurred(EventPayload about);
+
+    /// <summary>
+    /// Hands one occurrence to whoever is listening and gives back what they decided,
+    /// or null where nobody decided anything.
+    /// </summary>
+    private delegate EnumAccessResponse? Answered(EventPayload about);
+
+    /// <summary>
+    /// Hands something a player said to whoever is listening and gives back what
+    /// should be said instead and whether anybody should see it.
+    /// </summary>
+    private delegate (string Message, bool Consumed) Said(
+        IServerPlayer player, int group, string message, bool consumed);
 
     /// <summary>How many handlers are listening, for the startup report.</summary>
     public int Count => handlers.Values.Sum(listening => listening.Count);
@@ -317,6 +350,69 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// only for an event known to arrive on the main thread, and worth the checking
     /// that claim needs.
     /// </remarks>
+    /// <summary>
+    /// Called before the server lets somebody act on a place, with the answer it has
+    /// arrived at so far, and answered by whatever a handler returns.
+    /// </summary>
+    /// <remarks>
+    /// The one event here a handler decides rather than observes. The game asks every
+    /// mod in turn, handing each the answer the one before it gave, and takes the last
+    /// answer as the decision — so a handler may refuse what the claim allowed and
+    /// may allow what the claim refused. Both directions are the game's own behaviour
+    /// and both are offered, which means a script here can open a player's claim to
+    /// somebody else; a handler that means only to refuse should answer nothing
+    /// wherever it does not mean to refuse, rather than answering <c>granted</c>.
+    ///
+    /// Answered where it is asked. The server's own two callers — a player breaking a
+    /// block and a player using one — ask on the thread it ticks on, but another mod
+    /// calling the same check may ask from any thread, and an answer marshalled onto
+    /// the main thread would arrive after the decision was made. So a call arriving
+    /// anywhere else leaves the answer exactly as it found it, and says so once.
+    /// </remarks>
+    public void OnTestBlockAccess(ScriptOrigin origin, ScriptValue.Func handler) =>
+        OnAnswered("testBlockAccess", origin, handler, answer =>
+            api.Event.OnTestBlockAccess += (player, selection, kind, ref claimant, response) =>
+            {
+                // Not an IServerPlayer for a caller that supplied none, and every
+                // payload here is built from one. Nothing to tell a script about.
+                if (player is not IServerPlayer asked) return response;
+
+                var about = new AccessTestEventPayload(asked, selection?.Position,
+                    ValueSet.As<EnumAccessKind>(kind), ValueSet.As<EnumAccessResponse>(response),
+                    claimant);
+
+                return answer(about) is { } decided
+                    ? ValueSet.As<EnumWorldAccessResponse>(decided)
+                    : response;
+            });
+
+    /// <summary>
+    /// Called before anybody sees what a player said, and answered by what the handler
+    /// returns: a string to say something else instead, <c>false</c> to say nothing,
+    /// <c>true</c> to say it after all, or nothing at all to leave it alone.
+    /// </summary>
+    /// <remarks>
+    /// Handlers are asked in turn and each is given what the one before it left, so a
+    /// rewrite chains and the last word stands. That is the game's own rule for this
+    /// event and it is followed exactly, which is worth knowing in one direction
+    /// particularly: a handler answering <c>true</c> undoes a swallow an earlier one
+    /// asked for, so a script that mutes players and a script that rewrites messages
+    /// have to be ordered deliberately rather than dropped into the folder in any
+    /// order.
+    ///
+    /// Raised on the thread the server ticks on, where the answer is needed, so the
+    /// same guard applies as to the other answering event: asked from anywhere else,
+    /// the message is left exactly as it was found.
+    /// </remarks>
+    public void OnPlayerChat(ScriptOrigin origin, ScriptValue.Func handler) =>
+        OnChat("playerChat", origin, handler, said =>
+            api.Event.PlayerChat += (IServerPlayer player, int group, ref string message, ref string data, BoolRef consumed) =>
+            {
+                var (spoken, swallowed) = said(player, group, message, consumed.value);
+                message = spoken;
+                consumed.value = swallowed;
+            });
+
     private void OnAnyThread(
         string name, ScriptOrigin origin, ScriptValue.Func handler, Action<Occurred> subscribe) =>
         On(name, origin, handler, occurred => subscribe(
@@ -358,6 +454,7 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// <returns>What each refused subscription was, for whoever is going to report them.</returns>
     public IReadOnlyList<string> Activate()
     {
+        mainThread = Environment.CurrentManagedThreadId;
         var refused = new List<string>();
 
         foreach (var (name, subscribe) in pending)
@@ -375,6 +472,157 @@ public sealed class ScriptEvents(ICoreServerAPI api)
 
         pending.Clear();
         return refused;
+    }
+
+    /// <summary>
+    /// Adds a handler for an event whose answer decides something, subscribing the
+    /// first time one arrives. The same bookkeeping <see cref="On"/> does, differing
+    /// only in that what a handler returns is carried back rather than dropped.
+    /// </summary>
+    private void OnAnswered(
+        string name, ScriptOrigin origin, ScriptValue.Func handler, Action<Answered> subscribe)
+    {
+        if (!handlers.TryGetValue(name, out var listening))
+        {
+            handlers[name] = listening = [];
+            pending.Add((name, () => subscribe(about => RaiseAnswered(name, about))));
+        }
+
+        listening.Add(new Handler(origin, handler));
+    }
+
+    /// <summary>
+    /// Adds a handler for the chat event, subscribing the first time one arrives. The
+    /// same bookkeeping <see cref="On"/> does, differing in what a handler is given
+    /// back the chance to change.
+    /// </summary>
+    private void OnChat(
+        string name, ScriptOrigin origin, ScriptValue.Func handler, Action<Said> subscribe)
+    {
+        if (!handlers.TryGetValue(name, out var listening))
+        {
+            handlers[name] = listening = [];
+            pending.Add((name, () => subscribe(
+                (player, group, message, consumed) => RaiseChat(name, player, group, message, consumed))));
+        }
+
+        listening.Add(new Handler(origin, handler));
+    }
+
+    /// <summary>
+    /// Calls every handler for something said, each given what the one before it left,
+    /// and carries back what should be said and whether anybody should see it.
+    /// </summary>
+    /// <remarks>
+    /// A fresh table per handler, because what a handler is told has to be what the
+    /// handler before it decided rather than what was typed. Chat is a thing people do
+    /// rather than a thing the server does, so that cost is paid a few times a minute.
+    ///
+    /// Refuses to run anywhere but the thread the server ticks on, for the reason
+    /// <see cref="RaiseAnswered"/> gives: the answer is needed where it was asked.
+    /// </remarks>
+    private (string Message, bool Consumed) RaiseChat(
+        string name, IServerPlayer player, int group, string message, bool consumed)
+    {
+        if (handlers.GetValueOrDefault(name) is not { Count: > 0 } listening) return (message, consumed);
+
+        if (Environment.CurrentManagedThreadId != mainThread)
+        {
+            if (offThread.Add(name))
+            {
+                api.Logger.Warning(
+                    "[moontweaks] '{0}' was raised on another thread and was left alone. "
+                    + "A script cannot answer it there, so handlers for it did not run.",
+                    name);
+            }
+            return (message, consumed);
+        }
+
+        foreach (var handler in listening.ToArray())
+        {
+            try
+            {
+                var about = new ChatEventPayload(player, group, message, consumed);
+
+                switch (handler.Call.Call([PayloadWriter.Table(about)]))
+                {
+                    // A string is what should be said instead. Whether anybody sees it
+                    // is a separate question, and this answer does not touch it.
+                    case ScriptValue.Str said:
+                        message = said.Value;
+                        break;
+
+                    // false swallows it and true puts it back, which is the game's own
+                    // pair of answers rather than this mod's.
+                    case ScriptValue.Bool deliver:
+                        consumed = !deliver.Value;
+                        break;
+                }
+            }
+            catch (Exception failure)
+            {
+                listening.Remove(handler);
+                api.Logger.Error(
+                    "[moontweaks] {0}: handler for '{1}' failed and will not be called again: {2}",
+                    handler.Origin, name, failure.Message);
+            }
+        }
+
+        return (message, consumed);
+    }
+
+    /// <summary>
+    /// Calls every handler for one event and carries back the last answer any of them
+    /// gave, or null where none of them gave one.
+    /// </summary>
+    /// <remarks>
+    /// Last rather than first, because that is what the game does with the mods it
+    /// asks: each is handed the answer so far and the last word stands. A handler
+    /// wanting the earlier answer reads it off the event.
+    ///
+    /// Refuses to run anywhere but the thread the server ticks on. The interpreter is
+    /// not thread safe and the answer is needed where it was asked, so there is
+    /// nothing to do off that thread but leave the decision alone. Said once per
+    /// event rather than per call: whatever is asking off-thread will ask again.
+    /// </remarks>
+    private EnumAccessResponse? RaiseAnswered(string name, EventPayload about)
+    {
+        if (handlers.GetValueOrDefault(name) is not { Count: > 0 } listening) return null;
+
+        if (Environment.CurrentManagedThreadId != mainThread)
+        {
+            if (offThread.Add(name))
+            {
+                api.Logger.Warning(
+                    "[moontweaks] '{0}' was asked from another thread and was left to the server to answer. "
+                    + "A script cannot answer it there, so handlers for it do not run for whatever asked.",
+                    name);
+            }
+            return null;
+        }
+
+        var payload = PayloadWriter.Table(about);
+        EnumAccessResponse? decided = null;
+
+        foreach (var handler in listening.ToArray())
+        {
+            try
+            {
+                if (handler.Call.Call([payload]) is ScriptValue.Str answer)
+                {
+                    decided = ValueSet.Named<EnumAccessResponse>(answer.Value, handler.Origin, name);
+                }
+            }
+            catch (Exception failure)
+            {
+                listening.Remove(handler);
+                api.Logger.Error(
+                    "[moontweaks] {0}: handler for '{1}' failed and will not be called again: {2}",
+                    handler.Origin, name, failure.Message);
+            }
+        }
+
+        return decided;
     }
 
     /// <summary>

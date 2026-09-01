@@ -44,6 +44,14 @@ public static class CollectibleProperties
         if (spec.TransitionableProps is { } changes) asset.TransitionableProps = Stale(changes, stacks, origin);
         if (spec.CreativeInventoryTabs is { } tabs) asset.CreativeInventoryTabs = tabs;
         if (spec.CreativeInventoryStacks is { } shown) asset.CreativeInventoryStacks = Shown(shown, stacks, origin);
+
+        // Last, and asked as one question rather than two: adding reads what is
+        // carried now, so a spec naming both would otherwise depend on which ran first.
+        if (spec.AddTags is not null || spec.SetTags is not null)
+        {
+            asset.Tags = TagRegistration.Wanted(
+                stacks.World.Api.CollectibleTagRegistry, asset.Tags, spec.AddTags, spec.SetTags, origin);
+        }
     }
 
     /// <summary>

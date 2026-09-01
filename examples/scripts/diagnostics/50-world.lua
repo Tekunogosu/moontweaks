@@ -49,6 +49,41 @@ diag.later("world.surfaceAt", function()
   return ("ground at %d %d %d"):format(spot.x, surface, spot.z)
 end)
 
+-- The world's own spawn, which is where the game sends anybody who has none of their
+-- own. Read once the world is up rather than at startup: it resolves against the
+-- terrain map, which is not there while the assets are still loading.
+diag.later("world.spawn", function()
+  local at = world.spawn()
+  assert(at, "this world worked out no spawn at all")
+  assert(type(at.x) == "number" and type(at.y) == "number" and type(at.z) == "number",
+    "a spawn came back without three numbers in it")
+
+  return ("the world spawn is %d %d %d")
+    :format(math.floor(at.x), math.floor(at.y), math.floor(at.z))
+end)
+
+-- Moving it, and moving it back. Written as a round trip rather than as a write that
+-- changes nothing, because the whole question is whether the write lands: setting the
+-- spawn to where it already is would pass whether or not anything happened.
+diag.later("world.setSpawn", function()
+  local before = world.spawn()
+  assert(before, "this world worked out no spawn to move")
+
+  local x, y, z = math.floor(before.x), math.floor(before.y), math.floor(before.z)
+  world.setSpawn(x + 8, y, z + 8)
+
+  local moved = world.spawn()
+  assert(moved, "the world worked out no spawn after one was written")
+
+  -- Put back before asserting, so a mismatch does not leave the world spawn moved.
+  world.setSpawn(x, y, z)
+
+  assert(math.floor(moved.x) == x + 8 and math.floor(moved.z) == z + 8,
+    ("wrote %d %d and read back %d %d"):format(x + 8, z + 8, math.floor(moved.x), math.floor(moved.z)))
+
+  return ("moved the world spawn 8 blocks and put it back at %d %d %d"):format(x, y, z)
+end)
+
 diag.later("world.loadChunk", function()
   local at = airAbove()
 

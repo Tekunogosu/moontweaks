@@ -92,3 +92,36 @@ events.didBreakBlock(function(e)
   local first = inventory.slot({ player = e.player, which = "hotbar" }, 1)
   players.say(e.player, "First belt slot: " .. (first and first.name or "empty"))
 end)
+
+-- ## What one stack has left
+--
+-- Durability sits on the stack rather than on the kind, so two axes in one bag answer
+-- differently. `durability` is what this one has left and `maxDurability` is what its
+-- kind has when new — which is the figure `moontweaks.items.set` writes.
+--
+-- Both are nil for anything that does not wear out, which is most things, so a script
+-- reading them checks before dividing by one.
+commands.add {
+  name = "worn",
+  description = "List what in your bags is wearing out",
+  requiresPlayer = true,
+  handler = function(e)
+    local worn = {}
+
+    for _, slot in ipairs(inventory.list { player = e.player, which = "backpack" }) do
+      if slot.durability and slot.maxDurability then
+        local left = slot.durability / slot.maxDurability
+
+        if left < 0.25 then
+          worn[#worn + 1] = ("%s (%d%%)"):format(slot.name, math.floor(left * 100))
+        end
+      end
+    end
+
+    if #worn == 0 then
+      return "Nothing in your bags is close to breaking."
+    end
+
+    return "Nearly worn out: " .. table.concat(worn, ", ")
+  end,
+}

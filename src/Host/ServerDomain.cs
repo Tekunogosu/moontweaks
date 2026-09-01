@@ -90,6 +90,10 @@ public sealed class ServerDomain(ICoreServerAPI api, ScriptTimers timers)
         Pvp = api.Server.Config.AllowPvP,
         FireSpread = api.Server.Config.AllowFireSpread,
         FallingBlocks = api.Server.Config.AllowFallingBlocks,
+        EntitySpawning = api.WorldManager.SaveGame.EntitySpawning,
+        BlockTickInterval = api.Server.Config.BlockTickInterval,
+        RandomBlockTicksPerChunk = api.Server.Config.RandomBlockTicksPerChunk,
+        SpawnCapPlayerScaling = api.Server.Config.SpawnCapPlayerScaling,
     };
 
     /// <summary>
@@ -108,9 +112,46 @@ public sealed class ServerDomain(ICoreServerAPI api, ScriptTimers timers)
         if (rules.Pvp is { } pvp) api.Server.Config.AllowPvP = pvp;
         if (rules.FireSpread is { } fire) api.Server.Config.AllowFireSpread = fire;
         if (rules.FallingBlocks is { } falling) api.Server.Config.AllowFallingBlocks = falling;
+        if (rules.BlockTickInterval is { } interval) api.Server.Config.BlockTickInterval = interval;
+        if (rules.RandomBlockTicksPerChunk is { } ticks) api.Server.Config.RandomBlockTicksPerChunk = ticks;
+        if (rules.SpawnCapPlayerScaling is { } scaling)
+        {
+            api.Server.Config.SpawnCapPlayerScaling = (float)scaling;
+        }
+
+        // Kept with the world rather than with the server, so it is saved by the world
+        // being saved and is not what MarkConfigDirty below is about.
+        if (rules.EntitySpawning is { } spawning) api.WorldManager.SaveGame.EntitySpawning = spawning;
 
         // Written to disk by the server on its own schedule rather than here, so a
         // handler changing a rule every tick costs one write rather than one a tick.
         api.Server.MarkConfigDirty();
     }
+
+    /// <summary>
+    /// Declares a privilege, so that a command may require it and
+    /// <c>moontweaks.players.hasPrivilege</c> may ask after it. A name the server has
+    /// never been told about is one nobody holds, which makes a command requiring it
+    /// a command nobody can run.
+    /// </summary>
+    /// <remarks>
+    /// Declaring a privilege is not granting it. Administrators and the server
+    /// console are given it on declaration, which is what lets a script's own command
+    /// be run by whoever owns the server the moment it is declared; everybody else
+    /// gets it by the operator naming it in a role in <c>serverconfig.json</c>. What
+    /// grants a privilege to a player outright stays unbound deliberately, since a
+    /// script that can grant one can grant itself anything.
+    ///
+    /// The declaration lasts as long as the server runs and no longer, so this belongs
+    /// in a script's body — which runs at every startup — rather than in a handler.
+    /// </remarks>
+    /// <param name="origin">Script line declaring it.</param>
+    /// <param name="code">Name the privilege is required and read by.</param>
+    /// <param name="description">
+    /// What holding it allows, as an operator reading the role it is named in will
+    /// see it.
+    /// </param>
+    [LuaFunction("addPrivilege")]
+    public void AddPrivilege(ScriptOrigin origin, string code, string description) =>
+        api.Permissions.RegisterPrivilege(code, description);
 }

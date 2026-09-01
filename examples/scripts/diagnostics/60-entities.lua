@@ -75,6 +75,42 @@ diag.later("entities.around", function()
   return ("%d nearby, first is %s"):format(#found, found[1].code)
 end)
 
+-- Selecting by what a creature is rather than what it is called. The tags are read
+-- off a registry of their own, separate from the one items and blocks share, so this
+-- is also the check that the two are not being confused for each other.
+diag.later("entities.around (by tag)", function()
+  local at = diag.origin()
+
+  -- Asserting a count would be asserting what wanders past. What is checked is that
+  -- the condition is accepted and answers a number, and that a tag nothing carries
+  -- narrows rather than widens.
+  local everything = entities.count { x = at.x, y = at.y, z = at.z, range = 64 }
+  local tagged = entities.count {
+    x = at.x, y = at.y, z = at.z, range = 64,
+    tags = { anyOf = { "animal", "predator" } },
+  }
+
+  assert(type(tagged) == "number", "a tag condition answered something other than a count")
+  assert(tagged <= everything,
+    ("a tag narrowed to %d out of %d, which is more than there were"):format(tagged, everything))
+
+  return ("%d of %d creature(s) within 64 blocks are animals or predators"):format(tagged, everything)
+end)
+
+diag.later("entities.around (refuses an unknown tag)", function()
+  local at = diag.origin()
+  local ok, why = pcall(entities.count, {
+    x = at.x, y = at.y, z = at.z, range = 8,
+    tags = { "moontweaks:no-such-creature-tag" },
+  })
+
+  assert(not ok, "a creature tag nothing declared was accepted")
+  assert(tostring(why):find("no%-such%-creature%-tag"),
+    ("the refusal did not name the tag: %s"):format(tostring(why)))
+
+  return "refused an unknown creature tag and named it"
+end)
+
 diag.later("entities.nearest", function()
   local it = entities.nearest(area(16))
   assert(it, "nothing is nearest in a box the hen is standing in")

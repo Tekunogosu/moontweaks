@@ -289,6 +289,27 @@ The same `tags` key selects for `items.set`, `blocks.set` and every recipe
 selector, so a condition worked out once is written the same way wherever it is
 used.
 
+A server may declare tags of its own and put them on whatever should carry them,
+which is how a rule gets a name that means something here rather than being spelled
+out at every call site:
+
+```lua
+moontweaks.tags.add "myserver:contraband"          -- one name
+moontweaks.tags.add { "myserver:scrap", "myserver:relic" }  -- or several
+
+moontweaks.items.set { code = "game:metalbit-*", addTags = "myserver:scrap" }
+moontweaks.items.set { tags = { "myserver:scrap" }, maxStackSize = 128 }
+```
+
+`addTags` puts them on top of what an asset already carries, which is nearly always
+what is wanted — the tags the game gave something are what its own recipes select it
+by. `setTags` replaces them instead.
+
+Declaring belongs in a script's body: the server closes its tag registry as soon as
+the scripts have run, so a handler is too late and is told so. Players install
+nothing for it, because the server sends its whole tag table to each client as they
+connect.
+
 Knapping reads the same way, with one material rather than a grid of them:
 
 ```lua

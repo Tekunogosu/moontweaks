@@ -126,7 +126,27 @@ public sealed class InventoryAccess(
                 // Reads the name off Collectible, which an unresolved stack has none
                 // of, whatever the declared type says.
                 Name = stack.GetName() ?? "",
+                Durability = Wear(stack, remaining: true),
+                MaxDurability = Wear(stack, remaining: false),
             };
+
+    /// <summary>
+    /// How much use a stack has left, or how much its kind has when new, and nil for
+    /// anything that does not wear out.
+    /// </summary>
+    /// <remarks>
+    /// Asked of the collectible rather than read off the stack's attributes, because
+    /// the game lets a behaviour answer for both and reading the attribute directly
+    /// would miss whatever a mod does with it. Something with no maximum has no
+    /// durability at all, which is a different answer from having none left.
+    /// </remarks>
+    private static int? Wear(ItemStack stack, bool remaining)
+    {
+        if (stack.Collectible is not { } kind) return null;
+
+        var maximum = kind.GetMaxDurability(stack);
+        return maximum <= 0 ? null : remaining ? kind.GetRemainingDurability(stack) : maximum;
+    }
 
     /// <summary>Everything standing in an inventory, in slot order, skipping the empty ones.</summary>
     public static IReadOnlyList<SlotPayload> List(IInventory inventory) =>

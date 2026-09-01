@@ -6,6 +6,7 @@
 
 local commands = moontweaks.commands
 local events   = moontweaks.events
+local groups   = moontweaks.groups
 local players  = moontweaks.players
 local server   = moontweaks.server
 
@@ -61,5 +62,71 @@ commands.add {
     if not left then return ("%s has been here, but not lately."):format(e.args.name) end
 
     return ("%s was last at %d %d %d."):format(e.args.name, left.x, left.y, left.z)
+  end,
+}
+
+-- ## Reaching some players and not others
+--
+-- `announce` reaches everybody and `say` reaches one. A chat group is the middle:
+-- the game's own channel, which players make and join, and which the server can
+-- address as a whole.
+--
+-- A group is named by the number `of` and `find` hand back, not by its name, because
+-- names are the players' own and two servers will not agree on them.
+commands.add {
+  name = "mygroups",
+  description = "Say which chat groups you are in",
+  requiresPlayer = true,
+  handler = function(e)
+    local mine = groups.of(e.player)
+    if #mine == 0 then
+      return "You are not in any chat group."
+    end
+
+    local said = {}
+    for _, membership in ipairs(mine) do
+      said[#said + 1] = ("%s (%s)"):format(membership.name, membership.standing)
+    end
+
+    return "You are in " .. table.concat(said, ", ")
+  end,
+}
+
+-- Speaking into one. A group is named by its name, and one this server has not got is
+-- refused by name — so this asks first rather than assuming the group exists.
+local STAFF = "staff"
+
+events.playerJoin(function(e)
+  local staff = groups.find(STAFF)
+  if not staff then return end
+
+  groups.say(STAFF,
+    ("%s has joined; %d of you are on."):format(players.name(e.player), #staff.online))
+end)
+
+-- ## Turning somebody away
+--
+-- `kick` ends the session and tells them why. It does not keep them out: they may
+-- reconnect at once, so anything meant to be lasting has to turn them away again when
+-- they do.
+--
+-- Nothing here asks first and nothing undoes it. A condition that is wrong empties the
+-- server, so the condition is what wants the care, not the call.
+commands.add {
+  name = "sendhome",
+  description = "Disconnect a player, telling them why",
+  privilege = "controlserver",
+  args = {
+    { name = "player", type = "player" },
+    { name = "reason", type = "text", optional = true },
+  },
+  handler = function(e)
+    -- Read before the kick, not after: every other function here resolves a connected
+    -- player, and a moment later there is no such player to resolve.
+    local name = players.name(e.args.player)
+
+    players.kick(e.args.player, e.args.reason or "An administrator ended your session.")
+
+    return ("Disconnected %s."):format(name)
   end,
 }

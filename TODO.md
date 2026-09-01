@@ -66,14 +66,22 @@ bounce against. `allowSpawnCreatureGroups` decides what may spawn on it,
 onto the face of another, as a rug or a moulding — is a placement path rather than a
 property.
 
-Tags are the one asymmetry worth naming: `tags` selects what to change and cannot be
-changed. `CollectibleObject.Tags` is a `TagSet` the registry hands out rather than a
-list an asset owns, so writing one means registering the names and rebuilding the
-set, and nothing has asked yet.
+Creature tags are selected by and not yet written. `moontweaks.entities.around` and
+its siblings take the same `tags` condition items and blocks take, read against
+`ICoreAPI.EntityTagRegistry`. What is missing is giving a creature type a tag of its
+own, which wants the mutation path `items.set` has rather than a binding, and an
+editor that offers the creature names inside that key — a tag condition is one shape
+wherever it is written and names its suggestion set once, so it offers the item and
+block names in both places. Both want a script asking before they are designed.
+
+The collectible half is done. `moontweaks.tags.add` declares
+names an item or a block may carry, and `addTags` closed the asymmetry there. Whatever
+declares creature tags inherits the same one-phase window: both registries lock
+together, immediately after the phase this mod runs scripts in.
 
 ## The events still unbound
 
-Twenty-nine are bound. What is left falls into groups that want quite different
+Thirty-one are bound. What is left falls into groups that want quite different
 things, listed here nearest to done first.
 
 **Notifications carrying something new** are down to nothing worth binding.
@@ -85,25 +93,46 @@ that reads it — marshalled onto the main thread it arrives after
 `PhysicsThreadStart` fires once, at startup, and says nothing a script cannot see
 from `worldgenStartup`. `AssetsFinalizers` is obsolete and wants binding never.
 
-**Events whose handler must answer** are the ones needing a decision rather than
-work. `CanUseBlock` and `CanPlaceOrBreakBlock` return a bool, `BreakBlock`,
-`HandInteract` and `OnPlayerInteractEntity` take a `ref EnumHandling`, `PlayerChat`
-takes `ref string message` and a `BoolRef consumed`, `BeforeActiveSlotChanged`
-returns `EnumHandling`, `ServerSuspend` returns `EnumSuspendState`, and
-`OnTestBlockAccess` and `OnTestBlockAccessClaim` decide whether somebody may touch a
-place at all. `ScriptValue.Func.Call` already hands back what a handler returned and
-`Raise` throws it away, so the machinery is half there. What is missing is a rule:
-several handlers may answer one event, and what a veto beside an approval means has
-to be decided before any of these is offered. The two access ones are the sharpest
-case, since answering wrongly hands somebody else's build to a stranger.
+**Events whose handler must answer.** `OnTestBlockAccess` is bound, as
+`events.testBlockAccess`, and settled the rule for the rest of the group by turning
+out not to need one. The game hands each mod the answer the one before it gave and
+takes the last as the decision, so handlers already compose without anything having to
+be decided about vetoes: what a script returns is simply the next answer in that
+chain. `RaiseAnswered` in `ScriptEvents` is that path, and is what any further
+answering event should reach for.
+
+`PlayerChat` is bound too, as `events.playerChat`, and needed a second raise path
+rather than the same one: it carries two things a handler may change — the message and
+whether anybody sees it — where the access event carries one. `RaiseChat` is that
+path. Both follow the game's own rule that the last answer stands, which for chat
+means a handler answering `true` puts back a message an earlier one swallowed. That is
+documented on the binding rather than designed away, because designing it away would
+have meant this mod's rule rather than the game's.
+
+What is left needs the same treatment, one at a time. `CanUseBlock` and
+`CanPlaceOrBreakBlock` return a bool, `BreakBlock`, `HandInteract` and
+`OnPlayerInteractEntity` take a `ref EnumHandling`, `BeforeActiveSlotChanged` returns
+`EnumHandling`, and `ServerSuspend` returns `EnumSuspendState`. These are not one
+decision but several: an `EnumHandling` is not a chained answer the way an access
+response is, and what two handlers each returning `PreventDefault` should mean is a
+question per event rather than one for the group.
+
+`OnTestBlockAccessClaim` is the sibling of the bound one and wants the same shape;
+nothing has asked for it yet.
 
 Marshalling does not help this group and never will. These events need an answer on
 the thread that asked, and anything deferred to the next tick answers after the
-decision was made — so the four raised off the main thread
-(`OnTrySpawnEntity`, `OnTrySpawnGroupNearOffthread`, and the two access ones where
-they are reached off-thread) stay out of reach whatever is decided about vetoes.
+decision was made. `RaiseAnswered` therefore compares the calling thread against the
+one the server ticks on and leaves the decision alone anywhere else, saying so once
+per event — the game's own callers ask on the main thread, and another mod calling
+`TryAccess` off it is what that guard is for. `OnTrySpawnEntity` and
+`OnTrySpawnGroupNearOffthread` are raised off the main thread always rather than
+sometimes, so they stay out of reach whatever else is bound.
 
-**Events on a hot path** should stay unbound whatever else is. `OnGetClimate`,
+**Events on a hot path** should stay unbound whatever else is. These are raised per
+frame, per match attempt or per block written, which is a different order of frequency
+from `testBlockAccess` — bound above, and raised once per block a player actually
+breaks or uses. `OnGetClimate`,
 `OnGetWindSpeed`, `MatchesGridRecipe`, `MatchesRecipe` and `ChunkDirty` are raised
 per frame, per match attempt or per block written, and a script call costs roughly
 130ns against 3ns for the same method in C#. Binding one puts the interpreter inside
@@ -121,8 +150,9 @@ thinned where it lands rather than in every handler.
 `moontweaks.players` reaches a player's body, their standing and their memory.
 `moontweaks.entities` reaches everything else alive. `moontweaks.inventory` reaches
 any set of slots. `moontweaks.world` reads and writes blocks, searches a
-region, reads the weather, plays sounds, throws off particles, asks about land claims
-and remembers things against the save game. What is left is smaller than it was, and
+region, reads the weather, plays sounds, throws off particles, asks whether somebody
+may act somewhere and remembers things against the save game. `moontweaks.claims`
+reads, adds and removes the land claims that question is asked against. What is left is smaller than it was, and
 each piece wants the same treatment the recipe kinds had — one owner for reaching the
 thing, and a spec for what a script writes.
 

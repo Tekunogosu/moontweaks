@@ -56,6 +56,28 @@ public sealed class AreaSpec
     public double? Height { get; set; }
 
     /// <summary>
+    /// Tags everything found must carry, such as <c>{ "animal" }</c>. Matches on what
+    /// a creature is rather than what it is called, so one search reaches a modded
+    /// wolf as readily as a vanilla one. Used alone, or alongside <c>code</c> to narrow
+    /// a wildcard further. A bare list asks for every tag in it; the keys of a
+    /// <c>TagCondition</c> ask for anything richer than that.
+    /// </summary>
+    /// <remarks>
+    /// Creatures carry tags from a registry of their own rather than the one items and
+    /// blocks share, so a name here is not a name <c>moontweaks.items.set</c> selects
+    /// by and the two cannot be mixed. <c>library/codes.lua</c> lists both sets, the
+    /// creature one under <c>EntityTag</c>.
+    ///
+    /// An editor offers the item and block names inside this key rather than the
+    /// creature ones, because a tag condition is one shape wherever it is written and
+    /// names its suggestions once. Every name is still accepted and one the server does
+    /// not know is refused by name, so the wrong suggestion costs a glance at
+    /// <c>codes.lua</c> rather than a silent mismatch.
+    /// </remarks>
+    [LuaField("tags")]
+    public TagConditionSpec? Tags { get; set; }
+
+    /// <summary>
     /// Only count what this code names, which may be a <c>*</c> wildcard such as
     /// <c>game:wolf-*</c>. Everything is counted when omitted.
     /// </summary>

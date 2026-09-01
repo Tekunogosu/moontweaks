@@ -220,6 +220,38 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     public int? SurfaceAt(ScriptOrigin origin, int x, int z) => world.Surface(x, z);
 
     /// <summary>
+    /// Where this world puts somebody who has no spawn of their own, as a table of
+    /// <c>x</c>, <c>y</c> and <c>z</c>, or nil where the game cannot work one out.
+    /// Read <c>moontweaks.players.spawn</c> for where one particular player would
+    /// land, which is this only when nothing nearer to them has an answer.
+    /// </summary>
+    /// <remarks>
+    /// A centre rather than a block, in both senses: the position is the middle of the
+    /// block, and the server scatters arrivals across the radius its configuration
+    /// names rather than standing them all on it.
+    /// </remarks>
+    /// <param name="origin">Script line asking.</param>
+    [LuaFunction("spawn")]
+    public VectorPayload? Spawn(ScriptOrigin origin) => world.Spawn();
+
+    /// <summary>
+    /// Moves the world's own spawn, so that anybody with no spawn of their own arrives
+    /// here instead. Saved with the world.
+    /// </summary>
+    /// <remarks>
+    /// This is where a player who has never set a spawn starts, and where clearing a
+    /// player's own spawn returns them to. Moving it moves nobody who already has one
+    /// of their own — <c>moontweaks.players.clearSpawn</c> is what gives them back to
+    /// the world's.
+    /// </remarks>
+    /// <param name="origin">Script line moving it.</param>
+    /// <param name="x">Where to put it, east to west.</param>
+    /// <param name="y">Where to put it, from the world's floor upwards.</param>
+    /// <param name="z">Where to put it, north to south.</param>
+    [LuaFunction("setSpawn")]
+    public void SetSpawn(ScriptOrigin origin, int x, int y, int z) => world.SetSpawn(x, y, z);
+
+    /// <summary>
     /// How much light of one kind reaches a position, from 0 in the dark to the
     /// world's brightest.
     /// </summary>

@@ -104,6 +104,13 @@ public static class SuggestionSets
 
     /// <summary>Every character trait a server's assets define.</summary>
     public const string ASSET_TRAIT = "AssetTrait";
+
+    /// <summary>
+    /// Every tag any creature carries. A separate set from <see cref="ASSET_TAG"/>,
+    /// because the game keeps creature tags in a registry of their own and a name in
+    /// one says nothing about the other.
+    /// </summary>
+    public const string ENTITY_TAG = "EntityTag";
 }
 
 /// <summary>

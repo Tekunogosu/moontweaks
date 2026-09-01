@@ -9,6 +9,7 @@
 -- nothing carries is refused by name rather than quietly matching nothing.
 
 local items = moontweaks.items
+local tags  = moontweaks.tags
 
 -- Every axe the server holds, whatever anybody called it.
 items.set {
@@ -97,5 +98,53 @@ items.set {
 -- asks for is every item on the server. Uncomment to see the failure it reports:
 --
 -- items.set { durability = 1 }
+
+-- ## Tags of your own
+--
+-- Everything above selects by tags the game already ships. A server may declare its
+-- own and put them on whatever should carry them, which is how a rule gets a name
+-- that means something here rather than being spelled out at every call site.
+--
+-- Declaring belongs in a script's body. The server closes its tag registry the moment
+-- the scripts have run, so a handler or a timer is too late and is told exactly that.
+--
+-- Nothing reaches a player's machine for this: the server sends its whole tag table
+-- to each client as they connect, so a tag declared here is one their game knows.
+
+-- One name is written on its own; several are written as a list. Both spellings are
+-- the same call.
+tags.add "moontweaks:example-scrap"
+tags.add { "moontweaks:example-contraband", "moontweaks:example-ritual" }
+
+-- `addTags` puts them on top of what an asset already carries, which is almost always
+-- what is wanted: the tags the game gave something are what the game's own recipes
+-- select it by, and taking those away breaks them.
+items.set {
+  code = "game:metalbit-*",
+  addTags = "moontweaks:example-scrap",
+}
+
+items.set {
+  tags = { "tool" },
+  addTags = { "moontweaks:example-contraband" },
+}
+
+-- And then selected by, exactly as one of the game's own is. This is the point of
+-- declaring one: the rule is written once against a name, and what carries that name
+-- is decided somewhere else.
+items.set {
+  tags = { "moontweaks:example-scrap" },
+  maxStackSize = 128,
+}
+
+-- `setTags` replaces rather than adds, and is the rarer half. Uncomment to strip an
+-- asset back to exactly what is named — including out of the game's own recipes:
+--
+-- items.set { code = "game:metalbit-copper", setTags = "moontweaks:example-scrap" }
+
+-- A tag nothing declared is refused by name, on the line that named it, rather than
+-- quietly matching nothing. Uncomment to see it:
+--
+-- items.set { code = "game:knife-flint", addTags = "moontweaks:never-declared" }
 
 moontweaks.log.info("tag-matched properties done")

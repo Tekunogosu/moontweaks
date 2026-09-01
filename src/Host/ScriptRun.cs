@@ -72,6 +72,7 @@ public sealed record ScriptRun(
         host.Bind(DomainBinder.Bind(new CookingDomain(log, server.World, registry)));
         host.Bind(DomainBinder.Bind(new ItemDomain(log, server.World)));
         host.Bind(DomainBinder.Bind(new BlockDomain(log, server.World)));
+        host.Bind(DomainBinder.Bind(new TagDomain(server.World)));
         host.Bind(DomainBinder.Bind(new LogDomain(server.Logger)));
         host.Bind(DomainBinder.Bind(new ServerDomain(server, timers)));
         host.Bind(DomainBinder.Bind(new EventDomain(events)));
@@ -82,8 +83,10 @@ public sealed record ScriptRun(
             new InventoryAccess(server, players, creatures), stacks, server.World)));
         host.Bind(DomainBinder.Bind(new CalendarDomain(server.World)));
         host.Bind(DomainBinder.Bind(new PlayerDomain(players, stacks)));
+        host.Bind(DomainBinder.Bind(new GroupDomain(server, players, new GroupAccess(server, players))));
         host.Bind(DomainBinder.Bind(
             new WorldDomain(new WorldAccess(server, players, undoHistory), stacks)));
+        host.Bind(DomainBinder.Bind(new ClaimDomain(new ClaimAccess(server, players))));
         // Everything below reaches inside another mod rather than the game's own API.
         // One lookup shared by all three, so a server missing one of those mods is
         // told the same thing whichever domain was asked.

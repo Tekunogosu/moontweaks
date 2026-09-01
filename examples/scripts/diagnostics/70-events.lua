@@ -35,6 +35,23 @@ end
 
 -- Somebody has to do these: right-click a block, mine one, place one, scroll the
 -- hotbar.
+-- The two events whose answers decide something. Watching either is safe precisely
+-- because a watcher returns nothing: what was going to happen still happens, and what
+-- is checked is that the handler is taken and fires.
+--
+-- `playerChat` is the sharper of the two. A watcher that answered `true` would put
+-- back a message some other script swallowed on purpose, which is why returning
+-- nothing is the only right answer for a check.
+diag.watch("playerChat", events.playerChat, function(e)
+  return ("%s said %d character(s) in group %d, delivered: %s")
+    :format(tostring(e.playerName), #e.message, e.group, tostring(e.delivered))
+end)
+
+diag.watch("testBlockAccess", events.testBlockAccess, function(e)
+  return ("%s wanted to %s at %d %d %d, and the server said %s")
+    :format(tostring(e.playerName), e.what, e.x, e.y, e.z, e.allowed)
+end)
+
 diag.watch("didUseBlock", events.didUseBlock, block)
 diag.watch("didBreakBlock", events.didBreakBlock, block)
 diag.watch("didPlaceBlock", events.didPlaceBlock, function(e)

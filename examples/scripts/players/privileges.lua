@@ -8,6 +8,27 @@
 local commands = moontweaks.commands
 local events   = moontweaks.events
 local players  = moontweaks.players
+local server   = moontweaks.server
+
+-- Declaring one is the exception, and it is not granting. A privilege the server has
+-- never been told about is a privilege nobody holds, so a command requiring a name
+-- invented here would be a command nobody could run. Declaring it makes the name real
+-- for as long as the server runs: administrators and the console hold it at once, and
+-- everybody else gets it when the operator names it in a role in `serverconfig.json`.
+--
+-- This belongs in a script's body rather than a handler, because the declaration is
+-- lost on shutdown and a script's body is what runs at every startup.
+server.addPrivilege("moontweaks.warden", "Use the warden tools this server adds")
+
+commands.add {
+  name = "warden",
+  description = "Warden tools",
+  privilege = "moontweaks.warden",
+  requiresPlayer = true,
+  handler = function(e)
+    return ("%s, the wardens are yours to command."):format(players.name(e.player))
+  end,
+}
 
 -- A command everyone may run that does more for those who may do more. The command's
 -- own `privilege` decides who may type it at all; this decides what they get.

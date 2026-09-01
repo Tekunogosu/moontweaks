@@ -117,3 +117,39 @@ events.didUseBlock(function(e)
   players.setWorldData(e.player, "quarry", looking)
   players.say(e.player, "Marked " .. entities.name(looking) .. ".")
 end)
+
+-- ## Finding by what something is
+--
+-- A code is a name, and a mod's wolf is not called `game:wolf-anything`. Creatures
+-- carry tags the same way items do, so one search written against a tag reaches a
+-- modded creature as readily as a vanilla one.
+--
+-- These are a separate set from the item and block tags: the game keeps the two in
+-- registries of their own, and `library/codes.lua` lists the creature ones under
+-- `EntityTag`. A name from the wrong set is refused rather than matching nothing.
+moontweaks.commands.add {
+  name = "whatsabout",
+  description = "Count the creatures around you by what they are",
+  privilege = "controlserver",
+  requiresPlayer = true,
+  handler = function(e)
+    local at = players.position(e.player)
+
+    local hunters = entities.count {
+      x = at.x, y = at.y, z = at.z,
+      range = 32,
+      tags = { "predator" },
+    }
+
+    -- The same condition grammar items use, so `anyOf`, `allOf` and `noneOf` all read
+    -- the same here as they do in `items.set`.
+    local rest = entities.count {
+      x = at.x, y = at.y, z = at.z,
+      range = 32,
+      tags = { allOf = { "animal" }, noneOf = { "predator" } },
+      skipPlayers = true,
+    }
+
+    return ("%d predator(s) and %d other animal(s) within 32 blocks."):format(hunters, rest)
+  end,
+}

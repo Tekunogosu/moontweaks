@@ -27,11 +27,17 @@ cp "$OUT/library/codes.lua" "$ROOT/examples/library/codes.lua"
 # snippet on the reference page from drifting out of step with the bindings it shows.
 mkdir -p "$ROOT/examples/snippets"
 cp "$OUT/snippets.lua" "$ROOT/examples/snippets/modules.lua"
+# The diagnostics suite measures its coverage against a checklist of every bound
+# function, and the checklist is generated for the same reason the snippets are: one
+# left to drift reports full coverage of the functions it happens to list and says
+# nothing about the ones it does not.
+cp "$OUT/surface.lua" "$ROOT/examples/scripts/diagnostics/01-surface.lua"
 echo "  examples/.luarc.json"
 echo "  examples/.vscode/extensions.json"
 echo "  examples/library/moontweaks.lua"
 echo "  examples/library/codes.lua"
 echo "  examples/snippets/modules.lua"
+echo "  examples/scripts/diagnostics/01-surface.lua"
 
 # The examples are shipped in the mod and scaffolded against the library just
 # written, so they are checked against the types this build actually produces.

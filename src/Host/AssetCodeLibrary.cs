@@ -58,6 +58,12 @@ public static class AssetCodeLibrary
             "A character trait, which a recipe may demand of whoever crafts it.\n"
             + "Any other string is still accepted.",
             world is null ? [] : TraitsOf(world)),
+
+        new(SuggestionSets.ENTITY_TAG, "entity tags",
+            "A tag a creature carries, naming what it is rather than what it is called.\n"
+            + "A separate set from the item and block tags above: the game keeps the two\n"
+            + "in registries of their own. Any other string is still accepted.",
+            world is null ? [] : EntityTagsOf(world)),
     ];
 
     /// <summary>
@@ -97,6 +103,21 @@ public static class AssetCodeLibrary
         return world.Items.Cast<CollectibleObject>().Concat(world.Blocks)
             .Where(asset => !asset.IsMissing)
             .SelectMany(asset => registry.SlowEnumerateTagNames(asset.Tags))
+            .Distinct()
+            .OrderBy(tag => tag, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Every tag any creature type carries, in one sorted list. Read off the types
+    /// rather than off what is alive: a world holds every type it could spawn and only
+    /// the handful of creatures actually standing in the loaded chunks.
+    /// </summary>
+    public static IReadOnlyList<string> EntityTagsOf(IWorldAccessor world)
+    {
+        var registry = world.Api.EntityTagRegistry;
+        return world.EntityTypes
+            .SelectMany(type => registry.SlowEnumerateTagNames(type.Tags))
             .Distinct()
             .OrderBy(tag => tag, StringComparer.Ordinal)
             .ToList();

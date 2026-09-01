@@ -44,7 +44,7 @@ public sealed class EntityDomain(EntityAccess entities, AssetStacks stacks)
     /// <param name="area">Where to look, how far, and what to count.</param>
     [LuaFunction("around")]
     public IReadOnlyList<EntityPayload> Around(ScriptOrigin origin, AreaSpec area) =>
-        [.. entities.Around(area).Select(EntityAccess.Describe)];
+        [.. entities.Around(area, origin).Select(EntityAccess.Describe)];
 
     /// <summary>
     /// The closest thing a search matches, or nil where it matches nothing. The same
@@ -54,7 +54,7 @@ public sealed class EntityDomain(EntityAccess entities, AssetStacks stacks)
     /// <param name="area">Where to look, how far, and what to count.</param>
     [LuaFunction("nearest")]
     public EntityPayload? Nearest(ScriptOrigin origin, AreaSpec area) =>
-        entities.Around(area).Select(EntityAccess.Describe).FirstOrDefault();
+        entities.Around(area, origin).Select(EntityAccess.Describe).FirstOrDefault();
 
     /// <summary>
     /// How many things a search matches. Cheaper than counting what <c>around</c>
@@ -63,7 +63,7 @@ public sealed class EntityDomain(EntityAccess entities, AssetStacks stacks)
     /// <param name="origin">Script line asking.</param>
     /// <param name="area">Where to look, how far, and what to count.</param>
     [LuaFunction("count")]
-    public int Count(ScriptOrigin origin, AreaSpec area) => entities.Around(area).Count;
+    public int Count(ScriptOrigin origin, AreaSpec area) => entities.Around(area, origin).Count;
 
     /// <summary>What one entity is, or nil where the identifier names nothing loaded.</summary>
     /// <param name="origin">Script line asking.</param>

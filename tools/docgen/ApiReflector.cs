@@ -222,7 +222,7 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         if (type == typeof(MoonTweaks.Scripting.ScriptValue)) return "any";
         // A handler the host calls back, given one table describing what happened.
         if (type == typeof(MoonTweaks.Scripting.ScriptValue.Func)) return "fun(event: table)";
-        if (type == typeof(string[])) return "string[]";
+        if (type == typeof(string[])) return "string | string[]";
         // Written as rows, or as a list of them when a shape has more than one layer.
         if (type == typeof(string[][])) return "string[] | string[][]";
         // One key read two ways: the tag names, or the groups those names sit in.

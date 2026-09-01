@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Scripting;
@@ -37,8 +38,9 @@ public static class TagConditions
     /// Where the condition itself sits, as a failure should name it — the whole path
     /// including the key, not the shape holding it.
     /// </param>
-    public static ComplexTagCondition<TagSet> Build(
-        ITagRegistry<TagSet> registry, TagConditionSpec? spec, ScriptOrigin origin, string path)
+    public static ComplexTagCondition<TSet> Build<TSet>(
+        ITagRegistry<TSet> registry, TagConditionSpec? spec, ScriptOrigin origin, string path)
+        where TSet : struct, IEquatable<TSet>
     {
         if (spec is null) return default;
 
@@ -75,14 +77,15 @@ public static class TagConditions
     /// nothing required to overlap an asset's tags and so matches nothing at all;
     /// built this way it means what it says.
     /// </remarks>
-    private static ComplexTagCondition<TagSet> Single(
-        ITagRegistry<TagSet> registry,
+    private static ComplexTagCondition<TSet> Single<TSet>(
+        ITagRegistry<TSet> registry,
         string[] required,
         string[]? forbidden,
         bool junction,
         ScriptOrigin origin,
         string path,
         string key)
+        where TSet : struct, IEquatable<TSet>
     {
         // An empty junction asks for nothing, which the game reads as matching
         // everything under one flag and nothing under the other. Neither is what a
@@ -92,11 +95,11 @@ public static class TagConditions
             throw new ScriptError(origin, $"{path}.{key} names no tags, so nothing would be selected by it");
         }
 
-        return new ComplexTagCondition<TagSet>
+        return new ComplexTagCondition<TSet>
         {
             conditions =
             [
-                new ComplexTagCondition<TagSet>.Condition
+                new ComplexTagCondition<TSet>.Condition
                 {
                     RequiredTags = Set(registry, required, origin, $"{path}.{key}"),
                     ForbiddenTags = Set(registry, forbidden ?? [], origin, $"{path}.noneOf"),
@@ -112,14 +115,15 @@ public static class TagConditions
     /// no group to belong to and is refused rather than quietly applied to all of
     /// them. The game refuses it in the same place and for the same reason.
     /// </remarks>
-    private static ComplexTagCondition<TagSet> Groups(
-        ITagRegistry<TagSet> registry,
+    private static ComplexTagCondition<TSet> Groups<TSet>(
+        ITagRegistry<TSet> registry,
         TagGroupSpec[] groups,
         TagConditionSpec spec,
         bool junction,
         ScriptOrigin origin,
         string path,
         string key)
+        where TSet : struct, IEquatable<TSet>
     {
         if (spec.NoneOf is not null)
         {
@@ -138,7 +142,7 @@ public static class TagConditions
         // asks each group for anything.
         var asked = junction == ANY_GROUP ? "allOf" : "anyOf";
 
-        return new ComplexTagCondition<TagSet>
+        return new ComplexTagCondition<TSet>
         {
             conditions = [.. groups.Select((group, index) =>
                 Group(registry, group, asked, origin, $"{path}.{key}[{index + 1}]"))],
@@ -147,12 +151,13 @@ public static class TagConditions
     }
 
     /// <summary>One group of a junction, which must ask with the key that junction leaves it.</summary>
-    private static ComplexTagCondition<TagSet>.Condition Group(
-        ITagRegistry<TagSet> registry,
+    private static ComplexTagCondition<TSet>.Condition Group<TSet>(
+        ITagRegistry<TSet> registry,
         TagGroupSpec group,
         string asked,
         ScriptOrigin origin,
         string path)
+        where TSet : struct, IEquatable<TSet>
     {
         var written = asked == "allOf" ? group.AllOf : group.AnyOf;
         var other = asked == "allOf" ? group.AnyOf : group.AllOf;
@@ -179,7 +184,7 @@ public static class TagConditions
             throw new ScriptError(origin, $"{path} names no tags, so nothing would be selected by it");
         }
 
-        return new ComplexTagCondition<TagSet>.Condition
+        return new ComplexTagCondition<TSet>.Condition
         {
             RequiredTags = Set(registry, written, origin, $"{path}.{asked}"),
             ForbiddenTags = Set(registry, group.NoneOf ?? [], origin, $"{path}.noneOf"),
@@ -191,10 +196,13 @@ public static class TagConditions
     /// server has never heard of, which the registry reports rather than guesses at,
     /// so a misspelling names itself instead of silently matching nothing.
     /// </summary>
-    private static TagSet Set(
-        ITagRegistry<TagSet> registry, string[] names, ScriptOrigin origin, string path)
+    private static TSet Set<TSet>(
+        ITagRegistry<TSet> registry, string[] names, ScriptOrigin origin, string path)
+        where TSet : struct, IEquatable<TSet>
     {
-        if (names.Length == 0) return TagSet.Empty;
+        // The empty set is the default one for both of the game's set types, which is
+        // what lets this be written without naming either.
+        if (names.Length == 0) return default;
 
         var error = registry.TryCreateTagSet(out var set, names);
         if (error == TagRegistryError.None) return set;

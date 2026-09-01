@@ -15,10 +15,12 @@ which despawns on its own.
 Three numbers, written into the log at each stage and shown by `/diag`:
 
 - **passed / failed / skipped** — one line per check, `[diag] pass` or `[diag] FAIL`.
-- **_n_ of 166 bound functions exercised** — measured against `01-surface.lua`, which
-  is generated from the same reference the editor library comes from. A function
-  bound later shows up as untouched rather than going unnoticed.
-- **_n_ of 26 watched events have fired** — with the quiet ones named.
+- **_n_ of 199 bound functions exercised** — measured against `01-surface.lua`, which
+  `scripts/docs.sh` generates from the same reference the editor library comes from,
+  so a function bound later shows up as untouched rather than going unnoticed. The
+  total moves whenever a binding is added; the figure the suite prints is the one to
+  believe, not this sentence.
+- **_n_ of 31 watched events have fired** — with the quiet ones named.
 
 The whole answer to "did anything break" is `grep '\[diag\] FAIL'` over the log.
 
@@ -45,12 +47,13 @@ nobody; the rest need you logged in.
 ### 1. Start the server
 
 Watch for `[diag] ---- load ----`. This is the smallest report of the three: the
-world is not up yet, so only the registries, the server itself and the mod list have
-been reached. Expect **64 of 166** exercised and no failures.
+world is not up yet, so only the registries, the server itself, the tag registry and
+the mod list have been reached. Expect no failures; the exercised count is roughly a
+third of the total.
 
 A few seconds later the world comes up and `[diag] ---- world ----` follows, adding
-the calendar, the chunks, the weather and the entity checks. Expect **119 of 166**
-and no failures. Between the two reports the hen is spawned, put through every
+the calendar, the chunks, the weather and the entity checks. Expect no failures, and
+the exercised count to rise to roughly two thirds of the total. Between the two reports the hen is spawned, put through every
 function in its module, and cleared away again.
 
 Above the first report, the mod's own change log is worth a glance. Lines reading
@@ -60,7 +63,7 @@ evidence that both halves of each recipe check landed — a count taken inside a
 cannot show it, because a run's changes are applied only once every script has
 finished.
 
-**Good result:** two report blocks, no `FAIL` lines, and 119 of 166.
+**Good result:** two report blocks and no `FAIL` lines.
 
 **If the world report says "the server is holding no chunk near spawn":** the server
 had not finished loading spawn when the checks ran. Log in and run `/diag world`,
@@ -101,7 +104,7 @@ started — you will see your health and satiety flicker and return.
 It needs one empty slot in your backpack. If every slot is full, the slot checks say
 so rather than displacing anything.
 
-**Good result:** the count reaches **166 of 166**, no failures. Every function left
+**Good result:** the count reaches the full total, no failures. Every function left
 untouched by the first two reports is in this one group. You will be handed a stick
 and shown two chat lines, one plain and one as a warning.
 
@@ -124,16 +127,17 @@ function and made a decision about it. What changes is that the call was made.
 
 ### 6. Raise the events
 
-`/diag events` lists all twenty-six and what the first firing of each looked like.
-Nine fill themselves in during startup. The rest need somebody to do something:
+`/diag events` lists them all and what the first firing of each looked like. Nine
+fill themselves in during startup. The rest need somebody to do something:
 
 | Do this | Fills in |
 | --- | --- |
 | Log in | `playerJoin`, `playerNowPlaying`, `playerReady` |
+| Say anything in chat | `playerChat` |
 | Log in for the first time ever on this save | `playerCreate` |
 | Scroll the hotbar | `playerChangeSlot` |
 | Right-click a door or a chest | `didUseBlock` |
-| Mine a block | `didBreakBlock` |
+| Mine a block | `didBreakBlock`, `testBlockAccess` |
 | Place a block | `didPlaceBlock` |
 | Sit in a boat or on a saddled animal, then get off | `entityMounted`, `entityUnmounted` |
 | Die, by `/kill` or otherwise | `playerDeath` |

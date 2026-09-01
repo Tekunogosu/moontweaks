@@ -383,6 +383,34 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players, int un
     /// </summary>
     public int? Surface(int x, int z) => api.WorldManager.GetSurfacePosY(x, z);
 
+    /// <summary>
+    /// Moves the world's own spawn, which is where anybody with no spawn of their own
+    /// arrives and where a new player starts. Saved with the world.
+    /// </summary>
+    /// <remarks>
+    /// Written to the save game rather than to the server's configuration, so it
+    /// belongs to this world rather than to the server running it. The game scatters
+    /// arrivals across the radius its configuration names, so this is the middle of
+    /// where they land rather than the block each of them stands on.
+    /// </remarks>
+    public void SetSpawn(int x, int y, int z) =>
+        api.WorldManager.SaveGame.DefaultSpawn = new PlayerSpawnPos { x = x, y = y, z = z };
+
+    /// <summary>
+    /// The world's own spawn, which is where somebody with no spawn of their own
+    /// arrives, or null where the game cannot work one out. Resolved rather than read
+    /// off the save: a world that never had one written answers with the middle of the
+    /// map, which is where the game would send them.
+    /// </summary>
+    public VectorPayload? Spawn()
+    {
+        // Declared non-nullable and is null anyway, for the same reason a player's own
+        // spawn can be: a spawn missing its height is filled in from the terrain map,
+        // which answers with nothing for a column that has never been generated.
+        var at = world.DefaultSpawnPosition;
+        return at is null ? null : new VectorPayload(at.X, at.Y, at.Z);
+    }
+
     /// <summary>What the weather and the ground are like at a position, as it stands now.</summary>
     public ClimatePayload Climate(int x, int y, int z)
     {

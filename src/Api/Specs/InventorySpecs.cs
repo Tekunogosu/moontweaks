@@ -97,4 +97,24 @@ public sealed class SlotPayload
     /// </summary>
     [LuaField("name")]
     public string Name { get; init; } = "";
+
+    /// <summary>
+    /// How much use this one has left, or nil for something that does not wear out.
+    /// This is the stack's own remaining durability rather than the kind's maximum,
+    /// which <c>maxDurability</c> beside it carries.
+    /// </summary>
+    /// <remarks>
+    /// The game keeps it on the stack rather than on the asset, so two axes in one
+    /// chest answer differently. A stack that has never been used carries no figure of
+    /// its own and reads back as the maximum, which is what the game shows.
+    /// </remarks>
+    [LuaField("durability")]
+    public int? Durability { get; init; }
+
+    /// <summary>
+    /// How much use this kind has when new, or nil for something that does not wear
+    /// out. What <c>moontweaks.items.set</c> writes as <c>durability</c>.
+    /// </summary>
+    [LuaField("maxDurability")]
+    public int? MaxDurability { get; init; }
 }
