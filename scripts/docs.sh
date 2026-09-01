@@ -39,15 +39,10 @@ echo "  examples/library/codes.lua"
 echo "  examples/snippets/modules.lua"
 echo "  examples/scripts/diagnostics/01-surface.lua"
 
-# The examples are shipped in the mod and scaffolded against the library just
-# written, so they are checked against the types this build actually produces.
-# CI runs this and fails on it; here it runs when the tool is installed and says
-# so when it is not, rather than passing quietly either way.
-if command -v lua-language-server >/dev/null 2>&1; then
-    echo
-    lua-language-server --check "$ROOT/examples" --checklevel Warning
-else
-    echo
-    echo "lua-language-server is not installed, so the examples were not checked here."
-    echo "CI checks them on every push; install it to get the same answer locally."
-fi
+# Checking what was just scaffolded belongs to scripts/check-examples.sh, which is a
+# program of its own so that generating the reference and judging it are separately
+# invokable: scripts/package.sh generates as a build step and must not fail on a
+# diagnostic in an example, and CI runs the check as a step that reports its own
+# findings rather than one buried inside a build.
+echo
+echo "Run scripts/check-examples.sh to check them against the types just written."

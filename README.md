@@ -448,8 +448,9 @@ The reference is published at
 generated from the bindings, never written alongside them:
 
 ```sh
-./scripts/docs.sh            # the reference, the library, and a scaffolded examples/
-./scripts/docs.sh --check    # fail on any undocumented binding, write nothing
+./scripts/docs.sh              # the reference, the library, and a scaffolded examples/
+./scripts/docs.sh --check      # fail on any undocumented binding, write nothing
+./scripts/check-examples.sh    # fail on an example disagreeing with the types just written
 ```
 
 It writes `docs/api.json`, `docs/library/`, `docs/index.html`, the highlighter that
@@ -457,11 +458,11 @@ page loads, and scaffolds `examples/`
 with the same files the mod installs into a server: the editor configuration held in
 `src/Host/Resources/`, embedded in the mod and written out verbatim, and the library
 this build produced. The repository's own scripts are therefore checked exactly where
-an author's are:
-
-```sh
-lua-language-server --check examples
-```
+an author's are, by `check-examples.sh` running `lua-language-server` over that
+scaffolded folder. Generating and checking are separate programs because they answer
+separate questions: `package.sh` generates the library as a build step and must not
+fail on a diagnostic in an example, and a diagnostic reported by a build step reads
+as the packaging being broken rather than as a finding about the examples.
 
 `ApiReflector` enumerates the surface through `DomainBinder.FunctionsOf` and
 `SpecBinder.FieldsOf` — the same helpers the interpreter uses to decide what
@@ -477,11 +478,17 @@ against. A snippet that stops compiling fails the build rather than sitting wron
 the site.
 
 `--check` fails when any module, function, parameter, table, field, or enumerated
-value lacks a description, or when a module lacks an example. The two checks pair: that one fails on a binding without a
-description, `lua-language-server` on an example that disagrees with the types the
-binding produced. Both run in CI ahead of the Pages deploy, the example check against
-the library `docs.sh` has just written rather than a checked-in copy, so neither an
-undocumented binding nor a drifted example reaches `main`.
+value lacks a description, when a module lacks an example, or when two bindings
+declare the same type name. That last one matters because a Lua type is addressed by
+name alone: two bindings sharing one are read as a single type holding the union of
+both sets of fields, and a table satisfying either is then reported against the
+other's requirements.
+
+The checks pair: `--check` fails on a binding the reference cannot describe,
+`check-examples.sh` on an example that disagrees with the types the binding produced.
+Both run in CI ahead of the Pages deploy, the example check against the library
+`docs.sh` has just written rather than a checked-in copy, so neither an undocumented
+binding nor a drifted example reaches `main`.
 
 The examples are coloured by highlight.js, vendored under `third_party/highlight.js`
 at a pinned version and copied into `docs/` beside the page. The site loads nothing

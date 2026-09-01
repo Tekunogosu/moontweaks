@@ -133,7 +133,7 @@ public sealed class ClaimAccess(ICoreServerAPI api, PlayerAccess players)
             Owned(claim.OwnedByPlayerUid ?? "").IndexOf(claim));
 
     /// <summary>One box of a claim, as two corners the way a script writes them.</summary>
-    private static BoxPayload Described(Cuboidi area) => new()
+    private static ClaimAreaPayload Described(Cuboidi area) => new()
     {
         X = area.MinX, Y = area.MinY, Z = area.MinZ,
         ToX = area.MaxX, ToY = area.MaxY, ToZ = area.MaxZ,

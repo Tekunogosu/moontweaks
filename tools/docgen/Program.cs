@@ -33,6 +33,17 @@ if (undocumented.Count > 0)
     return 1;
 }
 
+var collisions = Colliding(api).ToList();
+foreach (var name in collisions) Console.Error.WriteLine($"declared more than once: {name}");
+
+if (collisions.Count > 0)
+{
+    Console.Error.WriteLine(
+        $"{collisions.Count} name(s) declared by more than one binding; give each its own "
+        + "LuaTable or LuaEnum name.");
+    return 1;
+}
+
 if (checkOnly)
 {
     Console.WriteLine($"all {Members(api)} member(s) documented");
@@ -83,6 +94,20 @@ static int Members(ApiModel api) =>
     api.Modules.Sum(module => 1 + module.Functions.Count)
     + api.Tables.Sum(table => 1 + table.Fields.Count)
     + api.Enums.Sum(value => 1 + value.Values.Count);
+
+/// <summary>
+/// Every type name more than one binding declares. A Lua type is addressed by name
+/// alone, so two bindings sharing one are read as a single type whose fields are the
+/// union of both: a table satisfying either is then reported against the other's
+/// requirements. The reference cannot describe two such types apart, so a repeated
+/// name fails the build rather than being published as one.
+/// </summary>
+static IEnumerable<string> Colliding(ApiModel api) =>
+    api.Tables.Select(table => table.Name)
+        .Concat(api.Enums.Select(enumeration => enumeration.Name))
+        .GroupBy(name => name, StringComparer.Ordinal)
+        .Where(names => names.Count() > 1)
+        .Select(names => $"{names.Key} ({names.Count()} bindings)");
 
 /// <summary>
 /// Every documented surface that carries no description. A non-empty result fails

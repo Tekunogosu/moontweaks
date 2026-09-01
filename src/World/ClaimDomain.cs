@@ -24,6 +24,10 @@ namespace MoonTweaks.World;
 /// <code>
 /// local claims = moontweaks.claims
 ///
+/// -- The player the plot below is claimed for. A script has this from an event or
+/// -- from the person who ran its command rather than written out as it is here.
+/// local somebodyUid = "0000-somebody"
+///
 /// -- What is claimed where somebody is standing, and by whom.
 /// for _, claim in ipairs(claims.at(500, 110, 500)) do
 ///   moontweaks.log.info(("%s holds claim %d here: %s")

@@ -68,9 +68,12 @@ jobs:
         run: git diff --exit-code examples/scripts/diagnostics/01-surface.lua
 
       # docs.sh scaffolds examples/ with this build's library, so the check runs
-      # against the types this commit generates rather than a checked-in copy.
+      # against the types this commit generates rather than a checked-in copy. It is
+      # a step of its own rather than part of package.sh: a diagnostic in an example
+      # is a finding about the examples, and a build step failing on it reports the
+      # packaging as broken instead.
       - name: Check the examples against the generated types
-        run: lua-language-server --check examples --checklevel Warning
+        run: ./scripts/check-examples.sh
 
       # Only the default branch is published, so every other build checks the
       # reference without producing an artifact nothing will deploy.

@@ -49,11 +49,11 @@ public sealed class ClaimPayload
     public int ProtectionLevel { get; init; }
 
     /// <summary>
-    /// The boxes it covers. A claim may hold several, so a claim that is not a single
+    /// The areas it covers. A claim may hold several, so a claim that is not a single
     /// box is still one claim and is removed as one.
     /// </summary>
     [LuaField("areas")]
-    public BoxPayload[] Areas { get; init; } = [];
+    public ClaimAreaPayload[] Areas { get; init; } = [];
 
     /// <summary>Whether anybody at all may operate what stands on it.</summary>
     [LuaField("allowUseEveryone")]
@@ -68,9 +68,9 @@ public sealed class ClaimPayload
     public PermitPayload[] Permitted { get; init; } = [];
 }
 
-/// <summary>One box of a claim, given as two opposite corners.</summary>
-[LuaTable("Box", Given = true)]
-public sealed class BoxPayload
+/// <summary>One area of a claim, given as two opposite corners.</summary>
+[LuaTable("ClaimArea", Given = true)]
+public sealed class ClaimAreaPayload
 {
     /// <summary>The lower corner, east to west.</summary>
     [LuaField("x")]
