@@ -164,10 +164,10 @@ commands.add {
     local from = { player = e.player, which = "backpack" }
     local to = { x = at.x, y = at.y, z = at.z }
 
-    local carried = inventory.count(from, e.code)
-    if carried == 0 then return { error = ("you are carrying no %s."):format(e.code) } end
+    local carried = inventory.count(from, e.args.code)
+    if carried == 0 then return { error = ("you are carrying no %s."):format(e.args.code) } end
 
-    local ok, moved = pcall(function() return inventory.move(from, to, { code = e.code, quantity = carried }) end)
+    local ok, moved = pcall(function() return inventory.move(from, to, { code = e.args.code, quantity = carried }) end)
     if not ok then return { error = tostring(moved) } end
 
     if moved < carried then

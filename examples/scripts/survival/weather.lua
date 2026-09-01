@@ -50,13 +50,13 @@ moontweaks.commands.add {
     { name = "level", type = "number", optional = true },
   },
   handler = function(e)
-    if not e.level then
+    if not e.args.level then
       weather.clearPrecipitation()
       return "The weather is its own again."
     end
 
-    weather.setPrecipitation(e.level)
-    return ("Held at %.2f everywhere. Run this with no number to let it go."):format(e.level)
+    weather.setPrecipitation(e.args.level)
+    return ("Held at %.2f everywhere. Run this with no number to let it go."):format(e.args.level)
   end,
 }
 
