@@ -689,17 +689,56 @@ learns that a second engine exists.
 
 ### What a script may and may not do
 
+The reported version is Lua 5.2, so `//` is not integer division, `goto` is not a
+keyword, and there is no integer subtype: every number is a double.
+
 The interpreter opens the basic library, `string`, `table`, `math` and `bit32`, and
 nothing else. `coroutine`, `debug`, `io`, `os`, `package` and `utf8` are absent
 rather than present and refusing, so a script has no clock of its own — which is
 what `moontweaks.server.elapsedMs` exists to answer — and no way to reach a file.
+`require` belongs to `package` and is absent with it, so a script cannot pull in
+another; scripts share one environment instead, described below.
+
 `dofile`, `loadfile`, `load` and `loadstring` come with the basic library and are
 taken back out, each being a way to compile or load code the bindings never offered.
 An editor still offers those four, since they are the standard library's rather than
 this mod's to withdraw; a script that calls one fails on the line that does.
 
-`pcall`, `error` and `setmetatable` are available. The reported version is Lua 5.2,
-so `//` is not integer division and `goto` is not a keyword.
+This is the whole of what a script may call. Anything not named here is absent.
+
+| Library | Available |
+| --- | --- |
+| basic | `assert` `collectgarbage` `error` `getmetatable` `ipairs` `next` `pairs` `pcall` `print` `rawequal` `rawget` `rawlen` `rawset` `select` `setmetatable` `tonumber` `tostring` `type` `xpcall` `_G` `_VERSION` |
+| `string` | `byte` `char` `dump` `find` `format` `gmatch` `gsub` `len` `lower` `match` `rep` `reverse` `sub` `upper` |
+| `table` | `concat` `insert` `pack` `remove` `sort` `unpack` |
+| `math` | `abs` `acos` `asin` `atan` `atan2` `ceil` `cos` `cosh` `deg` `exp` `floor` `fmod` `frexp` `huge` `ldexp` `log` `max` `min` `modf` `pi` `pow` `rad` `random` `randomseed` `sin` `sinh` `sqrt` `tan` `tanh` |
+| `bit32` | `arshift` `band` `bnot` `bor` `btest` `bxor` `extract` `lrotate` `lshift` `replace` `rrotate` `rshift` |
+
+Five details that the list alone does not give away:
+
+**Strings carry their methods.** The string metatable is set, so `("x"):upper()`
+works as well as `string.upper("x")`.
+
+**`string.dump` is present and always fails.** The engine ships it as a stub that
+raises rather than returning a binary chunk. Nothing could be done with one anyway,
+since `load` is withdrawn.
+
+**`print` does not reach the game log.** It writes a bare line to the server's
+standard output, with no timestamp, no severity and nothing naming the script it
+came from. `moontweaks.log.info` and `moontweaks.log.warn` are what write to the
+log the server keeps, and they name the file and line that called them.
+
+**Every script shares one global environment.** They run in sequence on one
+interpreter, so a global one script assigns is readable by every script after it,
+and a global one script overwrites is overwritten for all of them. `local` is what
+keeps a name to the script that declared it.
+
+**`math.randomseed` reseeds the whole server.** The generator is one shared
+instance rather than one per script. It lives in a global the engine reads on every
+`math.random` call, named `__lua_mathematics_library_random_instance`, which is
+therefore visible to scripts and load-bearing: a script that assigns to that name
+breaks `math.random` for every script and every handler until the server restarts.
+Nothing outside the engine has any reason to touch it.
 
 ## Licence
 
