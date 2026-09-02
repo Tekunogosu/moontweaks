@@ -11,14 +11,52 @@
 
 local events  = moontweaks.events
 local players = moontweaks.players
+local world   = moontweaks.world
+
+--- Whether a code names a bed, of which this world holds one per wood and per half.
+--- Matched on the code rather than on a tag, because the game gives beds none.
+local function isBed(code)
+  return code ~= nil and code:find(":bed%-") ~= nil
+end
+
+--- Whether a position stands in the block a vector points into. Spawns are answered
+--- as block centres, so 100 reads back as 100.5 and has to be floored to compare.
+local function isAt(where, x, y, z)
+  return where ~= nil
+    and math.floor(where.x) == x
+    and math.floor(where.y) == y
+    and math.floor(where.z) == z
+end
 
 -- The goal: sleeping in a bed becomes where you wake up. Vintage Story does not do
 -- this on its own, so the last bed a player used becomes their spawn.
 events.didUseBlock(function(e)
-  if e.block and e.block:find("bed") then
+  if isBed(e.block) then
     players.setSpawn(e.player, e.x, e.y, e.z)
     players.say(e.player, "Your spawn is now this bed.")
   end
+end)
+
+-- And the other half of the rule: a spawn lasts only as long as the bed holding it.
+-- Breaking a bed takes both of its blocks with it, so what settles this is whether a
+-- bed still stands where the player would wake — not which half they swung at, and
+-- not a position kept alongside the game's own.
+--
+-- `spawn` answers with the first of the four spawns the game holds, so somebody who
+-- has never slept anywhere is answered with the world's. That is the one case to step
+-- over: they have no bed to lose, and clearing would tell them otherwise.
+events.didBreakBlock(function(e)
+  if not isBed(e.block) then return end
+
+  local waking = players.spawn(e.player)
+  if not waking then return end
+
+  local x, y, z = math.floor(waking.x), math.floor(waking.y), math.floor(waking.z)
+  if isAt(world.spawn(), x, y, z) then return end   -- the world's spawn, not a bed
+  if isBed(world.blockAt(x, y, z)) then return end  -- their own bed still stands
+
+  players.clearSpawn(e.player)
+  players.say(e.player, "Your bed is gone. You will wake at the world spawn.")
 end)
 
 -- A code inside a handler is only a string. Unlike `items.set`, which refuses a code
