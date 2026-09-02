@@ -20,12 +20,41 @@ namespace MoonTweaks.World;
 ///
 /// if ground then
 ///   world.setBlock("game:cobblestone-granite", 500, ground + 1, 500)
+///   moontweaks.log.info("stood on " .. tostring(world.blockAt(500, ground, 500)))
 /// end
 ///
 /// -- One call for a whole box, where walking it would cost a call per block.
 /// moontweaks.log.info(("%d ore block(s) below"):format(world.countBlocks {
 ///   x = 480, y = 20, z = 480, toX = 520, toY = 80, toZ = 520, code = "game:ore-*",
 /// }))
+///
+/// -- Many blocks at once: queue them, commit once, and the whole commit undoes as
+/// -- one step.
+/// for x = 500, 510 do
+///   world.queueBlock("game:planks-oak-ud", x, 120, 500)
+/// end
+/// moontweaks.log.info(("%d block(s) written"):format(world.commit()))
+///
+/// -- What a place is like, without changing any of it.
+/// local climate = world.climateAt(500, 120, 500)
+/// moontweaks.log.info(("%.1fC, rainfall %.2f"):format(climate.temperature, climate.rainfall))
+///
+/// -- Drawing on somebody's screen, and asking whether they may build.
+/// moontweaks.events.didUseBlock(function(e)
+///   if world.testAccess { player = e.player, x = e.x, y = e.y, z = e.z } ~= "granted" then
+///     moontweaks.players.warn(e.player, "That is not yours.")
+///     return
+///   end
+///
+///   world.highlight {
+///     player = e.player,
+///     blocks = { { x = e.x, y = e.y, z = e.z } },
+///     colour = { red = 0, green = 255, blue = 0, alpha = 128 },
+///   }
+/// end)
+///
+/// -- What the world itself remembers, saved with the save game.
+/// world.setData("blocksPlaced", (world.getData("blocksPlaced") or 0) + 1)
 /// </code>
 /// </example>
 [LuaModule("moontweaks.world")]

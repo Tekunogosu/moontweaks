@@ -17,12 +17,42 @@ namespace MoonTweaks.Players;
 /// local players = moontweaks.players
 ///
 /// moontweaks.events.playerJoin(function(e)
+///   -- World data belongs to this world; setAccountData is the pair that outlives it.
 ///   local visits = players.getWorldData(e.player, "visits") or 0
 ///   players.setWorldData(e.player, "visits", visits + 1)
 ///   players.say(e.player, ("welcome back — visit number %d"):format(visits + 1))
 ///
 ///   local at = players.position(e.player)
 ///   players.setSpawn(e.player, math.floor(at.x), math.floor(at.y), math.floor(at.z))
+/// end)
+///
+/// -- What a player is made of, all read the same way.
+/// moontweaks.commands.add {
+///   name = "vitals",
+///   description = "Report how you are doing",
+///   requiresPlayer = true,
+///   handler = function(e)
+///     return ("health %.0f/%.0f, satiety %.0f/%.0f, %s"):format(
+///       players.health(e.player), players.maxHealth(e.player),
+///       players.satiety(e.player), players.maxSatiety(e.player),
+///       players.isSleeping(e.player) and "asleep" or "awake")
+///   end,
+/// }
+///
+/// -- Reaching everybody needs no event to have happened.
+/// moontweaks.server.every(600000, function()
+///   for _, uid in ipairs(players.all()) do
+///     if players.hasPrivilege(uid, "gamemode") then
+///       players.warn(uid, "You are still an operator.")
+///     end
+///   end
+///   players.announce("The server is still here.")
+/// end)
+///
+/// -- A temporary effect: set under a name, then cleared under the same one.
+/// players.setStat { player = "someone", stat = "walkspeed", name = "coffee", value = 0.3 }
+/// moontweaks.server.after(30000, function()
+///   players.clearStat("someone", "walkspeed", "coffee")
 /// end)
 /// </code>
 /// </example>

@@ -18,14 +18,49 @@ namespace MoonTweaks.Events;
 /// <code>
 /// local events = moontweaks.events
 ///
+/// -- Players coming and going.
 /// events.playerJoin(function(e)
 ///   moontweaks.players.say(e.player, "welcome back, " .. e.playerName)
 /// end)
 ///
+/// events.playerDeath(function(e)
+///   moontweaks.players.announce(e.playerName .. " has died.")
+/// end)
+///
+/// -- What people do to blocks. A place event also says what stood there before.
 /// events.didBreakBlock(function(e)
 ///   if e.block == "game:crock-burned" then
 ///     moontweaks.log.info(("%s broke a crock at %d %d %d"):format(e.playerName, e.x, e.y, e.z))
 ///   end
+/// end)
+///
+/// events.didPlaceBlock(function(e)
+///   if e.replaced then
+///     moontweaks.log.info(("%s built over %s"):format(e.playerName, e.replaced))
+///   end
+/// end)
+///
+/// -- Creatures. A death says what killed it, where it was known.
+/// events.entityDeath(function(e)
+///   if e.byPlayer then
+///     moontweaks.players.say(e.byPlayer, ("You killed a %s."):format(e.name))
+///   end
+/// end)
+///
+/// -- Answering rather than watching: a handler that returns decides the outcome.
+/// events.testBlockAccess(function(e)
+///   if e.y &lt; 20 and not moontweaks.players.hasPrivilege(e.player, "gamemode") then
+///     return "noprivilege"
+///   end
+/// end)
+///
+/// events.playerChat(function(e)
+///   if e.message:find("badword") then return false end
+/// end)
+///
+/// -- The server's own lifetime, for anything that has to be set up once.
+/// events.saveGameLoaded(function()
+///   moontweaks.log.info("the world is open")
 /// end)
 /// </code>
 /// </example>

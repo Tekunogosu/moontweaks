@@ -35,6 +35,30 @@ namespace MoonTweaks.Inventories;
 ///   local given = inventory.put({ player = e.player }, { code = "game:bread-spelt", quantity = 2 })
 ///   moontweaks.log.info(("%d loaf/loaves fitted"):format(given))
 /// end)
+///
+/// -- Walking what somebody is carrying. A slot is nil where nothing is in it.
+/// moontweaks.commands.add {
+///   name = "bags",
+///   description = "List what you are carrying",
+///   requiresPlayer = true,
+///   handler = function(e)
+///     local lines = {}
+///     for _, slot in ipairs(inventory.list { player = e.player }) do
+///       lines[#lines + 1] = ("%d: %d x %s"):format(slot.slot, slot.quantity, slot.code)
+///     end
+///     return #lines > 0 and table.concat(lines, "\n") or "You are carrying nothing."
+///   end,
+/// }
+///
+/// -- A chest is named by where it stands rather than by whose it is.
+/// local chest = { x = 500, y = 110, z = 500 }
+/// moontweaks.log.info(("chest holds %d gear"):format(inventory.count(chest, "game:gear-rusty")))
+///
+/// -- Charging for something: take says how much it actually got.
+/// local paid = inventory.take({ player = "someone" }, { code = "game:gear-rusty", quantity = 2 })
+/// if paid == 2 then
+///   inventory.put({ player = "someone" }, "game:linen-normal")
+/// end
 /// </code>
 /// </example>
 [LuaModule("moontweaks.inventory")]

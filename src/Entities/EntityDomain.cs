@@ -24,12 +24,32 @@ namespace MoonTweaks.Entities;
 /// <code>
 /// local entities = moontweaks.entities
 ///
+/// -- Searching. A box around a point, nearest first.
 /// for _, wolf in ipairs(entities.around { x = 500, y = 110, z = 500, range = 30,
 ///                                         code = "game:wolf-adult", aliveOnly = true }) do
 ///   moontweaks.log.info(("%s at %.0f %.0f %.0f"):format(wolf.name, wolf.x, wolf.y, wolf.z))
 /// end
 ///
-/// entities.spawn { code = "game:chicken-hen", x = 500, y = 111, z = 500, quantity = 3 }
+/// -- Spawning gives back the identifiers, which everything else here takes.
+/// local chickens = entities.spawn {
+///   code = "game:chicken-hen", x = 500, y = 111, z = 500, quantity = 3,
+/// }
+///
+/// -- An identifier is only good while its entity is loaded, so check before reaching.
+/// for _, id in ipairs(chickens) do
+///   if entities.isLoaded(id) then
+///     entities.setName(id, "Dinner")
+///     entities.setHealth(id, entities.maxHealth(id))
+///   end
+/// end
+///
+/// -- Remembering something against one. It is saved with the entity and comes back
+/// -- with its chunk.
+/// local pet = entities.nearest { x = 500, y = 110, z = 500, range = 10, code = "game:wolf-*" }
+/// if pet then
+///   entities.setData(pet.id, "tamedBy", "someone")
+///   entities.setStat { entity = pet.id, stat = "walkspeed", name = "hasty", value = 0.5 }
+/// end
 /// </code>
 /// </example>
 [LuaModule("moontweaks.entities")]
