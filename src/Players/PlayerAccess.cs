@@ -126,16 +126,16 @@ public sealed class PlayerAccess(ICoreServerAPI api)
     /// them is added up. An ability nothing has touched reads 1.
     /// </summary>
     public float Stat(string player, string stat, ScriptOrigin origin) =>
-        Find(player, origin).Entity.Stats.GetBlended(stat);
+        StatContribution.Blended(Find(player, origin).Entity.Stats, stat);
 
     /// <summary>Adds or replaces one named contribution to an ability.</summary>
     public void SetStat(StatSpec spec, ScriptOrigin origin) =>
-        Find(spec.Player, origin).Entity.Stats
-            .Set(spec.Stat, ModKey.For(spec.Name), (float)spec.Value, spec.Persistent);
+        StatContribution.Set(
+            Find(spec.Player, origin).Entity.Stats, spec.Stat, spec.Name, spec.Value, spec.Persistent);
 
     /// <summary>Takes back one named contribution, leaving every other alone.</summary>
     public void ClearStat(string player, string stat, string name, ScriptOrigin origin) =>
-        Find(player, origin).Entity.Stats.Remove(stat, ModKey.For(name));
+        StatContribution.Clear(Find(player, origin).Entity.Stats, stat, name);
 
     /// <summary>The block a player has their cursor on, or nothing where they point at nothing.</summary>
     public LookingPayload? Looking(string player, ScriptOrigin origin)

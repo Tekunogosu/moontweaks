@@ -220,22 +220,25 @@ public sealed class EntityAccess(ICoreServerAPI api)
     /// </summary>
     public void Remember(double id, string key, ScriptValue value, ScriptOrigin origin)
     {
-        var entity = Find(id, origin);
+        var held = Find(id, origin).WatchedAttributes;
 
-        entity.WatchedAttributes.SetString(ModKey.For(key), ScriptJson.Write(value));
-        entity.WatchedAttributes.MarkPathDirty(ModKey.For(key));
+        ScriptStore.Write(key, value, (name, json) =>
+        {
+            held.SetString(name, json);
+            held.MarkPathDirty(name);
+        });
     }
 
     /// <summary>What was remembered against an entity under a name, or nil when nothing was.</summary>
     public ScriptValue Recall(double id, string key, ScriptOrigin origin) =>
-        ScriptJson.Parse(Find(id, origin).WatchedAttributes.GetString(ModKey.For(key)));
+        ScriptStore.Read(key, name => Find(id, origin).WatchedAttributes.GetString(name));
 
     /// <summary>Adds or replaces one named contribution to an ability.</summary>
     public void SetStat(EntityStatSpec spec, ScriptOrigin origin) =>
-        Find(spec.Entity, origin).Stats
-            .Set(spec.Stat, ModKey.For(spec.Name), (float)spec.Value, spec.Persistent);
+        StatContribution.Set(
+            Find(spec.Entity, origin).Stats, spec.Stat, spec.Name, spec.Value, spec.Persistent);
 
     /// <summary>Takes back one named contribution, leaving every other alone.</summary>
     public void ClearStat(double id, string stat, string name, ScriptOrigin origin) =>
-        Find(id, origin).Stats.Remove(stat, ModKey.For(name));
+        StatContribution.Clear(Find(id, origin).Stats, stat, name);
 }

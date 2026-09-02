@@ -468,11 +468,11 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players, int un
     /// home for anything counted or tracked across everybody.
     /// </summary>
     public void Remember(string key, ScriptValue value, ScriptOrigin origin) =>
-        Save(origin).StoreData(ModKey.For(key), ScriptJson.Write(value));
+        ScriptStore.Write(key, value, Save(origin).StoreData);
 
     /// <summary>What the world remembered under a name, or nil where nothing was.</summary>
     public ScriptValue Recall(string key, ScriptOrigin origin) =>
-        ScriptJson.Parse(Save(origin).GetData<string?>(ModKey.For(key)));
+        ScriptStore.Read(key, name => Save(origin).GetData<string?>(name));
 
     /// <summary>
     /// The save game, which only exists once there is a world. Named in the failure

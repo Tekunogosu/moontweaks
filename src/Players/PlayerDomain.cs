@@ -252,7 +252,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <param name="value">What to store.</param>
     [LuaFunction("setWorldData")]
     public void SetWorldData(ScriptOrigin origin, string player, string key, ScriptValue value) =>
-        players.Find(player, origin).SetModData(ModKey.For(key), ScriptJson.Write(value));
+        ScriptStore.Write(key, value, players.Find(player, origin).SetModData);
 
     /// <summary>
     /// What was remembered about a player in this world under a name, or nil when
@@ -263,7 +263,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <param name="key">Name it was stored under.</param>
     [LuaFunction("getWorldData")]
     public ScriptValue GetWorldData(ScriptOrigin origin, string player, string key) =>
-        ScriptJson.Parse(players.Find(player, origin).GetModData<string?>(ModKey.For(key)));
+        ScriptStore.Read(key, name => players.Find(player, origin).GetModData<string?>(name));
 
     /// <summary>
     /// Remembers something about a player across every world this server runs, saved
@@ -291,7 +291,8 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <param name="value">What to store.</param>
     [LuaFunction("setAccountData")]
     public void SetAccountData(ScriptOrigin origin, string player, string key, ScriptValue value) =>
-        players.Account(player, origin).CustomPlayerData[ModKey.For(key)] = ScriptJson.Write(value);
+        ScriptStore.Write(key, value, (name, json) =>
+            players.Account(player, origin).CustomPlayerData[name] = json);
 
     /// <summary>
     /// What was remembered about a player across every world under a name, or nil when
@@ -302,8 +303,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <param name="key">Name it was stored under.</param>
     [LuaFunction("getAccountData")]
     public ScriptValue GetAccountData(ScriptOrigin origin, string player, string key) =>
-        ScriptJson.Parse(
-            players.Account(player, origin).CustomPlayerData.GetValueOrDefault(ModKey.For(key)));
+        ScriptStore.Read(key, players.Account(player, origin).CustomPlayerData.GetValueOrDefault);
 
     /// <summary>How tired a player is, from nothing to needing sleep.</summary>
     /// <param name="origin">Script line asking.</param>
