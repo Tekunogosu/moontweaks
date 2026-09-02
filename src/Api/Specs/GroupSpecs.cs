@@ -2,7 +2,7 @@ namespace MoonTweaks.Api;
 
 // The chat groups a server keeps, and what a script is told about them. A group is
 // the game's own channel: players join one, talk in it, and the server addresses it
-// as a whole, which is what makes it the way to reach some players and not others.
+// as a whole, so a message reaches some players and not others.
 
 /// <summary>Who may put themselves into a group.</summary>
 public enum EnumJoinPolicy
@@ -101,7 +101,7 @@ public sealed class GroupSpec
 
     /// <summary>
     /// Whether anybody may walk in with <c>/group join</c>. Invite only when omitted,
-    /// which is what the game gives a group made in its own command.
+    /// as the game makes a group in its own command.
     /// </summary>
     [LuaField("joinPolicy", Default = "\"inviteonly\"")]
     public EnumJoinPolicy JoinPolicy { get; set; } = EnumJoinPolicy.InviteOnly;

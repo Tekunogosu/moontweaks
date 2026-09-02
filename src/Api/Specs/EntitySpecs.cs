@@ -131,7 +131,7 @@ public sealed class SpawnSpec
 
     /// <summary>
     /// How far apart to scatter them, in blocks. Everything lands on the same spot
-    /// when omitted, which is what a single one wants and a herd does not.
+    /// when omitted.
     /// </summary>
     [LuaField("spread", Default = "0")]
     public double Spread { get; set; }
@@ -144,8 +144,8 @@ public sealed class SpawnSpec
     public double Yaw { get; set; }
 
     /// <summary>
-    /// Whether everything spawned belongs to one herd, which is what makes a group
-    /// move together rather than wander apart. Only means anything to creatures.
+    /// Whether everything spawned belongs to one herd, which makes them move together
+    /// rather than wander apart. Only means anything to creatures.
     /// </summary>
     [LuaField("herd", Default = "true")]
     public bool Herd { get; set; } = true;
@@ -281,7 +281,7 @@ public enum EnumDespawnKind
     /// <summary>It timed out, as a dropped stack does when nobody collects it.</summary>
     Expire,
 
-    /// <summary>Something took it out deliberately, which is what <c>despawn</c> does.</summary>
+    /// <summary>Something took it out deliberately, as <c>despawn</c> does.</summary>
     Removed,
 }
 

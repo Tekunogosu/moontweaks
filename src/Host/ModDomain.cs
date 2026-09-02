@@ -11,7 +11,7 @@ namespace MoonTweaks.Host;
 [LuaTable("ModInfo", Given = true)]
 public sealed class ModPayload(Mod mod)
 {
-    /// <summary>Identifier the mod is known by, which is what names it everywhere else.</summary>
+    /// <summary>Identifier the mod is known by, and the name every code it ships carries.</summary>
     [LuaField("id")]
     public string Id { get; } = mod.Info?.ModID ?? "";
 
@@ -31,7 +31,7 @@ public sealed class ModPayload(Mod mod)
 /// <remarks>
 /// This exists because every other binding is strict on purpose. A recipe or an
 /// <c>items.set</c> naming a code the server does not have refuses the whole run,
-/// which is what stops a typo becoming a silently missing recipe — but it also means
+/// so a typo cannot become a silently missing recipe — but it also means
 /// a script written for two servers, one with a mod and one without, cannot simply
 /// name that mod's items and hope. Asking first is how such a script is written:
 /// guard the block with <c>isEnabled</c> and the codes inside it are only ever read

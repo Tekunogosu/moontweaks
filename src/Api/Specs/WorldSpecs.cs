@@ -254,9 +254,9 @@ public sealed class HighlightSpec
 /// be the lower one: the box is worked out from both rather than assumed.
 /// </summary>
 /// <remarks>
-/// A search runs inside the game rather than in Lua, which is the whole point of it.
-/// Walking the same box with <c>blockAt</c> costs a crossing into a binding for every
-/// block; this costs one, however many blocks the box holds.
+/// A search runs inside the game rather than in Lua. Walking the same box with
+/// <c>blockAt</c> costs a crossing into a binding for every block; this costs one,
+/// however many blocks the box holds.
 /// </remarks>
 [LuaTable("Region")]
 public sealed class RegionSpec
@@ -386,7 +386,7 @@ public sealed class SoundSpec
 
     /// <summary>
     /// How high it sounds, where 1 is unaltered. Left out, the game varies it slightly
-    /// each time, which is what stops a repeated sound reading as a loop.
+    /// each time, so a repeated sound does not read as a loop.
     /// </summary>
     [LuaField("pitch")]
     public double? Pitch { get; set; }
@@ -396,7 +396,7 @@ public sealed class SoundSpec
 /// <remarks>
 /// The second thing a server-side script can draw on somebody's screen, alongside
 /// <c>highlight</c>. Given one point they appear there; given two they fill the box
-/// between, which is what makes a cloud rather than a spot.
+/// between, making a cloud rather than a spot.
 /// </remarks>
 [LuaTable("Particles")]
 public sealed class ParticlesSpec

@@ -63,9 +63,9 @@ public sealed class ReinforceDomain(GameSystems systems, PlayerAccess players)
     /// block that was reinforced and has since been worn down to nothing.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Which block.</param>
-    /// <param name="y">Which block.</param>
-    /// <param name="z">Which block.</param>
+    /// <param name="x">The block, east to west.</param>
+    /// <param name="y">The block, from the world's floor upwards.</param>
+    /// <param name="z">The block, north to south.</param>
     [LuaFunction("at")]
     public ReinforcementPayload? At(ScriptOrigin origin, int x, int y, int z) =>
         Reinforcement("reinforce.at", origin).GetReinforcment(new BlockPos(x, y, z)) is { } held
@@ -74,9 +74,9 @@ public sealed class ReinforceDomain(GameSystems systems, PlayerAccess players)
 
     /// <summary>Whether anything at all protects a block.</summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Which block.</param>
-    /// <param name="y">Which block.</param>
-    /// <param name="z">Which block.</param>
+    /// <param name="x">The block, east to west.</param>
+    /// <param name="y">The block, from the world's floor upwards.</param>
+    /// <param name="z">The block, north to south.</param>
     [LuaFunction("isReinforced")]
     public bool IsReinforced(ScriptOrigin origin, int x, int y, int z) =>
         Reinforcement("reinforce.isReinforced", origin).IsReinforced(new BlockPos(x, y, z));
@@ -93,9 +93,9 @@ public sealed class ReinforceDomain(GameSystems systems, PlayerAccess players)
     /// this charges through <c>moontweaks.inventory</c>.
     /// </remarks>
     /// <param name="origin">Script line reinforcing it.</param>
-    /// <param name="x">Which block.</param>
-    /// <param name="y">Which block.</param>
-    /// <param name="z">Which block.</param>
+    /// <param name="x">The block, east to west.</param>
+    /// <param name="y">The block, from the world's floor upwards.</param>
+    /// <param name="z">The block, north to south.</param>
     /// <param name="player">Identifier of the player it belongs to.</param>
     /// <param name="strength">How much protection to put on it.</param>
     [LuaFunction("strengthen")]
@@ -109,9 +109,9 @@ public sealed class ReinforceDomain(GameSystems systems, PlayerAccess players)
     /// nothing leaves the block unprotected.
     /// </summary>
     /// <param name="origin">Script line wearing it down.</param>
-    /// <param name="x">Which block.</param>
-    /// <param name="y">Which block.</param>
-    /// <param name="z">Which block.</param>
+    /// <param name="x">The block, east to west.</param>
+    /// <param name="y">The block, from the world's floor upwards.</param>
+    /// <param name="z">The block, north to south.</param>
     /// <param name="strength">How much protection to take off.</param>
     [LuaFunction("consume")]
     public void Consume(ScriptOrigin origin, int x, int y, int z, int strength) =>
@@ -121,9 +121,9 @@ public sealed class ReinforceDomain(GameSystems systems, PlayerAccess players)
     /// Takes every trace of protection off a block at once, whoever it belonged to.
     /// </summary>
     /// <param name="origin">Script line clearing it.</param>
-    /// <param name="x">Which block.</param>
-    /// <param name="y">Which block.</param>
-    /// <param name="z">Which block.</param>
+    /// <param name="x">The block, east to west.</param>
+    /// <param name="y">The block, from the world's floor upwards.</param>
+    /// <param name="z">The block, north to south.</param>
     [LuaFunction("clear")]
     public void Clear(ScriptOrigin origin, int x, int y, int z) =>
         Reinforcement("reinforce.clear", origin).ClearReinforcement(new BlockPos(x, y, z));
@@ -134,9 +134,9 @@ public sealed class ReinforceDomain(GameSystems systems, PlayerAccess players)
     /// on it for.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Which block.</param>
-    /// <param name="y">Which block.</param>
-    /// <param name="z">Which block.</param>
+    /// <param name="x">The block, east to west.</param>
+    /// <param name="y">The block, from the world's floor upwards.</param>
+    /// <param name="z">The block, north to south.</param>
     /// <param name="player">Identifier of the player asking about.</param>
     [LuaFunction("isLockedFor")]
     public bool IsLockedFor(ScriptOrigin origin, int x, int y, int z, string player) =>

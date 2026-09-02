@@ -294,7 +294,7 @@ public sealed class AlloyDomain(MutationLog log, IWorldAccessor world, RecipeReg
 /// <remarks>
 /// The odd one out. A cooking recipe makes no single product: what comes out is a
 /// container of servings named after what went in, so a recipe is identified by the
-/// code it carries and that is what selects one. Nothing expands either — a wildcard
+/// code it carries, and that code selects it. Nothing expands either — a wildcard
 /// among the stacks an ingredient accepts stays a wildcard, and the pot matches
 /// against it as it cooks.
 /// </remarks>

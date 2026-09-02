@@ -15,7 +15,7 @@ namespace MoonTweaks.Api;
 /// </remarks>
 public static class ColourChannel
 {
-    /// <summary>The brightest a channel goes, which is what one byte holds.</summary>
+    /// <summary>The brightest a channel goes, being the most one byte holds.</summary>
     public const int MOST = 255;
 
     /// <summary>One channel as the byte it is, or a failure naming the part that is out of range.</summary>

@@ -39,8 +39,8 @@ public sealed class RecipeSelector
 
     /// <summary>
     /// Whether one recipe is among them. Tags are read off the product the recipe
-    /// resolved to rather than its code, which is what lets them reach an output no
-    /// wildcard would have caught.
+    /// resolved to rather than its code, so they reach an output no wildcard would
+    /// have caught.
     /// </summary>
     public bool Matches(RecipeProduct made)
     {

@@ -12,7 +12,7 @@ namespace MoonTweaks.Api;
 /// prefix, the value is written as JSON, and what comes back is read as a script
 /// value again. Four stores answer for different lifetimes: a player's world data, a
 /// player's account, an entity, and the save game. They differ only in which pair of
-/// string calls holds the JSON, which is what each caller supplies.
+/// string calls holds the JSON, which each caller supplies.
 ///
 /// Keeping the round trip here is what stops the four drifting apart. A value written
 /// against a player and one written against the world are the same value, and a

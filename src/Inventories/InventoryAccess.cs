@@ -194,8 +194,8 @@ public sealed class InventoryAccess(
     /// </summary>
     /// <remarks>
     /// Answering less than was asked for is ordinary rather than a failure: a script
-    /// charging somebody for something checks what came back rather than assuming, and
-    /// the count is the whole point of the return value.
+    /// charging somebody for something checks the count that came back rather than
+    /// assuming it got everything.
     /// </remarks>
     public static int Take(IInventory inventory, string code, int quantity)
     {
@@ -223,8 +223,8 @@ public sealed class InventoryAccess(
     /// Puts what it can of a stack into an inventory, and says how many fitted.
     /// </summary>
     /// <remarks>
-    /// Merged into part-full slots before empty ones are used, which is what the game
-    /// does when a player picks something up. Whatever did not fit stays in the
+    /// Merged into part-full slots before empty ones are used, as the game does when
+    /// a player picks something up. Whatever did not fit stays in the
     /// caller's hands rather than being lost, so a script that must not lose it drops
     /// the remainder on the floor.
     /// </remarks>

@@ -29,7 +29,7 @@ public sealed class ItemDomain(MutationLog log, IWorldAccessor world)
     /// are left as the game loaded them.
     /// </summary>
     /// <param name="origin">Script line requesting the change.</param>
-    /// <param name="properties">What to change, and on what.</param>
+    /// <param name="properties">The codes to change, and the properties to set on them.</param>
     [LuaFunction("set")]
     public void Set(ScriptOrigin origin, AssetPropertiesSpec properties) =>
         log.Record(AssetSearch.Change(
@@ -66,7 +66,7 @@ public sealed class BlockDomain(MutationLog log, IWorldAccessor world)
     /// are left as the game loaded them.
     /// </summary>
     /// <param name="origin">Script line requesting the change.</param>
-    /// <param name="properties">What to change, and on what.</param>
+    /// <param name="properties">The codes to change, and the properties to set on them.</param>
     [LuaFunction("set")]
     public void Set(ScriptOrigin origin, BlockPropertiesSpec properties) =>
         log.Record(AssetSearch.Change(
@@ -104,7 +104,7 @@ internal static class AssetSearch
                 + "so this would do nothing");
         }
 
-        // A code searches the registry, which is what narrows the scan; tags alone
+        // A code searches the registry, narrowing the scan; tags alone
         // have nothing to narrow by and so are asked of everything.
         var condition = stacks.Condition(spec.Tags, origin, "tags");
         var candidates = spec.Code is { } code ? byCode(new AssetLocation(code)) : everything;

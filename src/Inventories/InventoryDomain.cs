@@ -200,7 +200,7 @@ public sealed class InventoryDomain(
     {
         var slot = inventories.Held(player, origin);
         // Inventory is declared non-nullable and is null on a slot belonging to none,
-        // which is what a DummySlot is.
+        // as a DummySlot is.
         return InventoryAccess.Describe(slot, slot.Inventory?.GetSlotId(slot) ?? 0);
     }
 

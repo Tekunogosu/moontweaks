@@ -49,8 +49,8 @@ public enum EnumFaceKind
 /// adds them to a base of 1 to arrive at what a player actually gets. So a
 /// <c>value</c> of 0.5 on <c>walkspeed</c> makes them half again as fast, -0.5 makes
 /// them half as fast, and 0 changes nothing. Two scripts may hold a contribution to
-/// the same ability at once without either losing its own, which is the whole reason
-/// each is named.
+/// the same ability at once without either losing its own, which is why each is
+/// named.
 ///
 /// The abilities themselves are the game's rather than this mod's, so what is worth
 /// setting depends on the version being run. <c>walkspeed</c>, <c>healingeffectivness</c>,
@@ -85,8 +85,7 @@ public sealed class StatSpec
     public double Value { get; set; }
 
     /// <summary>
-    /// Whether it survives a restart. Left off, it lasts until the player logs out,
-    /// which is what anything temporary wants.
+    /// Whether it survives a restart. Left off, it lasts until the player logs out.
     /// </summary>
     [LuaField("persistent", Default = "false")]
     public bool Persistent { get; set; }

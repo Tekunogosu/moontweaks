@@ -14,14 +14,14 @@ namespace MoonTweaks.Players;
 /// <remarks>
 /// A group is the game's own channel rather than anything this mod invents. Players
 /// make them with <c>/group</c>, join them and talk in them, and the server addresses
-/// one as a whole — which is what makes this the way to reach some players and not
-/// others, where <c>moontweaks.players.announce</c> reaches everybody and
+/// one as a whole — so this reaches some players and not others, where
+/// <c>moontweaks.players.announce</c> reaches everybody and
 /// <c>moontweaks.players.say</c> reaches one.
 ///
 /// A group is named by its name here, not by its number. The game assigns the number
 /// as a group is made and then offers no way to look a group up by it, so the number
 /// is something a script is told rather than something it uses. Two groups cannot
-/// share a name, which is what makes the name a handle at all.
+/// share a name, so the name serves as a handle.
 ///
 /// A group this makes is the same object the game's own command makes, so the two are
 /// interchangeable: a player may rename or disband one a script created, and a script
@@ -80,7 +80,7 @@ public sealed class GroupDomain(ICoreServerAPI api, PlayerAccess players, GroupA
     /// script asks whether the group it wants is already there.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="name">What the group is called.</param>
+    /// <param name="name">Name of the group.</param>
     [LuaFunction("find")]
     public GroupPayload? Find(ScriptOrigin origin, string name) =>
         groups.Find(name) is { } group ? groups.Described(group) : null;
@@ -109,7 +109,7 @@ public sealed class GroupDomain(ICoreServerAPI api, PlayerAccess players, GroupA
     /// anything a player sees.
     /// </remarks>
     /// <param name="origin">Script line taking it away.</param>
-    /// <param name="name">What the group is called.</param>
+    /// <param name="name">Name of the group.</param>
     [LuaFunction("remove")]
     public void Remove(ScriptOrigin origin, string name) => groups.Remove(name, origin);
 
@@ -128,7 +128,7 @@ public sealed class GroupDomain(ICoreServerAPI api, PlayerAccess players, GroupA
     /// </remarks>
     /// <param name="origin">Script line putting them there.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
-    /// <param name="name">What the group is called.</param>
+    /// <param name="name">Name of the group.</param>
     /// <param name="standing">What they are in it. A plain member when omitted.</param>
     [LuaFunction("join")]
     public void Join(ScriptOrigin origin, string player, string name, EnumGroupStanding? standing) =>
@@ -140,7 +140,7 @@ public sealed class GroupDomain(ICoreServerAPI api, PlayerAccess players, GroupA
     /// </summary>
     /// <param name="origin">Script line taking them out.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
-    /// <param name="name">What the group is called.</param>
+    /// <param name="name">Name of the group.</param>
     [LuaFunction("leave")]
     public void Leave(ScriptOrigin origin, string player, string name) =>
         groups.Leave(player, name, origin);
@@ -153,7 +153,7 @@ public sealed class GroupDomain(ICoreServerAPI api, PlayerAccess players, GroupA
     /// invites, nor who may read what is said in the group.
     /// </remarks>
     /// <param name="origin">Script line changing it.</param>
-    /// <param name="name">What the group is called.</param>
+    /// <param name="name">Name of the group.</param>
     /// <param name="policy">Whether anybody may walk in.</param>
     [LuaFunction("setJoinPolicy")]
     public void SetJoinPolicy(ScriptOrigin origin, string name, EnumJoinPolicy policy) =>
@@ -169,7 +169,7 @@ public sealed class GroupDomain(ICoreServerAPI api, PlayerAccess players, GroupA
     /// <c>moontweaks.players.say</c>.
     /// </remarks>
     /// <param name="origin">Script line saying it.</param>
-    /// <param name="name">What the group is called.</param>
+    /// <param name="name">Name of the group.</param>
     /// <param name="message">Text to send.</param>
     [LuaFunction("say")]
     public void Say(ScriptOrigin origin, string name, string message) =>

@@ -61,9 +61,9 @@ public sealed class WeatherDomain(GameSystems systems)
     /// the game makes it.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="y">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="y">The position asked about, from the world's floor upwards.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     [LuaFunction("precipitation")]
     public double Precipitation(ScriptOrigin origin, double x, double y, double z) =>
         Weather("weather.precipitation", origin).GetPrecipitation(x, y, z);
@@ -78,21 +78,21 @@ public sealed class WeatherDomain(GameSystems systems)
     /// to know whether anything is actually falling.
     /// </remarks>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="y">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="y">The position asked about, from the world's floor upwards.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     [LuaFunction("falling")]
     public PrecipitationPayload Falling(ScriptOrigin origin, double x, double y, double z) =>
         new(Weather("weather.falling", origin).GetPrecipitationState(new Vec3d(x, y, z)));
 
     /// <summary>
-    /// How wet a place has been over the days just gone, which is what decides whether
-    /// the ground is soaked rather than whether it is raining now.
+    /// How wet a place has been over the days just gone, which decides whether the
+    /// ground is soaked rather than whether it is raining now.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="y">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="y">The position asked about, from the world's floor upwards.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     /// <param name="days">How many in-game days back to take into account.</param>
     [LuaFunction("wetness")]
     public double Wetness(ScriptOrigin origin, int x, int y, int z, double days) =>
@@ -134,9 +134,9 @@ public sealed class WeatherDomain(GameSystems systems)
     /// rather than a strike: nothing is set alight and nobody is hurt by it.
     /// </summary>
     /// <param name="origin">Script line calling it down.</param>
-    /// <param name="x">Where it comes down.</param>
-    /// <param name="y">Where it comes down.</param>
-    /// <param name="z">Where it comes down.</param>
+    /// <param name="x">Where it comes down, east to west.</param>
+    /// <param name="y">Where it comes down, from the world's floor upwards.</param>
+    /// <param name="z">Where it comes down, north to south.</param>
     [LuaFunction("lightning")]
     public void Lightning(ScriptOrigin origin, double x, double y, double z) =>
         Weather("weather.lightning", origin).SpawnLightningFlash(new Vec3d(x, y, z));

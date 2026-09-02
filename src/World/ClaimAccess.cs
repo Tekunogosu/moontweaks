@@ -99,8 +99,8 @@ public sealed class ClaimAccess(ICoreServerAPI api, PlayerAccess players)
     }
 
     /// <summary>
-    /// One owner's claims in the world's own order, which is what every number a
-    /// script sees counts along. Sole owner of that filter: reading a claim and
+    /// One owner's claims in the world's own order, which every number a script sees
+    /// counts along. Sole owner of that filter: reading a claim and
     /// removing it have to walk the same list in the same order or a number read from
     /// one would name a different claim to the other.
     /// </summary>

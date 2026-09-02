@@ -35,9 +35,9 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// The code of the block standing at a position, or nil where nothing does.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to look.</param>
-    /// <param name="y">Where to look.</param>
-    /// <param name="z">Where to look.</param>
+    /// <param name="x">The block to look at, east to west.</param>
+    /// <param name="y">The block to look at, from the world's floor upwards.</param>
+    /// <param name="z">The block to look at, north to south.</param>
     [LuaFunction("blockAt")]
     public string? BlockAt(ScriptOrigin origin, int x, int y, int z) => world.CodeAt(x, y, z);
 
@@ -47,9 +47,9 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// </summary>
     /// <param name="origin">Script line placing it.</param>
     /// <param name="code">Block to place, or <c>game:air</c> to clear.</param>
-    /// <param name="x">Where to put it.</param>
-    /// <param name="y">Where to put it.</param>
-    /// <param name="z">Where to put it.</param>
+    /// <param name="x">Where it goes, east to west.</param>
+    /// <param name="y">Where it goes, from the world's floor upwards.</param>
+    /// <param name="z">Where it goes, north to south.</param>
     [LuaFunction("setBlock")]
     public void SetBlock(
         ScriptOrigin origin,
@@ -63,9 +63,9 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// </summary>
     /// <param name="origin">Script line queueing it.</param>
     /// <param name="code">Block to place, or <c>game:air</c> to clear.</param>
-    /// <param name="x">Where to put it.</param>
-    /// <param name="y">Where to put it.</param>
-    /// <param name="z">Where to put it.</param>
+    /// <param name="x">Where it goes, east to west.</param>
+    /// <param name="y">Where it goes, from the world's floor upwards.</param>
+    /// <param name="z">Where it goes, north to south.</param>
     [LuaFunction("queueBlock")]
     public void QueueBlock(
         ScriptOrigin origin,
@@ -116,8 +116,8 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// </summary>
     /// <remarks>
     /// Writing anything new after an undo throws away what could have been redone,
-    /// which is what every editor does and for the same reason: the history is a line
-    /// rather than a tree.
+    /// as every editor does and for the same reason: the history is a line rather
+    /// than a tree.
     /// </remarks>
     /// <param name="origin">Script line redoing.</param>
     [LuaFunction("redo")]
@@ -157,9 +157,9 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// </summary>
     /// <param name="origin">Script line swapping it.</param>
     /// <param name="code">Block to put there instead.</param>
-    /// <param name="x">Which block to swap.</param>
-    /// <param name="y">Which block to swap.</param>
-    /// <param name="z">Which block to swap.</param>
+    /// <param name="x">The block to swap, east to west.</param>
+    /// <param name="y">The block to swap, from the world's floor upwards.</param>
+    /// <param name="z">The block to swap, north to south.</param>
     [LuaFunction("exchangeBlock")]
     public void ExchangeBlock(
         ScriptOrigin origin,
@@ -172,9 +172,9 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// player should ask first.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="y">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="y">The position asked about, from the world's floor upwards.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     [LuaFunction("isLoaded")]
     public bool IsLoaded(ScriptOrigin origin, int x, int y, int z) => world.IsLoaded(x, y, z);
 
@@ -202,8 +202,8 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// there.
     /// </remarks>
     /// <param name="origin">Script line asking for it.</param>
-    /// <param name="x">Any block position in the column wanted, east to west.</param>
-    /// <param name="z">Any block position in the column wanted, north to south.</param>
+    /// <param name="x">Any block in the column, east to west.</param>
+    /// <param name="z">Any block in the column, north to south.</param>
     [LuaFunction("loadChunk")]
     public bool LoadChunk(ScriptOrigin origin, int x, int z) => world.Load(x, z);
 
@@ -245,9 +245,9 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// the world's.
     /// </remarks>
     /// <param name="origin">Script line moving it.</param>
-    /// <param name="x">Where to put it, east to west.</param>
-    /// <param name="y">Where to put it, from the world's floor upwards.</param>
-    /// <param name="z">Where to put it, north to south.</param>
+    /// <param name="x">Where it goes, east to west.</param>
+    /// <param name="y">Where it goes, from the world's floor upwards.</param>
+    /// <param name="z">Where it goes, north to south.</param>
     [LuaFunction("setSpawn")]
     public void SetSpawn(ScriptOrigin origin, int x, int y, int z) => world.SetSpawn(x, y, z);
 
@@ -257,9 +257,9 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// </summary>
     /// <param name="origin">Script line asking.</param>
     /// <param name="kind">Which light to count.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="y">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="y">The position asked about, from the world's floor upwards.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     [LuaFunction("lightAt")]
     public int LightAt(ScriptOrigin origin, EnumLightKind kind, int x, int y, int z) =>
         world.Light(x, y, z, kind);
@@ -269,9 +269,9 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// is made to depend on where it happened rather than only on what happened.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="y">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="y">The position asked about, from the world's floor upwards.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     [LuaFunction("climateAt")]
     public ClimatePayload ClimateAt(ScriptOrigin origin, int x, int y, int z) =>
         world.Climate(x, y, z);
@@ -281,9 +281,9 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// length is its speed.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="y">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="y">The position asked about, from the world's floor upwards.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     [LuaFunction("windAt")]
     public VectorPayload WindAt(ScriptOrigin origin, int x, int y, int z) => world.Wind(x, y, z);
 
@@ -376,7 +376,7 @@ public sealed class WorldDomain(WorldAccess world, AssetStacks stacks)
     /// </summary>
     /// <param name="origin">Script line storing it.</param>
     /// <param name="key">Name to store it under.</param>
-    /// <param name="value">What to store. Any value a script can write, a table included.</param>
+    /// <param name="value">The value to store. Any value a script can write, a table included.</param>
     [LuaFunction("setData")]
     public void SetData(ScriptOrigin origin, string key, ScriptValue value) =>
         world.Remember(key, value, origin);

@@ -283,7 +283,7 @@ public enum EnumToolKind
 /// <summary>What becoming stale turns something into.</summary>
 public enum EnumTransitionKind
 {
-    /// <summary>Nothing in particular, which is what the game's own meal recipes say.</summary>
+    /// <summary>Nothing in particular, as the game's own meal recipes say.</summary>
     None,
 
     /// <summary>Rots.</summary>

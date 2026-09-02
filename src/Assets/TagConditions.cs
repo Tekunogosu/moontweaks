@@ -64,7 +64,7 @@ public static class TagConditions
     }
 
     /// <summary>
-    /// One group standing on its own, which is what a junction of bare names is.
+    /// One group standing on its own, as a junction of bare names is.
     /// </summary>
     /// <remarks>
     /// Read with the junction the names were written under: required tags mean

@@ -72,7 +72,7 @@ public class BlockEventPayload(IServerPlayer player, BlockPos? at, Block? block)
 {
     /// <summary>
     /// Code of the block the event is about. Nil for a block whose code could not be
-    /// read, which is what a position outside the loaded world leaves behind.
+    /// read, as happens for a position outside the loaded world.
     /// </summary>
     [LuaField("block")]
     [LuaSuggests(SuggestionSets.ASSET_CODE)]
@@ -99,8 +99,8 @@ public class BlockEventPayload(IServerPlayer player, BlockPos? at, Block? block)
 /// <param name="player">Player who said it.</param>
 /// <param name="group">Channel they said it in.</param>
 /// <param name="message">
-/// What will be delivered as this handler is asked, which is what the handler before
-/// it left rather than necessarily what was typed.
+/// What will be delivered as this handler is asked: what the handler before it left,
+/// rather than necessarily what was typed.
 /// </param>
 /// <param name="consumed">Whether anybody is currently going to see it.</param>
 [LuaTable("ChatEvent", Given = true)]
@@ -224,15 +224,15 @@ public class ChunkColumnEventPayload(int chunkX, int chunkZ) : EventPayload
     public int ChunkZ { get; } = chunkZ;
 
     /// <summary>
-    /// The block position of the column's lowest corner, east to west, which is what
-    /// every other <c>moontweaks.world</c> function counts in.
+    /// The block position of the column's lowest corner, east to west. Every other
+    /// <c>moontweaks.world</c> function counts in the same units.
     /// </summary>
     [LuaField("x")]
     public int X { get; } = chunkX * GlobalConstants.ChunkSize;
 
     /// <summary>
-    /// The block position of the column's lowest corner, north to south, which is what
-    /// every other <c>moontweaks.world</c> function counts in.
+    /// The block position of the column's lowest corner, north to south. Every other
+    /// <c>moontweaks.world</c> function counts in the same units.
     /// </summary>
     [LuaField("z")]
     public int Z { get; } = chunkZ * GlobalConstants.ChunkSize;
@@ -287,15 +287,15 @@ public sealed class MapRegionEventPayload(int regionX, int regionZ, int size) : 
     public int RegionZ { get; } = regionZ;
 
     /// <summary>
-    /// The block position of the region's lowest corner, east to west, which is what
-    /// every other <c>moontweaks.world</c> function counts in.
+    /// The block position of the region's lowest corner, east to west. Every other
+    /// <c>moontweaks.world</c> function counts in the same units.
     /// </summary>
     [LuaField("x")]
     public int X { get; } = regionX * size;
 
     /// <summary>
-    /// The block position of the region's lowest corner, north to south, which is what
-    /// every other <c>moontweaks.world</c> function counts in.
+    /// The block position of the region's lowest corner, north to south. Every other
+    /// <c>moontweaks.world</c> function counts in the same units.
     /// </summary>
     [LuaField("z")]
     public int Z { get; } = regionZ * size;

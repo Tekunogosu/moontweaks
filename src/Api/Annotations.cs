@@ -130,7 +130,7 @@ public sealed class LuaPayloadAttribute(Type shape) : Attribute
 
     /// <summary>
     /// What the host does with whatever the handler hands back, written as the Lua
-    /// type it accepts. Omitted where nothing is read, which is what an event does.
+    /// type it accepts. Omitted where nothing is read, as an event does.
     /// </summary>
     public string? Returns { get; init; }
 }

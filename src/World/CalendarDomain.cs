@@ -45,9 +45,9 @@ public sealed class CalendarDomain(IWorldAccessor world)
     /// are half a year apart, so there is no answer to give without one.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="y">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="y">The position asked about, from the world's floor upwards.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     [LuaFunction("seasonAt")]
     public SeasonPayload SeasonAt(ScriptOrigin origin, int x, int y, int z)
     {
@@ -64,8 +64,8 @@ public sealed class CalendarDomain(IWorldAccessor world)
     /// underground reads the same as one on the surface above it.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     [LuaFunction("daylightAt")]
     public double DaylightAt(ScriptOrigin origin, double x, double z) =>
         world.Calendar.GetDayLightStrength(x, z);

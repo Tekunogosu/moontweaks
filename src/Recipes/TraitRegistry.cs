@@ -7,8 +7,8 @@ using Vintagestory.API.Common;
 namespace MoonTweaks.Recipes;
 
 /// <summary>
-/// The character traits a server's assets define, which is what gates a recipe
-/// behind a character class. Sole owner of that list, so nothing checks a trait name
+/// The character traits a server's assets define, which gate a recipe behind a
+/// character class. Sole owner of that list, so nothing checks a trait name
 /// against a set it assembled for itself.
 /// </summary>
 /// <remarks>

@@ -35,9 +35,9 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// </summary>
     /// <param name="origin">Script line requesting the change.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
-    /// <param name="x">Block position to respawn at.</param>
-    /// <param name="y">Block position to respawn at.</param>
-    /// <param name="z">Block position to respawn at.</param>
+    /// <param name="x">Where they respawn, east to west.</param>
+    /// <param name="y">Where they respawn, from the world's floor upwards.</param>
+    /// <param name="z">Where they respawn, north to south.</param>
     [LuaFunction("setSpawn")]
     public void SetSpawn(ScriptOrigin origin, string player, int x, int y, int z) =>
         players.Find(player, origin).SetSpawnPosition(new PlayerSpawnPos { x = x, y = y, z = z });
@@ -159,9 +159,9 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <summary>Moves a player somewhere else.</summary>
     /// <param name="origin">Script line requesting the move.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
-    /// <param name="x">Where to put them.</param>
-    /// <param name="y">Where to put them.</param>
-    /// <param name="z">Where to put them.</param>
+    /// <param name="x">Where they go, east to west.</param>
+    /// <param name="y">Where they go, from the world's floor upwards.</param>
+    /// <param name="z">Where they go, north to south.</param>
     [LuaFunction("teleport")]
     public void Teleport(ScriptOrigin origin, string player, double x, double y, double z) =>
         players.Find(player, origin).Entity.TeleportToDouble(x, y, z);
@@ -184,7 +184,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// </summary>
     /// <param name="origin">Script line requesting the change.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
-    /// <param name="health">What to set it to.</param>
+    /// <param name="health">The health to give them.</param>
     [LuaFunction("setHealth")]
     public void SetHealth(ScriptOrigin origin, string player, double health) =>
         players.Health(player, origin).Health = (float)health;
@@ -207,7 +207,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <summary>Sets how full a player is.</summary>
     /// <param name="origin">Script line requesting the change.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
-    /// <param name="satiety">What to set it to.</param>
+    /// <param name="satiety">How full to make them.</param>
     [LuaFunction("setSatiety")]
     public void SetSatiety(ScriptOrigin origin, string player, double satiety) =>
         players.Hunger(player, origin).Saturation = (float)satiety;
@@ -239,8 +239,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <remarks>
     /// What is written here belongs to the world it was written in. Another world on
     /// the same server keeps its own, and deleting a world takes its data with it —
-    /// which is what makes this the one to reach for unless the other is deliberately
-    /// wanted.
+    /// so this is the one to reach for unless the other is deliberately wanted.
     ///
     /// Needs the player to be on the server. What is stored lives on the player the
     /// game has loaded, and nothing is loaded for somebody who is away;
@@ -249,7 +248,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <param name="origin">Script line storing it.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
     /// <param name="key">Name to store it under.</param>
-    /// <param name="value">What to store.</param>
+    /// <param name="value">The value to store. Any value a script can write, a table included.</param>
     [LuaFunction("setWorldData")]
     public void SetWorldData(ScriptOrigin origin, string player, string key, ScriptValue value) =>
         ScriptStore.Write(key, value, players.Find(player, origin).SetModData);
@@ -288,7 +287,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <param name="origin">Script line storing it.</param>
     /// <param name="player">Identifier of the player, which need not be one who is here.</param>
     /// <param name="key">Name to store it under.</param>
-    /// <param name="value">What to store.</param>
+    /// <param name="value">The value to store. Any value a script can write, a table included.</param>
     [LuaFunction("setAccountData")]
     public void SetAccountData(ScriptOrigin origin, string player, string key, ScriptValue value) =>
         ScriptStore.Write(key, value, (name, json) =>
@@ -315,7 +314,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
     /// <summary>Sets how tired a player is.</summary>
     /// <param name="origin">Script line requesting the change.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>
-    /// <param name="tiredness">What to set it to.</param>
+    /// <param name="tiredness">How tired to make them.</param>
     [LuaFunction("setTiredness")]
     public void SetTiredness(ScriptOrigin origin, string player, double tiredness) =>
         players.Tiredness(player, origin).Tiredness = (float)tiredness;
@@ -403,7 +402,7 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
 
     /// <summary>
     /// Sends one message to everybody on the server. Needs no list of players and no
-    /// event to have happened, which is what makes it the way to announce anything.
+    /// event to have happened.
     /// </summary>
     /// <param name="origin">Script line announcing it.</param>
     /// <param name="message">Text to send.</param>
@@ -477,8 +476,8 @@ public sealed class PlayerDomain(PlayerAccess players, AssetStacks stacks)
 
     /// <summary>
     /// The block a player has their cursor on, or nil where they are pointing at
-    /// nothing. Answers without waiting for them to do anything to it, which is what
-    /// a command about "the block in front of me" needs.
+    /// nothing. Answers without waiting for them to do anything to it, as a command
+    /// about "the block in front of me" needs.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
     /// <param name="player">Identifier of the player, as an event gives it.</param>

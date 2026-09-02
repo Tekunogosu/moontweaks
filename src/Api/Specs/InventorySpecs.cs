@@ -45,8 +45,7 @@ public sealed class WhereSpec
     public string? Player { get; set; }
 
     /// <summary>
-    /// Which of that player's inventories. Their bags when omitted, which is what
-    /// "their inventory" usually means.
+    /// Which of that player's inventories. Their bags when omitted.
     /// </summary>
     [LuaField("which", Default = "\"backpack\"")]
     public EnumBagKind? Which { get; set; }
@@ -106,7 +105,7 @@ public sealed class SlotPayload
     /// <remarks>
     /// The game keeps it on the stack rather than on the asset, so two axes in one
     /// chest answer differently. A stack that has never been used carries no figure of
-    /// its own and reads back as the maximum, which is what the game shows.
+    /// its own and reads back as the maximum, as the game shows it.
     /// </remarks>
     [LuaField("durability")]
     public int? Durability { get; init; }

@@ -98,7 +98,7 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// <summary>Called after a player breaks a block.</summary>
     /// <remarks>
     /// Breaking a block removes it before this runs, so the position now holds air.
-    /// The game hands over what stood there, and that is what a handler is told.
+    /// The game hands over what stood there, and a handler is told the same.
     /// </remarks>
     public void OnDidBreakBlock(ScriptOrigin origin, ScriptValue.Func handler) =>
         On("didBreakBlock", origin, handler, occurred =>
@@ -171,7 +171,7 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// <remarks>
     /// Raised once per region, where the server ticks and again as it shuts down,
     /// both on the main thread — so a handler runs while the event is happening
-    /// rather than a tick later, which is what lets one at shutdown run at all.
+    /// rather than a tick later, so one at shutdown runs at all.
     /// </remarks>
     public void OnMapRegionUnloaded(ScriptOrigin origin, ScriptValue.Func handler) =>
         On("mapRegionUnloaded", origin, handler, occurred =>
@@ -339,7 +339,7 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// from there while the main thread is already inside the interpreter is a race.
     ///
     /// So the payload is built where the event happened — a snapshot of plain numbers
-    /// and strings, which is what every shape here already is — and only the call is
+    /// and strings, as every shape here already is — and only the call is
     /// handed across. Two things follow, and both reach script authors rather than
     /// staying here. The handler runs a tick late, so what it is told may already have
     /// changed and anything it reaches for wants checking first. And the game decides

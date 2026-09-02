@@ -168,7 +168,7 @@ public sealed class ClaimSpec
     [LuaField("toZ", Required = true)]
     public int ToZ { get; set; }
 
-    /// <summary>What to call it, which is what the game shows the owner.</summary>
+    /// <summary>Name for the claim, which the game shows its owner.</summary>
     [LuaField("description", Default = "\"\"")]
     public string Description { get; set; } = "";
 

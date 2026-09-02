@@ -8,8 +8,8 @@ namespace MoonTweaks.Assets;
 /// The tag names this server knows, and declaring new ones.
 /// </summary>
 /// <remarks>
-/// A tag says what something is rather than what it is called, which is what lets one
-/// rule reach a modded axe as readily as a vanilla one. The game ships a set of them
+/// A tag says what something is rather than what it is called, so one rule reaches a
+/// modded axe as readily as a vanilla one. The game ships a set of them
 /// and a script may declare its own, then put them on items and blocks through
 /// <c>addTags</c> on <c>moontweaks.items.set</c> and <c>moontweaks.blocks.set</c>.
 /// Every place that already selects by tags — an asset change, a recipe ingredient, a
@@ -55,7 +55,7 @@ public sealed class TagDomain(IWorldAccessor world)
     /// <remarks>
     /// One name may be written on its own; several are written as a list. The
     /// declaration lasts as long as the server runs and is made again at every
-    /// startup, which is what a script's body is for.
+    /// startup, which is why it belongs in a script's body.
     /// </remarks>
     /// <param name="origin">Script line declaring them.</param>
     /// <param name="names">Name to declare, or a list of them.</param>

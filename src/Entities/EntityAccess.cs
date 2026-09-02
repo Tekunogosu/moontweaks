@@ -119,8 +119,8 @@ public sealed class EntityAccess(ICoreServerAPI api)
     /// <remarks>
     /// The type is looked up first and refused by name if the server has none, which
     /// is the one thing here that can be checked before anything happens. Everything
-    /// spawned in one call shares a herd, which is what makes a group move together
-    /// rather than scatter the moment it appears.
+    /// spawned in one call shares a herd, so a group moves together rather than
+    /// scattering the moment it appears.
     /// </remarks>
     public IReadOnlyList<double> Spawn(SpawnSpec spec, ScriptOrigin origin)
     {

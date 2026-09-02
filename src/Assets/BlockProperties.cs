@@ -91,7 +91,7 @@ public static class BlockProperties
 
     /// <summary>
     /// One sound asset, under the folder the game keeps sounds in. Added here where a
-    /// script left it off, which is what the game's own loader does with the paths in
+    /// script left it off, as the game's own loader does with the paths in
     /// a block's JSON — and its own assets are written both ways.
     /// </summary>
     private static AssetLocation Asset(string path) =>

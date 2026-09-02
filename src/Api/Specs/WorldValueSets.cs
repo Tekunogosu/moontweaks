@@ -163,7 +163,7 @@ public enum EnumAccessResponse
 /// <summary>Which shape a particle is drawn as.</summary>
 public enum EnumParticleKind
 {
-    /// <summary>A flat square facing the viewer, which is what most effects use.</summary>
+    /// <summary>A flat square facing the viewer.</summary>
     Quad,
 
     /// <summary>A solid cube, as a broken block throws off.</summary>

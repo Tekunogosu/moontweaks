@@ -54,7 +54,7 @@ public sealed class GroupAccess(ICoreServerAPI api, PlayerAccess players)
         Online = [.. group.OnlinePlayers.Select(member => member.PlayerUID)],
         // Held as a bare string the game compares against one spelling, so anything
         // that is not exactly that spelling means invite only — including nothing,
-        // which is what a group made through the game's own command carries.
+        // as a group made through the game's own command carries.
         JoinPolicy = group.JoinPolicy == Policy(EnumJoinPolicy.Everyone)
             ? EnumJoinPolicy.Everyone
             : EnumJoinPolicy.InviteOnly,

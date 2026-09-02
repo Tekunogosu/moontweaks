@@ -136,8 +136,8 @@ public sealed class ServerDomain(ICoreServerAPI api, ScriptTimers timers)
     /// </summary>
     /// <remarks>
     /// Declaring a privilege is not granting it. Administrators and the server
-    /// console are given it on declaration, which is what lets a script's own command
-    /// be run by whoever owns the server the moment it is declared; everybody else
+    /// console are given it on declaration, so whoever owns the server can run a
+    /// script's own command the moment it is declared; everybody else
     /// gets it by the operator naming it in a role in <c>serverconfig.json</c>. What
     /// grants a privilege to a player outright stays unbound deliberately, since a
     /// script that can grant one can grant itself anything.

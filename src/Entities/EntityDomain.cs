@@ -107,8 +107,8 @@ public sealed class EntityDomain(EntityAccess entities, AssetStacks stacks)
 
     /// <summary>
     /// Takes something out of the world without killing it. Nothing drops and nothing
-    /// notices, which is what clearing up after a script wants rather than
-    /// <c>kill</c>.
+    /// notices, so this rather than <c>kill</c> is how a script clears up after
+    /// itself.
     /// </summary>
     /// <param name="origin">Script line removing it.</param>
     /// <param name="entity">Identifier of the entity, as a search gives it.</param>
@@ -118,9 +118,9 @@ public sealed class EntityDomain(EntityAccess entities, AssetStacks stacks)
     /// <summary>Moves something somewhere else.</summary>
     /// <param name="origin">Script line moving it.</param>
     /// <param name="entity">Identifier of the entity, as a search gives it.</param>
-    /// <param name="x">Where to put it.</param>
-    /// <param name="y">Where to put it.</param>
-    /// <param name="z">Where to put it.</param>
+    /// <param name="x">Where it goes, east to west.</param>
+    /// <param name="y">Where it goes, from the world's floor upwards.</param>
+    /// <param name="z">Where it goes, north to south.</param>
     [LuaFunction("teleport")]
     public void Teleport(ScriptOrigin origin, double entity, double x, double y, double z) =>
         entities.Find(entity, origin).TeleportToDouble(x, y, z);
@@ -141,7 +141,7 @@ public sealed class EntityDomain(EntityAccess entities, AssetStacks stacks)
     /// <summary>Sets how much health something has.</summary>
     /// <param name="origin">Script line requesting the change.</param>
     /// <param name="entity">Identifier of the entity, as a search gives it.</param>
-    /// <param name="health">What to set it to.</param>
+    /// <param name="health">The health to give it.</param>
     [LuaFunction("setHealth")]
     public void SetHealth(ScriptOrigin origin, double entity, double health) =>
         entities.Health(entity, origin).Health = (float)health;
@@ -186,7 +186,7 @@ public sealed class EntityDomain(EntityAccess entities, AssetStacks stacks)
     /// </summary>
     /// <param name="origin">Script line naming it.</param>
     /// <param name="entity">Identifier of the entity, as a search gives it.</param>
-    /// <param name="name">What to call it.</param>
+    /// <param name="name">The name to give it.</param>
     [LuaFunction("setName")]
     public void SetName(ScriptOrigin origin, double entity, string name) =>
         entities.SetName(entity, name, origin);
@@ -210,7 +210,7 @@ public sealed class EntityDomain(EntityAccess entities, AssetStacks stacks)
     /// <param name="origin">Script line storing it.</param>
     /// <param name="entity">Identifier of the entity, as a search gives it.</param>
     /// <param name="key">Name to store it under.</param>
-    /// <param name="value">What to store. Any value a script can write, a table included.</param>
+    /// <param name="value">The value to store. Any value a script can write, a table included.</param>
     [LuaFunction("setData")]
     public void SetData(ScriptOrigin origin, double entity, string key, ScriptValue value) =>
         entities.Remember(entity, key, value, origin);

@@ -42,7 +42,7 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players, int un
     /// here rather than made one at a time: each single write relights and re-sends
     /// the chunk it touched, so a script filling a shape one block at a time pays that
     /// cost per block, where queued writes pay it once at the commit. Each commit also
-    /// records what stood there before, which is what <see cref="Undo"/> puts back.
+    /// records what stood there before, which <see cref="Undo"/> puts back.
     /// </summary>
     /// <remarks>
     /// One per script rather than one for the server, because an undo has to mean
@@ -99,7 +99,7 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players, int un
 
     /// <summary>
     /// Puts a block somewhere, taking effect at once. One step of history of its own,
-    /// which is what makes a single write undoable on the same terms a whole queue is.
+    /// so a single write is undoable on the same terms a whole queue is.
     /// </summary>
     public void Set(int blockId, int x, int y, int z, ScriptOrigin origin)
     {
@@ -265,7 +265,7 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players, int un
     /// <remarks>
     /// Two calls rather than one because the game offers two: naming a pitch asks for
     /// exactly that pitch, and naming none lets the game vary it a little each time,
-    /// which is what stops a repeated sound reading as a loop.
+    /// so a repeated sound does not read as a loop.
     /// </remarks>
     public void Play(SoundSpec sound)
     {
@@ -356,8 +356,8 @@ public sealed class WorldAccess(ICoreServerAPI api, PlayerAccess players, int un
     /// <see cref="IsLoaded"/> from a later tick rather than on the next line.
     ///
     /// The column is not held open. It unloads again on the game's own terms once
-    /// nothing is keeping it, which is what stops a script quietly pinning the world
-    /// into memory a chunk at a time.
+    /// nothing is keeping it, so a script cannot quietly pin the world into memory a
+    /// chunk at a time.
     /// </remarks>
     public bool Load(int x, int z)
     {

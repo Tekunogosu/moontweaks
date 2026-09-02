@@ -58,7 +58,7 @@ public sealed class BlockDropSpec : AssetSpec
 
     /// <summary>
     /// Tool this only drops for, such as <c>axe</c>. Dropped whatever broke it when
-    /// omitted, which is what most blocks do.
+    /// omitted.
     /// </summary>
     [LuaField("tool")]
     public EnumToolKind? Tool { get; set; }
@@ -80,9 +80,8 @@ public sealed class BlockDropSpec : AssetSpec
 
 /// <summary>
 /// One sound a block makes, named by the asset that holds it. A bare string names
-/// the sound and leaves everything else as the game had it, which is what a script
-/// usually wants: how loudly and how far a sound carries is filled in per kind of
-/// sound as the game loads, and a value written over it is a value to get right.
+/// the sound and leaves everything else as the game had it. How loudly and how far a
+/// sound carries is filled in per kind of sound as the game loads.
 /// </summary>
 /// <remarks>
 /// A sound is an asset rather than an item or a block, so nothing completes the path
@@ -349,8 +348,8 @@ public sealed class BlockPropertiesSpec : AssetPropertiesSpec
     public BoxSpec[]? CollisionBoxes { get; set; }
 
     /// <summary>
-    /// The boxes a player's cursor picks it out by, which is what draws the outline
-    /// around it. Replaces every box it had; an empty list makes it unselectable.
+    /// The boxes a player's cursor picks it out by, and what draws the outline around
+    /// it. Replaces every box it had; an empty list makes it unselectable.
     /// </summary>
     [LuaField("selectionBoxes")]
     public BoxSpec[]? SelectionBoxes { get; set; }

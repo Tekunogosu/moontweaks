@@ -42,7 +42,7 @@ public sealed class ServerPayload(ICoreServerAPI api)
     [LuaField("seed")]
     public int Seed { get; } = api.World.Seed;
 
-    /// <summary>The height the sea sits at, which is what "above ground" is measured from.</summary>
+    /// <summary>The height the sea sits at, which "above ground" is measured from.</summary>
     [LuaField("seaLevel")]
     public int SeaLevel { get; } = api.World.SeaLevel;
 

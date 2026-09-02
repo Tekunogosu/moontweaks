@@ -204,7 +204,7 @@ public class MoonTweaksSystem : ModSystem
 
         // The run succeeded and its handlers are the live ones, so this is where the
         // game is actually subscribed to and the timers are started. A check never
-        // reaches here, which is what keeps it from doing either twice.
+        // reaches here, so it does neither twice.
         Attempt(server.Logger, "subscribing the event handlers", () =>
             Report(server.Logger, events.Activate()));
         Attempt(server.Logger, "starting the timers", () =>
@@ -284,7 +284,7 @@ public class MoonTweaksSystem : ModSystem
     /// </summary>
     /// <remarks>
     /// Deferred to the run phase the game enters after it has started every mod,
-    /// which is what decides who pays for a clash. Registered any earlier, a name a
+    /// which decides who pays for a clash. Registered any earlier, a name a
     /// content mod also wants would be ours first and theirs second, and the game
     /// refuses the second — inside that mod's own start, which the game answers by
     /// dropping the whole mod. Registered here, the clash lands in

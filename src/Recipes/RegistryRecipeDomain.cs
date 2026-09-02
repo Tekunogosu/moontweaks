@@ -39,7 +39,7 @@ public abstract class RegistryRecipeDomain(MutationLog log, IWorldAccessor world
     /// disabled, in which case the change is kept for the report and never applied.
     /// </summary>
     /// <param name="spec">What the script declared, which says whether it is enabled.</param>
-    /// <param name="named">What the report calls the recipe, which is what it makes.</param>
+    /// <param name="named">Name the report gives the recipe, being what it makes.</param>
     /// <param name="built">Every recipe that declaration turned into.</param>
     /// <param name="origin">Script line requesting the change.</param>
     protected void RecordAddition<TRecipe>(

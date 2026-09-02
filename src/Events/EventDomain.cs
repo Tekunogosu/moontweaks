@@ -225,8 +225,8 @@ public sealed class EventDomain(ScriptEvents events)
     /// <summary>
     /// Called when something comes back with the chunk it was saved in. The
     /// counterpart of a despawn whose reason was <c>unload</c>: the same creature
-    /// returning rather than a new one appearing, which is what makes this the place
-    /// to put back whatever was remembered about it.
+    /// returning rather than a new one appearing, so this is where whatever was
+    /// remembered about it is put back.
     /// </summary>
     /// <inheritdoc cref="EntitySpawn" path="/remarks"/>
     /// <param name="origin">Script line adding the handler.</param>
@@ -291,8 +291,7 @@ public sealed class EventDomain(ScriptEvents events)
     /// rather than once per packet.
     ///
     /// Only a mount whose rider's own client reports its position raises this at all,
-    /// which is what makes it the pace a rider chose rather than one the server
-    /// worked out. Nothing is raised for a creature the server is walking itself.
+    /// so the pace is one a rider chose rather than one the server worked out. Nothing is raised for a creature the server is walking itself.
     /// </remarks>
     /// <param name="origin">Script line adding the handler.</param>
     /// <param name="handler">Called each time it happens.</param>

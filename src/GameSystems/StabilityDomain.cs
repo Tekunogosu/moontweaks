@@ -53,9 +53,9 @@ public sealed class StabilityDomain(GameSystems systems)
     /// is not; 2 everywhere on a world with temporal stability turned off.
     /// </summary>
     /// <param name="origin">Script line asking.</param>
-    /// <param name="x">Where to ask.</param>
-    /// <param name="y">Where to ask.</param>
-    /// <param name="z">Where to ask.</param>
+    /// <param name="x">The position asked about, east to west.</param>
+    /// <param name="y">The position asked about, from the world's floor upwards.</param>
+    /// <param name="z">The position asked about, north to south.</param>
     [LuaFunction("at")]
     public double At(ScriptOrigin origin, double x, double y, double z) =>
         Stability("stability.at", origin).GetTemporalStability(x, y, z);

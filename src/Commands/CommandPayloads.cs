@@ -16,8 +16,8 @@ public sealed class CommandPayload(Caller caller, ScriptValue args)
 {
     /// <summary>
     /// Identifier of the player who ran it, which every <c>moontweaks.players</c>
-    /// function takes. Nil when the server console ran it, which is what
-    /// <c>requiresPlayer</c> rules out.
+    /// function takes. Nil when the server console ran it, which <c>requiresPlayer</c>
+    /// rules out.
     /// </summary>
     [LuaField("player")]
     public string? Player { get; } = caller.Player?.PlayerUID;

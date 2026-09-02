@@ -41,8 +41,8 @@ public sealed class LuaCSharpHost : IScriptHost
     /// library, <c>string</c>, <c>table</c>, <c>math</c> and <c>bit32</c>. The rest
     /// are never opened, so <c>io</c>, <c>os</c>, <c>package</c>, <c>coroutine</c>,
     /// <c>debug</c> and <c>utf8</c> are absent rather than present and refusing.
-    /// A script therefore has no clock of its own, which is what
-    /// <c>moontweaks.server.elapsedMs</c> exists to answer.
+    /// A script therefore has no clock of its own, and asks
+    /// <c>moontweaks.server.elapsedMs</c> for the time instead.
     /// </summary>
     public LuaCSharpHost()
     {
@@ -255,7 +255,7 @@ public sealed class LuaCSharpHost : IScriptHost
         ScriptValue.Num n => n.Value,
         ScriptValue.Bool b => b.Value,
         // Tables travel this way only when the host calls a script rather than the
-        // other way round, which is what an event handler is.
+        // other way round, as an event handler does.
         ScriptValue.List list => ToLuaValue(list),
         ScriptValue.Map map => ToLuaValue(map),
         _ => LuaValue.Nil,

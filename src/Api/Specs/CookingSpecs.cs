@@ -2,7 +2,7 @@ namespace MoonTweaks.Api;
 
 // What a script writes to declare a meal a pot cooks. The kind with no single
 // product: what comes out is named after what went in, so a recipe carries a code of
-// its own and that is what selects one.
+// its own, and that code selects it.
 
 /// <summary>
 /// A cooked form one of a valid stack's inputs may also take, so a recipe accepting

@@ -27,7 +27,7 @@ public sealed class TimerPayload(float seconds)
 /// A script's body runs while the server is loading, so a timer it asks for then is
 /// recorded and started once the run is known to have succeeded — a check therefore
 /// starts nothing. A handler asking for one is already past that point and starts it
-/// at once, which is what lets a command hand a long job to the ticks that follow it.
+/// at once, so a command can hand a long job to the ticks that follow it.
 /// </remarks>
 public sealed class ScriptTimers(ICoreServerAPI api)
 {
@@ -43,8 +43,7 @@ public sealed class ScriptTimers(ICoreServerAPI api)
 
     /// <summary>
     /// Runs a handler over and over, waiting this long between each. The handler stops
-    /// it by answering false, which is what a job spread over several ticks does once
-    /// it has finished.
+    /// it by answering false, which is how a job spread over several ticks ends.
     /// </summary>
     public void Every(int milliseconds, ScriptOrigin origin, ScriptValue.Func handler)
     {

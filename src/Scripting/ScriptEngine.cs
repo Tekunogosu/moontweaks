@@ -19,8 +19,8 @@ public static class ScriptEngine
 {
     /// <summary>
     /// Engine a server runs on. A candidate replaces this only once it has been
-    /// measured against it on the bindings a server actually uses, which is what
-    /// <c>scripts/bench.sh</c> is for.
+    /// measured against it on the bindings a server actually uses, which
+    /// <c>scripts/bench.sh</c> does.
     /// </summary>
     public const string DEFAULT = LuaCSharpHost.ENGINE_NAME;
 

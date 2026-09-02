@@ -29,7 +29,7 @@ public sealed class CalendarPayload(IGameCalendar calendar)
     [LuaField("month")]
     public EnumMonthName Month { get; } = ValueSet.As<EnumMonthName>(calendar.MonthName);
 
-    /// <summary>How much of the moon is lit, which is what decides how dark a night is.</summary>
+    /// <summary>How much of the moon is lit, which decides how dark a night is.</summary>
     [LuaField("moonPhase")]
     public EnumMoonKind MoonPhase { get; } = ValueSet.As<EnumMoonKind>(calendar.MoonPhase);
 

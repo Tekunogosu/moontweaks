@@ -17,7 +17,7 @@ namespace MoonTweaks.Recipes;
 /// and knows what each of them means: which field carries its output code, whether it
 /// is numbered, how a new one is registered. This reaches any kind at all, including
 /// one belonging to a mod nobody here has heard of, and knows correspondingly less —
-/// it can count them and it can take them away, and that is the whole of it.
+/// it can count them and it can take them away, and nothing more.
 ///
 /// The two are views of the same lists rather than two stores. The survival mod
 /// registers its knapping recipes under <c>knappingrecipes</c> and keeps the same

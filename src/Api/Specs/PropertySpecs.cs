@@ -21,8 +21,8 @@ public sealed class SpreadSpec
 
     /// <summary>
     /// How the range picks within itself. Left alone, anywhere in it is as likely as
-    /// anywhere else, which is what the game's own recipe files mean by a bare
-    /// average and variance.
+    /// anywhere else, as a bare average and variance means in the game's own recipe
+    /// files.
     /// </summary>
     [LuaField("dist", Default = "\"uniform\"")]
     public EnumSpreadKind Distribution { get; set; } = EnumSpreadKind.Uniform;

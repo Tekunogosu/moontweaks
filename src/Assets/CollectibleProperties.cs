@@ -152,8 +152,8 @@ public static class CollectibleProperties
 
     /// <summary>
     /// The keys that say what to change rather than what to change it to. Everything
-    /// else on a spec is a property, which is what lets the question below be asked
-    /// of the shape itself rather than of a list kept by hand.
+    /// else on a spec is a property, so the question below is asked of the shape
+    /// itself rather than of a list kept by hand.
     /// </summary>
     private static readonly string[] Selectors = ["code", "tags"];
 

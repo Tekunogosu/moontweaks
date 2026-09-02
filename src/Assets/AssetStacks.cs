@@ -98,7 +98,7 @@ public sealed class AssetStacks(IWorldAccessor world)
 
     /// <summary>
     /// Whether an asset carries what a condition asks for. An empty condition matches
-    /// everything, which is what makes tags optional beside a code.
+    /// everything, so tags are optional beside a code.
     /// </summary>
     public static bool Matches(ComplexTagCondition<TagSet> condition, CollectibleObject asset) =>
         condition.IsEmpty || condition.Matches(asset.Tags);
