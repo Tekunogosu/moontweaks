@@ -81,7 +81,7 @@ together, immediately after the phase this mod runs scripts in.
 
 ## The events still unbound
 
-Thirty-one are bound. What is left falls into groups that want quite different
+Thirty-three are bound. What is left falls into groups that want quite different
 things, listed here nearest to done first.
 
 **Notifications carrying something new** are down to nothing worth binding.
@@ -109,8 +109,18 @@ means a handler answering `true` puts back a message an earlier one swallowed. T
 documented on the binding rather than designed away, because designing it away would
 have meant this mod's rule rather than the game's.
 
-What is left needs the same treatment, one at a time. `CanUseBlock` and
-`CanPlaceOrBreakBlock` return a bool, `BreakBlock`, `HandInteract` and
+`CanUseBlock` and `CanPlaceOrBreakBlock` want binding never, which is a firmer answer
+than the rest of this group gets and is worth writing down so it is not re-derived.
+Both are raised from `WorldMap.testBlockAccessInternal`, and `OnTestBlockAccess` — the
+bound one — is raised from `TestBlockAccess` immediately after that method returns,
+with its result handed over as the `response` argument. So a handler on the bound
+event already sees the outcome of both and answers later with more to go on. Binding
+the pair would let a script answer earlier and with less, which is a worse hook for
+the same question rather than an additional one. They add nothing a script can reach
+for, and the claim protection a server wants is `events.testBlockAccess` and
+`world.testAccess`.
+
+What is left needs the same treatment, one at a time. `BreakBlock`, `HandInteract` and
 `OnPlayerInteractEntity` take a `ref EnumHandling`, `BeforeActiveSlotChanged` returns
 `EnumHandling`, and `ServerSuspend` returns `EnumSuspendState`. These are not one
 decision but several: an `EnumHandling` is not a chained answer the way an access
@@ -129,21 +139,42 @@ per event — the game's own callers ask on the main thread, and another mod cal
 `OnTrySpawnGroupNearOffthread` are raised off the main thread always rather than
 sometimes, so they stay out of reach whatever else is bound.
 
-**Events on a hot path** should stay unbound whatever else is. These are raised per
-frame, per match attempt or per block written, which is a different order of frequency
-from `testBlockAccess` — bound above, and raised once per block a player actually
-breaks or uses. `OnGetClimate`,
-`OnGetWindSpeed`, `MatchesGridRecipe`, `MatchesRecipe` and `ChunkDirty` are raised
-per frame, per match attempt or per block written, and a script call costs roughly
-130ns against 3ns for the same method in C#. Binding one puts the interpreter inside
-the game's inner loop. The pull-based readings are bound instead: `world.climateAt`
-and `world.windAt` answer the same questions when a script asks rather than when the
-game does, and `chunkColumnLoaded` says a chunk arrived without saying every time
-one is touched.
+**Events on a hot path** are raised per frame, per match attempt or per block written,
+which is a different order of frequency from `testBlockAccess` — bound above, and
+raised once per block a player actually breaks or uses. A script call costs roughly
+130ns against 3ns for the same method in C#, so binding one naively puts the
+interpreter inside the game's inner loop.
 
-`MountGaitReceived` was in this group and left it: the game raises it per packet
-from every rider, and `mountGaitChanged` reports only a change, so the stream is
-thinned where it lands rather than in every handler.
+`OnGetClimate` and `OnGetWindSpeed` stay unbound, and for a second reason beyond the
+first: both let a handler rewrite a value in place, and the server and every client
+work climate out independently. A handler that changed one would leave the server and
+the players disagreeing about the weather they are standing in, which is the
+client-side boundary this mod is built around. The pull-based readings are bound
+instead — `world.climateAt` and `world.windAt` answer the same questions when a script
+asks rather than when the game does. `ChunkDirty` stays unbound outright, and
+`chunkColumnLoaded` says a chunk arrived without saying every time one is touched.
+
+Two have left this group, by the same move each time: thin the stream where it lands
+rather than in every handler.
+
+`MountGaitReceived` was the first. The game raises it per packet from every rider, and
+`mountGaitChanged` reports only a change.
+
+`MatchesGridRecipe` and `MatchesRecipe` are the second, bound as
+`events.matchesGridRecipe` and `events.matchesRecipe`. Both take an output code as
+their first argument rather than offering one, and `RaiseRecipeMatch` in `ScriptEvents`
+matches it against the candidate recipe in C# before a payload is built or the
+interpreter entered. A script watching one recipe therefore costs a wildcard match per
+candidate and a call only for the recipes it named. Requiring the filter rather than
+defaulting it is what keeps that guarantee: there is no way to ask for every recipe,
+so no way to put an interpreter call on the whole path by omission.
+
+Both refuse and cannot permit, which is the game's own shape rather than a choice made
+here. `GridRecipe.Matches` and `BarrelRecipe.Matches` raise the trigger before checking
+the ingredients at all and return false immediately on a false answer, so a refusal
+stops a recipe and anything else leaves the game to decide. The bindings read only a
+`false` for that reason: reading a `true` would promise a script something the event
+cannot do.
 
 ## What a handler can do to the world
 

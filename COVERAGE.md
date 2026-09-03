@@ -8,10 +8,15 @@ Each section says what is bound, what is not, and what the gap costs a script
 author. A gap that is deliberate says so and why, rather than being listed as
 though nobody had looked at it.
 
+Every count below is a fact about the bindings, and `docs/api.json` is where that
+fact lives — `scripts/docs.sh` writes it from the annotations themselves. Check a
+number against that file rather than against this one, and correct this one where
+the two disagree.
+
 | Area | Reached | Missing in one line |
 | --- | --- | --- |
 | Recipes | every kind, vanilla and modded | Editing a kind this mod has never seen |
-| Item properties | 20 fields | Particles, held sounds |
+| Item properties | 18 fields | Particles, held sounds |
 | Block properties | 16 further fields | Decor, particles |
 | Asset registry | counting them, declaring tags | Listing or testing a code from a script |
 | Players | 38 functions | Richer messages, connection facts |
@@ -21,7 +26,7 @@ though nobody had looked at it.
 | Entities | 23 functions | Giving one a tag, mounting, pathing, behaviours |
 | Inventory | 13 functions | What one stack carries besides its wear |
 | Calendar | 8 functions | Nothing worth naming |
-| Events | 31 of 50 | See `TODO.md` for the classification |
+| Events | 33 of 50 | See `TODO.md` for the classification |
 | Scheduling | 2 functions | Nothing worth naming |
 | Commands | declaring one | Six argument kinds of two dozen, aliases, others' commands |
 | Storage | per player and per world | Nothing worth naming |
@@ -46,17 +51,28 @@ has never seen is matched on what its recipes resolve to as an output, since tha
 is all such a kind reliably offers — so a modded kind can be counted and thinned
 out, and a recipe cannot be added to one or have its ingredients read.
 
+Adding and removing are not the only ways to change what a server can make.
+`events.matchesGridRecipe` and `events.matchesRecipe` are asked as the game tests an
+arrangement against a recipe, and a handler answering `false` refuses that attempt —
+so a recipe can be gated on who is crafting or where they stand while staying in the
+handbook and staying craftable by everybody else. Both require the output code they
+watch, which is matched before the interpreter is entered; the events section of
+`TODO.md` says why that is required rather than offered. A handler refuses and cannot
+permit, because the game asks before it has checked the ingredients at all.
+
 ## Item and block properties
 
-`moontweaks.items.set` reaches the fifteen fields anything carried has: durability,
+`moontweaks.items.set` reaches the eighteen fields anything carried has: durability,
 stack size, tool class and tool tier, mining speed, attack power and range, material
-density, storage flags, what damages it, arbitrary attributes, and the combustible,
-grinding, crushing and nutrition property groups.
+density, storage flags, what damages it, arbitrary attributes, where it appears in
+creative and as what stack, how it changes once it stops being fresh, and the
+combustible, grinding, crushing and nutrition property groups.
 
-`moontweaks.blocks.set` takes all of those and twelve more that only something
+`moontweaks.blocks.set` takes all of those and sixteen more that only something
 standing in the world has: breaking resistance, required mining tier, block
 material, drops, light colour, light absorption, replaceability, fertility, walk
-speed, drag, climbability and rain permeability.
+speed, drag, climbability, rain permeability, the sounds it makes, its collision and
+selection boxes, and what it grows as a crop.
 
 Selecting is by `code`, which accepts a `*` wildcard, or by `tags`, or by both.
 Tags select on what an asset is rather than what it is called, so one entry reaches
@@ -76,12 +92,9 @@ server sends its whole tag table in the assets packet and each client registers 
 names in handle order, so a declared tag is one every client knows by the same
 handle.
 
-Beyond those: `transitionableProps` is the list of ways a thing changes once it stops
-being fresh, `creativeInventoryTabs` and `creativeInventoryStacks` are where it
-appears in creative, and a block carries `sounds`, `collisionBoxes`,
-`selectionBoxes` and `cropProps`. Every quantity written as an average and a variance
-also takes a `dist`, so a drop or a crushing yield can be made to cluster near its
-average rather than falling anywhere in its range.
+Every quantity written as an average and a variance also takes a `dist`, so a drop
+or a crushing yield can be made to cluster near its average rather than falling
+anywhere in its range.
 
 Unbound, in the order they are likely to be wanted:
 
@@ -129,9 +142,12 @@ Also unbound:
 
 - **Inventory** is reached, through `moontweaks.inventory` rather than here.
   `players.give` remains the one-line way to hand something over and hear whether it
-  fitted. What `IPlayerInventoryManager` still keeps to itself is moving a stack from
-  one place to another in a single call: a script does it as a `take` and a `put`, and
-  has to put back what the second half could not place.
+  fitted, and `inventory.move` carries a stack from one place to another in a single
+  operation. What `IPlayerInventoryManager` still keeps to itself is the window a
+  player has open — `OpenInventory`, `CloseInventory` and `OpenedInventories` — which
+  is a client's screen rather than the slots behind it, and `DropAllInventoryItems`
+  and `DiscardAll`, which empty a player out wholesale where `clear` already does it
+  per inventory.
 - **Granting privileges.** Reading them is bound, and declaring one is
   `moontweaks.server.addPrivilege`. What `IPermissionManager` grants, denies and
   revokes is not, and `SetRole` is deliberately excluded: a script that can set roles
@@ -160,7 +176,17 @@ Also unbound:
   `ActiveHotbarSlotNumber` decides which hand slot that is, and is unbound. The
   offhand slot is reached only as a numbered slot of the hotbar inventory, where
   `OffhandHotbarSlot` names it directly.
-- **Connection facts.** `Ping`, `IpAddress`, `LanguageCode`, `ConnectionState`.
+- **Connection facts.** `Ping`, `IpAddress`, `LanguageCode`, `ConnectionState` and
+  `CurrentChunkSentRadius` say how a player is connected rather than anything about
+  the world. Nothing has asked, and `IpAddress` is the kind of thing a server should
+  have to reach for deliberately.
+- **Client preferences.** `ItemCollectMode` and `ImmersiveFpMode` are the player's
+  own settings, and `Entitlements` is what their account carries. Read-only facts
+  about somebody's client rather than levers on the world.
+- **`IsInInteractionRangeOf`.** Whether a player could reach a place, which
+  `players.position` and arithmetic already answer for anything a script decides.
+- **`BroadcastPlayerData`.** Pushes a player's data to clients; every binding that
+  changes a player already does whatever refresh the game does for it.
 - **Offline players past a name.** `IPlayerDataManager` answers for somebody who is
   not here; `uidOf` uses it, and the rest of what it holds is unreached.
 
@@ -222,9 +248,23 @@ Still unreached:
   already do.
 - **Ray casting.** `RayTraceForSelection` answers what is along a line, which is
   what a reach test or a line-of-sight check needs.
-- **World facts a script cannot change.** Light level tables, sun brightness, sea
-  level as a setting rather than a reading, and the world configuration that
-  `classExclusiveRecipes` is read from.
+- **World facts a script cannot change.** `SetSunLightLevels`,
+  `SetBlockLightLevels`, `SetSunBrightness` and `SetSeaLevel` on `IWorldManagerAPI`
+  rewrite the tables the whole world is lit and levelled by. Clients hold their own
+  copies, so a server moving one alone disagrees with every player about what is
+  bright and what is underwater. `world.seaLevel` and `world.light` read; nothing
+  writes. The world configuration `classExclusiveRecipes` is read from sits here too.
+- **Chunk management past loading one.** `world.loadChunk` and `world.isChunkLoaded`
+  are the two a script has reason to call. `IWorldManagerAPI` also unloads and
+  deletes chunk columns, forces them to a client, relights them and lists every one
+  in memory — operations that move the world out from under players rather than
+  changing what is in it, and that a script asking for a chunk by position does not
+  need. `AutoGenerateChunks` and `SetDefaultSpawnPosition` are world settings of the
+  same kind: settable, and unbound because nothing has asked.
+- **Where the save lives.** `CurrentWorldFilepath` and `CurrentPlayStyle` name the
+  file on disk and the play style it was made under. `server.info` answers the world
+  name and seed, which is what a script writes against; a path is the beginning of
+  reaching outside the save, which the sandbox section rules out.
 
 ## Chat groups
 
@@ -279,8 +319,21 @@ so it already accounts for protections this mod knows nothing about.
 block.
 
 `events.testBlockAccess` is the other side of that: a script's handler is asked the
-same question and its answer is the decision. It is the one bound event whose return
-value is read, and the only one that can override a land claim in either direction.
+same question and its answer is the decision. It is the only bound event that can
+override a land claim in either direction.
+
+`CanUseBlock` and `CanPlaceOrBreakBlock` look like they belong here and do not. Both
+are raised from inside `WorldMap.testBlockAccessInternal`, and the bound event is
+raised straight after that method returns, with its result handed over as the answer
+so far — so a handler already sees what both of them decided, and answers later with
+more to go on. `TODO.md` records why binding them would be a worse hook for the same
+question rather than an extra guard.
+
+None of the three fires on what a script itself writes. `world.setBlock` and its
+siblings reach the block accessor directly and consult no claim, which is the server
+acting rather than a player asking, exactly as the game's own `/land` commands do. A
+script that means to respect claims asks `world.testAccess` first, which runs the whole
+chain including every other mod's handlers.
 
 ## Entities
 
@@ -333,11 +386,13 @@ hold stays exactly where it was rather than needing putting back by hand. `put` 
 `take` remain bound for the halves that are genuinely halves — charging for something
 that then ceases to exist, or handing out something that did not exist a moment ago.
 
-What one stack carries is unreached in the reading direction. A slot answers with a
-code, a count, what would fit and what the game calls it — not with the attributes
-the stack itself holds, of which a tool's remaining durability is the one every
-server asks about. Writing them is bound: every shape naming a stack takes
-`attributes`, so a script can hand over a half-worn axe it cannot afterwards read.
+A slot answers with a code, a count, what would fit, what the game calls it, and how
+worn it is — `durability` and `maxDurability`, which is the one attribute every
+server asks about. The rest of what a stack carries is unreached in the reading
+direction: the arbitrary attributes behind it are written and not read back, so a
+script can hand over an axe with something recorded on it and cannot afterwards ask
+what that was. Writing is bound throughout, since every shape naming a stack takes
+`attributes`.
 
 Nothing says a set of slots changed. `IInventory.SlotModified` is raised per
 inventory rather than through `IEventAPI`, so hearing it means subscribing to one
@@ -392,8 +447,10 @@ altered. That is this mod's own rule rather than the game's —
 `BeginSubCommand` nests onto it — and it is held because two mods extending one
 command have no way to agree on what its arguments mean.
 
-`IChatCommandApi.Execute` runs a command a script did not declare, which nothing
-here offers.
+`IChatCommandApi.Execute` and `ExecuteUnparsed` run a command a script did not
+declare, which nothing here offers: a script running the console's own commands
+reaches whatever any other mod registered, and none of that has been thought about.
+`GetOrdered` lists what is registered, which is only useful for extending one.
 
 ## Storage
 
@@ -428,6 +485,33 @@ Unbound besides: `ShutDown`, `CurrentRunPhase`, `IsShuttingDown`, and the rest o
 the default role and the roles themselves. Several are settable and none are bound;
 nothing has asked for them.
 
+`ISaveGame` holds more than `info` reads. `EntitySpawning` is bound as a rule and
+`Seed`, `WorldName` and `TotalGameSeconds` are read; `CreatedGameVersion`,
+`LastSavedGameVersion`, `SavegameIdentifier`, `IsNew`, `WorldType` and `PlayStyle`
+are not. They describe how the world was made rather than what is true in it, and
+a script that behaves differently on an older save is a script whose author wanted
+`moontweaks.mods` instead. `DefaultSpawn` is covered under players above.
+
+The rest of `IServerAPI` falls into three groups, none of which wants a binding:
+
+- **Facts about the process rather than the world.** `ServerIp`, `IsDedicated`,
+  `TotalSentBytes`, `TotalReceivedBytes` and `ReducedServerThreads` describe the
+  host. `info` already answers the ones a script writes against.
+- **Threading.** `AddServerThread`, `AddPhysicsTickable`, `RemovePhysicsTickable`,
+  `PauseThread` and `ResumeThread` hand work to threads other than the one the
+  interpreter runs on. A script cannot be called from any of them, for the reason
+  the events section gives, so `server.every` and `after` are the whole of what
+  scheduling can safely offer.
+- **Reaching past the script surface.** `InjectConsole` and `HandleCommand` run
+  console input as the server itself, which would let a script do anything the
+  console can regardless of what this mod binds. `MarkConfigDirty` is called
+  already, by `setRules`, and is not a script's to call.
+
+`RegisterTreeGenerator` and the mini-dimension calls (`GetMiniDimension`,
+`LoadMiniDimension`, `SetMiniDimension`, `CreateMiniDimension`) are worldgen and
+the moving-block machinery behind boats and elevators. Both take CLR types or run on
+the generation thread, which puts them with the classes below.
+
 ## Permissions
 
 `players.hasPrivilege` and `players.privileges` read what a server has already
@@ -437,10 +521,17 @@ administrators and the console hold a new privilege as it is declared and everyb
 else gets it from a role in `serverconfig.json`, and the declaration lasts only as
 long as the server runs.
 
-What `IPermissionManager` grants, denies and revokes, per player or per group, stays
-unbound, as does `SetRole`. The line is drawn there rather than at the module: a
-script that can grant a privilege can grant itself any of them, where one that can
-only declare a name has added nothing it did not already have.
+`RegisterPrivilege` is the one member of `IPermissionManager` bound. The rest stays
+unbound as a single decision rather than one per member: `GrantPrivilege`,
+`RevokePrivilege`, `DenyPrivilege`, `RemovePrivilegeDenial`,
+`GrantTemporaryPrivilege`, `DropTemporaryPrivilege`, `AddPrivilegeToGroup`,
+`RemovePrivilegeFromGroup`, `SetRole` and `GetRole`. The line is drawn there rather
+than at the module: a script that can grant a privilege can grant itself any of them,
+where one that can only declare a name has added nothing it did not already have.
+
+`GetPlayerPermissionLevel` only reads, and is unbound for a different reason —
+`players.hasPrivilege` answers the question a script actually asks, by name rather
+than by a number whose meaning is the server's own.
 
 Gating is where the game already puts it. A command a script declares carries its
 own `privilege`, and the whole of `/moontweaks` is behind the one `commandPrivilege`
@@ -491,6 +582,14 @@ should look like depends on what is being reached for.
 - **Worldgen.** `MapChunkGeneration`, `ChunkColumnGeneration` and the tree
   generators all run on the generation thread, so they sit behind the same
   main-thread marshalling that `TODO.md` describes for off-thread events.
-- **Registering classes.** `RegisterBlockClass`, `RegisterEntityBehaviorClass` and
-  their siblings take a CLR type. A Lua table is not one, and making it one is a
-  different mod from this.
+- **Registering classes.** `RegisterBlockClass`, `RegisterEntityBehaviorClass`,
+  `RegisterEntityClass` and their siblings take a CLR type. A Lua table is not one,
+  and making it one is a different mod from this.
+- **The asset pipeline.** `IAssetManager` reads every JSON and texture the game and
+  its mods ship, and is how a mod that ships files of its own gets at them. This mod
+  changes what the registries hold after they are built rather than what is loaded
+  into them, which is what lets a script edit a modded item without that mod knowing.
+  Reading raw assets would be a second way to do the same thing, one file layout
+  change away from breaking.
+- **The file the server was started with.** `CmdlArguments` is the command line, and
+  `ClassRegistry` maps names to the CLR types above. Neither describes the world.

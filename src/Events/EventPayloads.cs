@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using MoonTweaks.Api;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -440,3 +442,95 @@ public sealed class EntityMountEventPayload(Entity entity, IMountableSeat? seat)
     public string? Seat { get; } = seat?.SeatId;
 }
 
+
+/// <summary>
+/// A recipe the game is testing a set of ingredients against, as the handler that
+/// may refuse it is given it.
+/// </summary>
+/// <remarks>
+/// Asked while somebody is arranging ingredients rather than when they take the
+/// result, so a handler is answering "may this be made" rather than "this was made".
+/// It is asked again for every rearrangement, and answering does not consume
+/// anything.
+///
+/// A handler refuses and cannot permit: the game asks before it has checked the
+/// ingredients against the recipe, so <c>false</c> stops a recipe that would have
+/// been made and anything else leaves the game to decide for itself.
+/// </remarks>
+/// <param name="player">Whoever is arranging the ingredients.</param>
+/// <param name="recipe">Recipe being tested, which names what it would make.</param>
+/// <param name="ingredients">Slots the game is testing, in the order it holds them.</param>
+/// <param name="gridWidth">
+/// How wide the arrangement is, for a recipe laid out in a grid. Zero for a kind
+/// that has no layout.
+/// </param>
+[LuaTable("RecipeMatchEvent", Given = true)]
+public class RecipeMatchEventPayload(
+    IPlayer? player, IRecipeBase recipe, ItemSlot[]? ingredients, int gridWidth) : EventPayload
+{
+    /// <summary>
+    /// Identifier of whoever is arranging the ingredients, which
+    /// <c>moontweaks.players</c> takes. Nil where the game named nobody, as it does
+    /// when something other than a player asks.
+    /// </summary>
+    [LuaField("player")]
+    public string? Player { get; } = (player as IServerPlayer)?.PlayerUID;
+
+    /// <summary>Name of whoever is arranging them, or nil where the game named nobody.</summary>
+    [LuaField("playerName")]
+    public string? PlayerName { get; } = player?.PlayerName;
+
+    /// <summary>
+    /// Code of what the recipe would make. This is what a handler reads to decide
+    /// whether the recipe is one it cares about, and what the filter it was declared
+    /// with already matched.
+    /// </summary>
+    [LuaField("output")]
+    [LuaSuggests(SuggestionSets.ASSET_CODE)]
+    public string? Output { get; } = recipe.RecipeOutput?.ResolvedItemStack?.Collectible?.Code?.ToString();
+
+    /// <summary>How many of it the recipe makes.</summary>
+    [LuaField("quantity")]
+    public int Quantity { get; } = recipe.RecipeOutput?.ResolvedItemStack?.StackSize ?? 0;
+
+    /// <summary>
+    /// The recipe's own name, as the file declaring it was called. Nil for a recipe
+    /// a script added, which the game never names.
+    /// </summary>
+    [LuaField("recipe")]
+    public string? Recipe { get; } = recipe.Name?.ToString();
+
+    /// <summary>
+    /// Character trait the recipe demands of whoever makes it, where it demands one.
+    /// The game has already applied this, so a handler seeing a value here is seeing
+    /// a recipe the player is entitled to.
+    /// </summary>
+    [LuaField("requiresTrait")]
+    [LuaSuggests(SuggestionSets.ASSET_TRAIT)]
+    public string? RequiresTrait { get; } = recipe.RequiresTrait;
+
+    /// <summary>
+    /// How wide the arrangement is, for a recipe laid out in a grid. Zero for a kind
+    /// with no layout, such as a barrel's or an anvil's.
+    /// </summary>
+    [LuaField("gridWidth")]
+    public int GridWidth { get; } = gridWidth;
+
+    /// <summary>
+    /// Codes of what is being offered to the recipe, in the order the game holds them.
+    /// An empty slot reads as the empty string rather than as nil, so the list keeps
+    /// its length and its gaps: a grid arrangement read with <c>#ingredients</c> or
+    /// <c>ipairs</c> is the arrangement the player laid out, where a nil would have
+    /// cut it short at the first gap.
+    /// </summary>
+    /// <remarks>
+    /// Read alongside <c>gridWidth</c> to work out where in the grid something sits:
+    /// the slot at row <c>r</c> and column <c>c</c>, both counting from 1, is
+    /// <c>ingredients[(r - 1) * gridWidth + c]</c>.
+    /// </remarks>
+    [LuaField("ingredients")]
+    public IReadOnlyList<string> Ingredients { get; } =
+        ingredients is null
+            ? []
+            : [.. ingredients.Select(slot => slot?.Itemstack?.Collectible?.Code?.ToString() ?? "")];
+}

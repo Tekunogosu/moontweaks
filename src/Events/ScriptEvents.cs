@@ -8,18 +8,27 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.API.Util;
 
 namespace MoonTweaks.Events;
 
 /// <summary>
-/// The game events a script asked to hear about, and the only place a script's
-/// function is called back. Sole owner of what happens when one of them fails.
+/// Things that happen while a server runs, which a script may react to. Every
+/// handler is given one table describing what happened, whose shape each function
+/// below names.
 /// </summary>
 /// <remarks>
-/// One method per event, each naming that event and subscribing to the game's own in
-/// the same breath. Written that way on purpose: a name and a subscription declared
-/// apart have to be paired by hand at every call, and a pair that is wrong, is wrong
-/// silently — handlers for one event would be called when another happened.
+/// A handler runs on the thread the server ticks on, whichever thread the game
+/// raised the event on. One that the game raises elsewhere — a creature spawned by
+/// chunk generation, a packet arriving from a rider — is therefore called on the
+/// tick after it happened, and each says so.
+///
+/// One method per event, each naming that event, describing it to a script author and
+/// subscribing to the game's own in the same breath. Written that way on purpose: a
+/// name and a subscription declared apart have to be paired by hand at every call, and
+/// a pair that is wrong, is wrong silently — handlers for one event would be called
+/// when another happened. A description kept apart drifts the same way, saying one
+/// thing to a script author while the subscription beside it does another.
 ///
 /// Subscriptions are taken out once, when the first handler for an event arrives, and
 /// the handlers are held here. There is one interpreter for the whole server and it
@@ -27,6 +36,57 @@ namespace MoonTweaks.Events;
 /// on is subscribed through <see cref="OnAnyThread"/> and delivered on the next tick
 /// of that one; <see cref="On"/> is for the events known to arrive there already.
 /// </remarks>
+/// <example>
+/// <code>
+/// local events = moontweaks.events
+///
+/// -- Players coming and going.
+/// events.playerJoin(function(e)
+///   moontweaks.players.say(e.player, "welcome back, " .. e.playerName)
+/// end)
+///
+/// events.playerDeath(function(e)
+///   moontweaks.players.announce(e.playerName .. " has died.")
+/// end)
+///
+/// -- What people do to blocks. A place event also says what stood there before.
+/// events.didBreakBlock(function(e)
+///   if e.block == "game:crock-burned" then
+///     moontweaks.log.info(("%s broke a crock at %d %d %d"):format(e.playerName, e.x, e.y, e.z))
+///   end
+/// end)
+///
+/// events.didPlaceBlock(function(e)
+///   if e.replaced then
+///     moontweaks.log.info(("%s built over %s"):format(e.playerName, e.replaced))
+///   end
+/// end)
+///
+/// -- Creatures. A death says what killed it, where it was known.
+/// events.entityDeath(function(e)
+///   if e.byPlayer then
+///     moontweaks.players.say(e.byPlayer, ("You killed a %s."):format(e.name))
+///   end
+/// end)
+///
+/// -- Answering rather than watching: a handler that returns decides the outcome.
+/// events.testBlockAccess(function(e)
+///   if e.y &lt; 20 and not moontweaks.players.hasPrivilege(e.player, "gamemode") then
+///     return "noprivilege"
+///   end
+/// end)
+///
+/// events.playerChat(function(e)
+///   if e.message:find("badword") then return false end
+/// end)
+///
+/// -- The server's own lifetime, for anything that has to be set up once.
+/// events.saveGameLoaded(function()
+///   moontweaks.log.info("the world is open")
+/// end)
+/// </code>
+/// </example>
+[LuaModule("moontweaks.events")]
 public sealed class ScriptEvents(ICoreServerAPI api)
 {
     private readonly Dictionary<string, List<Handler>> handlers = [];
@@ -67,7 +127,15 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     private readonly HashSet<string> offThread = [];
 
     /// <summary>One script function listening for one event.</summary>
-    private sealed record Handler(ScriptOrigin Origin, ScriptValue.Func Call);
+    /// <param name="Origin">Script line that added it, for naming it in a failure.</param>
+    /// <param name="Call">The function itself.</param>
+    /// <param name="Filter">
+    /// Output code this handler asked to hear about, matched before the interpreter is
+    /// entered. Null on an event that hands every occurrence to every handler; the
+    /// recipe events require one, because they are asked often enough that deciding
+    /// in Lua would be the whole cost.
+    /// </param>
+    private sealed record Handler(ScriptOrigin Origin, ScriptValue.Func Call, AssetLocation? Filter = null);
 
     /// <summary>Hands one occurrence of an event to whoever is listening for it.</summary>
     private delegate void Occurred(EventPayload about);
@@ -90,56 +158,97 @@ public sealed class ScriptEvents(ICoreServerAPI api)
 
     /// <summary>Called after a player uses a block, which is left standing.</summary>
     /// <remarks>Using a block leaves it standing, so what stands there is what was used.</remarks>
-    public void OnDidUseBlock(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("didUseBlock")]
+    public void OnDidUseBlock(
+        ScriptOrigin origin, [LuaPayload(typeof(BlockEventPayload))] ScriptValue.Func handler) =>
         On("didUseBlock", origin, handler, occurred =>
             api.Event.DidUseBlock += (player, selection) => occurred(
                 new BlockEventPayload(player, selection?.Position, Standing(selection?.Position))));
 
-    /// <summary>Called after a player breaks a block.</summary>
+    /// <summary>
+    /// Called after a player breaks a block. The block is the one that stood there:
+    /// it has already gone by the time a handler runs.
+    /// </summary>
     /// <remarks>
     /// Breaking a block removes it before this runs, so the position now holds air.
     /// The game hands over what stood there, and a handler is told the same.
     /// </remarks>
-    public void OnDidBreakBlock(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("didBreakBlock")]
+    public void OnDidBreakBlock(
+        ScriptOrigin origin, [LuaPayload(typeof(BlockEventPayload))] ScriptValue.Func handler) =>
         On("didBreakBlock", origin, handler, occurred =>
             api.Event.DidBreakBlock += (player, brokenId, selection) => occurred(
                 new BlockEventPayload(player, selection?.Position, api.World.GetBlock(brokenId))));
 
-    /// <summary>Called after a player puts a block down.</summary>
+    /// <summary>
+    /// Called after a player puts a block down. <c>block</c> is what now stands there
+    /// and <c>replaced</c> is what it went over, which is air where nothing was.
+    /// </summary>
     /// <remarks>
     /// Placing leaves the new block standing, so what stands there is what was placed.
     /// What it went over has already gone, and the game hands that over separately.
     /// </remarks>
-    public void OnDidPlaceBlock(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("didPlaceBlock")]
+    public void OnDidPlaceBlock(
+        ScriptOrigin origin, [LuaPayload(typeof(BlockPlacedEventPayload))] ScriptValue.Func handler) =>
         On("didPlaceBlock", origin, handler, occurred =>
             api.Event.DidPlaceBlock += (player, replacedId, selection, _) => occurred(
                 new BlockPlacedEventPayload(
                     player, selection?.Position, Standing(selection?.Position),
                     api.World.GetBlock(replacedId))));
 
-    /// <summary>Called when a column of chunks has been brought in.</summary>
+    /// <summary>
+    /// Called once a column of chunks has been brought in and its blocks can be
+    /// reached. This is what lets a script act on a place nobody is standing, together
+    /// with <c>moontweaks.world.loadChunk</c>.
+    /// </summary>
     /// <remarks>
     /// Raised on the thread the server ticks on, once the column is ready rather than
     /// while it is being read, so what a handler does to those blocks is safe to do.
+    ///
+    /// A busy server loads columns constantly, so a handler here runs often. Keep it
+    /// short, and decide whether the column is one worth acting on before doing
+    /// anything that costs.
     /// </remarks>
-    public void OnChunkColumnLoaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("chunkColumnLoaded")]
+    public void OnChunkColumnLoaded(
+        ScriptOrigin origin, [LuaPayload(typeof(ChunkColumnEventPayload))] ScriptValue.Func handler) =>
         On("chunkColumnLoaded", origin, handler, occurred =>
             api.Event.ChunkColumnLoaded += (at, _) => occurred(new ChunkColumnEventPayload(at.X, at.Y)));
 
-    /// <summary>Called as one chunk is let go.</summary>
+    /// <summary>
+    /// Called as one chunk is let go, which is where anything remembered about its
+    /// blocks should be forgotten. The blocks themselves are on their way out and
+    /// should not be reached.
+    /// </summary>
     /// <remarks>
     /// Named for what it does rather than for what the game calls it. The game raises
     /// this once per layer of a column rather than once for the column, so a column
     /// going out of memory calls a handler once for every chunk stacked at that place.
-    ///
-    /// The blocks are on their way out, so this is for forgetting what was remembered
-    /// about them rather than for reaching them.
+    /// <c>chunkY</c> says which.
     /// </remarks>
-    public void OnChunkUnloaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("chunkUnloaded")]
+    public void OnChunkUnloaded(
+        ScriptOrigin origin, [LuaPayload(typeof(ChunkEventPayload))] ScriptValue.Func handler) =>
         On("chunkUnloaded", origin, handler, occurred =>
             api.Event.ChunkColumnUnloaded += at => occurred(new ChunkEventPayload(at.X, at.Y, at.Z)));
 
-    /// <summary>Called once a region of the map has come in.</summary>
+    /// <summary>
+    /// Called once a region of the map has come in, whether it was read from disk or
+    /// generated. A region is a square of chunk columns holding the maps a world is
+    /// grown from, so this is raised far less often than <c>chunkColumnLoaded</c> and
+    /// covers far more ground.
+    /// </summary>
     /// <remarks>
     /// Raised on the main thread: the game generates a region on the thread it
     /// supplies chunks from and hands the event to the main one itself, so there is
@@ -152,7 +261,11 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// goes further, which makes this the arrival its name claims — and pairs it with
     /// the unload, which is raised once for real.
     /// </remarks>
-    public void OnMapRegionLoaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("mapRegionLoaded")]
+    public void OnMapRegionLoaded(
+        ScriptOrigin origin, [LuaPayload(typeof(MapRegionEventPayload))] ScriptValue.Func handler) =>
         On("mapRegionLoaded", origin, handler, occurred =>
         {
             api.Event.MapRegionLoaded += (at, _) =>
@@ -167,52 +280,112 @@ public sealed class ScriptEvents(ICoreServerAPI api)
             api.Event.MapRegionUnloaded += (at, _) => regions.Remove((at.X, at.Y));
         });
 
-    /// <summary>Called as a region of the map is let go.</summary>
+    /// <summary>
+    /// Called as a region of the map is let go, which is where anything remembered
+    /// about that stretch of the world should be forgotten.
+    /// </summary>
     /// <remarks>
     /// Raised once per region, where the server ticks and again as it shuts down,
     /// both on the main thread — so a handler runs while the event is happening
     /// rather than a tick later, so one at shutdown runs at all.
     /// </remarks>
-    public void OnMapRegionUnloaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("mapRegionUnloaded")]
+    public void OnMapRegionUnloaded(
+        ScriptOrigin origin, [LuaPayload(typeof(MapRegionEventPayload))] ScriptValue.Func handler) =>
         On("mapRegionUnloaded", origin, handler, occurred =>
             api.Event.MapRegionUnloaded += (at, _) => occurred(Region(at)));
 
-    /// <summary>Called after a player changes which hotbar slot they are holding.</summary>
-    public void OnPlayerChangeSlot(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called after a player changes which hotbar slot they are holding. Ask
+    /// <c>moontweaks.inventory.held</c> what is now in their hand — the event says who
+    /// changed it rather than carrying the slot, since what is in it is the useful part.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerChangeSlot")]
+    public void OnPlayerChangeSlot(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerChangeSlot", origin, handler, occurred =>
             api.Event.AfterActiveSlotChanged += (player, _) => occurred(new PlayerEventPayload(player)));
 
-    /// <summary>Called when something is put into the world.</summary>
+    // The seven below reach things that are not players. The game raises them wherever
+    // it happens to be — chunk generation spawns creatures on its own thread — so a
+    // handler is called on the tick after the event rather than during it. What it is
+    // told is what was true at the moment; what it reaches for wants checking with
+    // moontweaks.entities.isLoaded first.
+
+    /// <summary>
+    /// Called when something is put into the world, however it got there: generated
+    /// with a chunk, bred, or spawned by a script.
+    /// </summary>
     /// <remarks>
     /// Raised wherever the game happened to spawn it, chunk generation included, so
-    /// this is delivered on the following tick.
+    /// this is delivered on the following tick — and the thing it describes may
+    /// already be gone, as a creature generated into a chunk nobody stayed near is.
+    /// Ask <c>moontweaks.entities.isLoaded</c> before reaching for it.
+    ///
+    /// Worldgen fills a chunk with creatures at once, so a busy server calls this in
+    /// bursts. Decide whether the code is one worth caring about before doing anything
+    /// that costs.
     /// </remarks>
-    public void OnEntitySpawn(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entitySpawn")]
+    public void OnEntitySpawn(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityEventPayload))] ScriptValue.Func handler) =>
         OnAnyThread("entitySpawn", origin, handler, occurred =>
             api.Event.OnEntitySpawn += entity => occurred(new EntityEventPayload(entity)));
 
-    /// <summary>Called when something comes back with the chunk it was saved in.</summary>
-    /// <remarks>
-    /// The counterpart of a despawn for <c>unload</c>: the same creature, returning
-    /// rather than appearing. Raised on the chunk's own thread, so delivered late.
-    /// </remarks>
-    public void OnEntityLoaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called when something comes back with the chunk it was saved in. The
+    /// counterpart of a despawn whose reason was <c>unload</c>: the same creature
+    /// returning rather than a new one appearing, so this is where whatever was
+    /// remembered about it is put back.
+    /// </summary>
+    /// <inheritdoc cref="OnEntitySpawn" path="/remarks"/>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityLoaded")]
+    public void OnEntityLoaded(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityEventPayload))] ScriptValue.Func handler) =>
         OnAnyThread("entityLoaded", origin, handler, occurred =>
             api.Event.OnEntityLoaded += entity => occurred(new EntityEventPayload(entity)));
 
-    /// <summary>Called when something dies, for anything alive rather than players alone.</summary>
-    public void OnEntityDeath(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called when anything alive dies, rather than players alone. <c>byPlayer</c>
+    /// names whoever is responsible where one is, so an arrow names the archer rather
+    /// than the arrow.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityDeath")]
+    public void OnEntityDeath(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityDeathEventPayload))] ScriptValue.Func handler) =>
         OnAnyThread("entityDeath", origin, handler, occurred =>
             api.Event.OnEntityDeath += (entity, cause) =>
                 occurred(new EntityDeathEventPayload(entity, cause)));
 
-    /// <summary>Called when something leaves the world, however it went.</summary>
-    public void OnEntityDespawn(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called when something leaves the world, however it went. Read <c>reason</c>
+    /// before concluding anything is gone for good: <c>unload</c> means its chunk left
+    /// memory and it will be back.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityDespawn")]
+    public void OnEntityDespawn(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityDespawnEventPayload))] ScriptValue.Func handler) =>
         OnAnyThread("entityDespawn", origin, handler, occurred =>
             api.Event.OnEntityDespawn += (entity, reason) =>
                 occurred(new EntityDespawnEventPayload(entity, reason)));
 
-    /// <summary>Called when a mount's rider changes the pace it is ridden at.</summary>
+    /// <summary>
+    /// Called when a mount's rider changes the pace it is ridden at. The table
+    /// describes the mount rather than the rider, so <c>id</c> is the horse and
+    /// <c>gait</c> is what it is now doing.
+    /// </summary>
     /// <remarks>
     /// Named for the change rather than for the packet the game named it after,
     /// because the change is what this raises. A client sends its mount's gait with
@@ -224,106 +397,202 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// Remembered where the packet lands, which is a network thread rather than the
     /// one the server ticks on. Two packets for one mount arriving at once may both
     /// be reported, which costs a script a repeated call and nothing else.
+    ///
+    /// Only a mount whose rider's own client reports its position raises this at all,
+    /// so the pace is one a rider chose rather than one the server worked out. Nothing
+    /// is raised for a creature the server is walking itself.
     /// </remarks>
-    public void OnMountGaitChanged(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("mountGaitChanged")]
+    public void OnMountGaitChanged(
+        ScriptOrigin origin, [LuaPayload(typeof(MountGaitEventPayload))] ScriptValue.Func handler) =>
         OnAnyThread("mountGaitChanged", origin, handler, occurred =>
             api.Event.MountGaitReceived += (mount, gait) =>
             {
                 if (Changed(mount.EntityId, gait)) occurred(new MountGaitEventPayload(mount, gait));
             });
 
-    /// <summary>Called when something climbs onto something else.</summary>
-    public void OnEntityMounted(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called when something climbs onto something else. <c>id</c> is whoever climbed
+    /// on and <c>mount</c> is what they climbed onto.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityMounted")]
+    public void OnEntityMounted(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityMountEventPayload))] ScriptValue.Func handler) =>
         OnAnyThread("entityMounted", origin, handler, occurred =>
             api.Event.EntityMounted += (entity, seat) =>
                 occurred(new EntityMountEventPayload(entity, seat)));
 
     /// <summary>Called when something gets off what it was riding.</summary>
-    public void OnEntityUnmounted(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("entityUnmounted")]
+    public void OnEntityUnmounted(
+        ScriptOrigin origin, [LuaPayload(typeof(EntityMountEventPayload))] ScriptValue.Func handler) =>
         OnAnyThread("entityUnmounted", origin, handler, occurred =>
             api.Event.EntityUnmounted += (entity, seat) =>
                 occurred(new EntityMountEventPayload(entity, seat)));
 
     /// <summary>Called when a player joins.</summary>
-    public void OnPlayerJoin(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerJoin")]
+    public void OnPlayerJoin(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerJoin", origin, handler, occurred =>
             api.Event.PlayerJoin += player => occurred(new PlayerEventPayload(player)));
 
     /// <summary>Called when a player dies.</summary>
-    public void OnPlayerDeath(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerDeath")]
+    public void OnPlayerDeath(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerDeath", origin, handler, occurred =>
             api.Event.PlayerDeath += (player, _) => occurred(new PlayerEventPayload(player)));
 
     /// <summary>Called when a player respawns.</summary>
-    public void OnPlayerRespawn(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerRespawn")]
+    public void OnPlayerRespawn(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerRespawn", origin, handler, occurred =>
             api.Event.PlayerRespawn += player => occurred(new PlayerEventPayload(player)));
 
-    /// <summary>Called the first time a player ever joins this world.</summary>
+    /// <summary>
+    /// Called the first time a player ever joins this world, before they are welcomed.
+    /// Every later join raises <c>playerJoin</c> alone, so this is where anything
+    /// given once belongs.
+    /// </summary>
     /// <remarks>
     /// Raised only for a player the world has never seen, and before the welcome
     /// message, so a starter kit handed out here arrives with them.
     /// </remarks>
-    public void OnPlayerCreate(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerCreate")]
+    public void OnPlayerCreate(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerCreate", origin, handler, occurred =>
             api.Event.PlayerCreate += player => occurred(new PlayerEventPayload(player)));
 
-    /// <summary>Called once the player is in the world and has been welcomed.</summary>
-    public void OnPlayerNowPlaying(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>Called once a joining player is in the world and has been welcomed.</summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerNowPlaying")]
+    public void OnPlayerNowPlaying(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerNowPlaying", origin, handler, occurred =>
             api.Event.PlayerNowPlaying += player => occurred(new PlayerEventPayload(player)));
 
-    /// <summary>Called when a joining player's client reports that it has finished.</summary>
-    /// <remarks>The last of the three events a join raises.</remarks>
-    public void OnPlayerReady(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called when a joining player's client reports that it has finished. The last
+    /// of the three events a join raises, and the one after which the player is
+    /// certainly able to be spoken to.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerReady")]
+    public void OnPlayerReady(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerReady", origin, handler, occurred =>
             api.Event.PlayerReady += player => occurred(new PlayerEventPayload(player)));
 
-    /// <summary>Called when a player quits of their own accord, before they are removed.</summary>
-    /// <remarks>
-    /// A player who was kicked or who dropped raises only <see cref="OnPlayerDisconnect"/>.
-    /// </remarks>
-    public void OnPlayerLeave(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called when a player quits of their own accord, before they are removed. One
+    /// who was kicked or who lost their connection raises <c>playerDisconnect</c> only.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerLeave")]
+    public void OnPlayerLeave(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerLeave", origin, handler, occurred =>
             api.Event.PlayerLeave += player => occurred(new PlayerEventPayload(player)));
 
-    /// <summary>Called as a player is removed, however they went.</summary>
-    /// <remarks>
-    /// A quit, a kick and a lost connection all reach here, so this is the one that
-    /// always runs.
-    /// </remarks>
-    public void OnPlayerDisconnect(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called as a player is removed, however they went: a quit, a kick and a lost
+    /// connection all reach here, so this is the one that always runs.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerDisconnect")]
+    public void OnPlayerDisconnect(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerDisconnect", origin, handler, occurred =>
             api.Event.PlayerDisconnect += player => occurred(new PlayerEventPayload(player)));
 
-    /// <summary>Called after a player changes game mode.</summary>
-    /// <remarks>Raised after the change, so asking the player their mode gives the new one.</remarks>
-    public void OnPlayerSwitchGameMode(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called after a player changes game mode, so asking them their mode gives the
+    /// one they changed to.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("playerSwitchGameMode")]
+    public void OnPlayerSwitchGameMode(
+        ScriptOrigin origin, [LuaPayload(typeof(PlayerEventPayload))] ScriptValue.Func handler) =>
         On("playerSwitchGameMode", origin, handler, occurred =>
             api.Event.PlayerSwitchGameMode += player => occurred(new PlayerEventPayload(player)));
 
     /// <summary>Called once the save game has been read, which is after every script has run.</summary>
-    public void OnSaveGameLoaded(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("saveGameLoaded")]
+    public void OnSaveGameLoaded(
+        ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
         On("saveGameLoaded", origin, handler, occurred =>
             api.Event.SaveGameLoaded += () => occurred(ServerEventPayload.Instance));
 
-    /// <summary>Called on the one start where the world is brand new.</summary>
-    public void OnSaveGameCreated(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called on the one start where the world is brand new, immediately before
+    /// <c>saveGameLoaded</c>. Never called again for that world.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("saveGameCreated")]
+    public void OnSaveGameCreated(
+        ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
         On("saveGameCreated", origin, handler, occurred =>
             api.Event.SaveGameCreated += () => occurred(ServerEventPayload.Instance));
 
-    /// <summary>Called as the world is written to disk.</summary>
-    public void OnGameWorldSave(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called as the world is written to disk, which a server does periodically and
+    /// again as it shuts down. Anything a script wants saved with the world should be
+    /// written by the time this returns.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("gameWorldSave")]
+    public void OnGameWorldSave(
+        ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
         On("gameWorldSave", origin, handler, occurred =>
             api.Event.GameWorldSave += () => occurred(ServerEventPayload.Instance));
 
-    /// <summary>Called once the world generators are starting.</summary>
-    public void OnWorldgenStartup(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called once the world generators are starting, which is the last thing a
+    /// server does before it begins ticking.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("worldgenStartup")]
+    public void OnWorldgenStartup(
+        ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
         On("worldgenStartup", origin, handler, occurred =>
             api.Event.WorldgenStartup += () => occurred(ServerEventPayload.Instance));
 
-    /// <summary>Called when a server that had suspended itself wakes up again.</summary>
-    public void OnServerResume(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <summary>
+    /// Called when a server that had suspended itself for want of players wakes up
+    /// again. Servers that never stand by never raise it.
+    /// </summary>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens.</param>
+    [LuaFunction("serverResume")]
+    public void OnServerResume(
+        ScriptOrigin origin, [LuaPayload(typeof(ServerEventPayload))] ScriptValue.Func handler) =>
         On("serverResume", origin, handler, occurred =>
             api.Event.ServerResume += () => occurred(ServerEventPayload.Instance));
 
@@ -351,25 +620,41 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// that claim needs.
     /// </remarks>
     /// <summary>
-    /// Called before the server lets somebody act on a place, with the answer it has
-    /// arrived at so far, and answered by whatever a handler returns.
+    /// Called before the server lets somebody act on a place, and answered by what the
+    /// handler returns: one of the same words <c>world.testAccess</c> reads back, or
+    /// nothing to leave the decision alone.
     /// </summary>
     /// <remarks>
-    /// The one event here a handler decides rather than observes. The game asks every
-    /// mod in turn, handing each the answer the one before it gave, and takes the last
-    /// answer as the decision — so a handler may refuse what the claim allowed and
-    /// may allow what the claim refused. Both directions are the game's own behaviour
-    /// and both are offered, which means a script here can open a player's claim to
-    /// somebody else; a handler that means only to refuse should answer nothing
-    /// wherever it does not mean to refuse, rather than answering <c>granted</c>.
+    /// The one event here a handler decides rather than observes. It is asked for every
+    /// block a player breaks and every block they use, after the land claim check and
+    /// with that check's answer on <c>e.allowed</c>, so a handler is the last word
+    /// rather than the first. The game asks every mod in turn, handing each the answer
+    /// the one before it gave, and takes the last answer as the decision — so a handler
+    /// may refuse what the claim allowed and may allow what the claim refused. Both
+    /// directions are the game's own behaviour and both are offered, which means
+    /// answering <c>"granted"</c> overrides a claim and opens somebody's land to
+    /// whoever asked; a handler meaning only to refuse should return nothing wherever
+    /// it does not mean to refuse.
+    ///
+    /// The server asks this constantly, so a handler here is on a hot path in a way no
+    /// other event is: keep it to arithmetic and a table lookup, and read nothing that
+    /// searches the world.
     ///
     /// Answered where it is asked. The server's own two callers — a player breaking a
     /// block and a player using one — ask on the thread it ticks on, but another mod
     /// calling the same check may ask from any thread, and an answer marshalled onto
     /// the main thread would arrive after the decision was made. So a call arriving
-    /// anywhere else leaves the answer exactly as it found it, and says so once.
+    /// anywhere else leaves the answer exactly as it found it, and says so once: a
+    /// protection written here holds for players and may not hold against another mod
+    /// reaching past them.
     /// </remarks>
-    public void OnTestBlockAccess(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time somebody is tested, and answers.</param>
+    [LuaFunction("testBlockAccess")]
+    public void OnTestBlockAccess(
+        ScriptOrigin origin,
+        [LuaPayload(typeof(AccessTestEventPayload), Returns = "EnumAccessResponse|nil")]
+        ScriptValue.Func handler) =>
         OnAnswered("testBlockAccess", origin, handler, answer =>
             api.Event.OnTestBlockAccess += (player, selection, kind, ref claimant, response) =>
             {
@@ -392,19 +677,30 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// <c>true</c> to say it after all, or nothing at all to leave it alone.
     /// </summary>
     /// <remarks>
-    /// Handlers are asked in turn and each is given what the one before it left, so a
-    /// rewrite chains and the last word stands. That is the game's own rule for this
-    /// event and it is followed exactly, which is worth knowing in one direction
-    /// particularly: a handler answering <c>true</c> undoes a swallow an earlier one
-    /// asked for, so a script that mutes players and a script that rewrites messages
-    /// have to be ordered deliberately rather than dropped into the folder in any
-    /// order.
+    /// This is how chat is filtered, prefixed, muted or routed somewhere else. Handlers
+    /// are asked in turn and each is given what the one before it left, so a rewrite
+    /// chains and the last word stands. That is the game's own rule for this event and
+    /// it is followed exactly, which is worth knowing in one direction particularly: a
+    /// handler answering <c>true</c> undoes a swallow an earlier one asked for, so a
+    /// script that mutes players can be undone by a later script that knows nothing
+    /// about muting. Scripts run in name order, so anything that must have the last
+    /// word belongs in a file that sorts last, and a handler that does not mean to
+    /// interfere should return nothing rather than <c>true</c>.
+    ///
+    /// The message reaches the group named on the event, so a handler that means to
+    /// send it somewhere else swallows it and calls <c>moontweaks.groups.say</c>.
     ///
     /// Raised on the thread the server ticks on, where the answer is needed, so the
     /// same guard applies as to the other answering event: asked from anywhere else,
     /// the message is left exactly as it was found.
     /// </remarks>
-    public void OnPlayerChat(ScriptOrigin origin, ScriptValue.Func handler) =>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time somebody says something, and answers.</param>
+    [LuaFunction("playerChat")]
+    public void OnPlayerChat(
+        ScriptOrigin origin,
+        [LuaPayload(typeof(ChatEventPayload), Returns = "string|boolean|nil")]
+        ScriptValue.Func handler) =>
         OnChat("playerChat", origin, handler, said =>
             api.Event.PlayerChat += (IServerPlayer player, int group, ref string message, ref string data, BoolRef consumed) =>
             {
@@ -413,10 +709,192 @@ public sealed class ScriptEvents(ICoreServerAPI api)
                 consumed.value = swallowed;
             });
 
+    /// <summary>
+    /// Called as the game tests whether a set of ingredients laid out in a grid makes
+    /// one particular recipe, and answered by what the handler returns: <c>false</c> to
+    /// refuse the recipe, or nothing to leave the game's own answer alone.
+    /// </summary>
+    /// <remarks>
+    /// This is how a recipe is gated on something the recipe itself cannot say: who is
+    /// crafting, where they are standing, what the server has decided about them. The
+    /// recipe stays in the book and stays craftable by anybody the handler does not
+    /// refuse, which is what separates this from removing it outright with
+    /// <c>moontweaks.recipes.grid.remove</c>.
+    ///
+    /// A handler refuses and cannot permit. The game asks this before it checks the
+    /// ingredients against the recipe at all and takes a <c>false</c> as the whole
+    /// answer, so refusing stops a recipe that would otherwise have been made, while
+    /// answering <c>true</c> only lets the game go on to decide for itself. There is
+    /// no way from here to make an arrangement produce something it does not match.
+    ///
+    /// <c>output</c> is required and is not a convenience. The game asks this once per
+    /// candidate recipe every time somebody moves an item in a crafting grid, so a
+    /// handler called for every recipe would put an interpreter call on one of the
+    /// busiest paths the server has. What is named here is matched before any of that,
+    /// so a script watching one recipe costs a wildcard match per candidate and a call
+    /// only for the recipes it asked about. It takes a <c>*</c> wildcard, so
+    /// <c>"game:bread-*"</c> reaches a family.
+    ///
+    /// Answering does not consume anything: this decides whether the arrangement makes
+    /// the recipe, and is asked again for every rearrangement, so a handler must not
+    /// treat being called as somebody having crafted something. It is asked on the
+    /// thread the server ticks on and answered there; the last handler to answer wins,
+    /// which is the game's own rule.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="output">
+    /// Code of what a recipe makes, which decides the recipes this handler hears about.
+    /// Takes a <c>*</c> wildcard.
+    /// </param>
+    /// <param name="handler">Called for each matching recipe tested, and answers.</param>
+    [LuaFunction("matchesGridRecipe")]
+    public void OnMatchesGridRecipe(
+        ScriptOrigin origin,
+        [LuaSuggests(SuggestionSets.ASSET_CODE)] string output,
+        [LuaPayload(typeof(RecipeMatchEventPayload), Returns = "false|nil")]
+        ScriptValue.Func handler) =>
+        OnRecipeMatch("matchesGridRecipe", output, origin, handler, () =>
+            api.Event.MatchesGridRecipe += (player, recipe, ingredients, gridWidth) =>
+                RaiseRecipeMatch("matchesGridRecipe", recipe,
+                    new RecipeMatchEventPayload(player, recipe, ingredients, gridWidth), true));
+
+    /// <summary>
+    /// Called as the game tests whether a set of ingredients makes one particular
+    /// recipe of a kind that is not laid out in a grid — a barrel's, an anvil's, a clay
+    /// form's or a knapping surface's — and answered the same way
+    /// <c>matchesGridRecipe</c> is: <c>false</c> to refuse, nothing to leave it alone.
+    /// </summary>
+    /// <remarks>
+    /// The same event as <c>matchesGridRecipe</c> in everything but which kinds it
+    /// covers, down to refusing rather than permitting, and <c>output</c> is required
+    /// here for the same reason. It is asked less often, being raised as somebody works
+    /// a barrel or an anvil rather than as they rearrange a crafting grid, but the two
+    /// share a shape so that a script gating a recipe writes the same handler whichever
+    /// kind makes it.
+    ///
+    /// <c>gridWidth</c> is zero here, since none of these kinds has a layout.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="output">
+    /// Code of what a recipe makes, which decides the recipes this handler hears about.
+    /// Takes a <c>*</c> wildcard.
+    /// </param>
+    /// <param name="handler">Called for each matching recipe tested, and answers.</param>
+    [LuaFunction("matchesRecipe")]
+    public void OnMatchesRecipe(
+        ScriptOrigin origin,
+        [LuaSuggests(SuggestionSets.ASSET_CODE)] string output,
+        [LuaPayload(typeof(RecipeMatchEventPayload), Returns = "false|nil")]
+        ScriptValue.Func handler) =>
+        OnRecipeMatch("matchesRecipe", output, origin, handler, () =>
+            api.Event.MatchesRecipe += (player, recipe, ingredients) =>
+                RaiseRecipeMatch("matchesRecipe", recipe,
+                    new RecipeMatchEventPayload(player, recipe, ingredients, 0), true));
+
     private void OnAnyThread(
         string name, ScriptOrigin origin, ScriptValue.Func handler, Action<Occurred> subscribe) =>
         On(name, origin, handler, occurred => subscribe(
             about => api.Event.EnqueueMainThreadTask(() => occurred(about), $"moontweaks:{name}")));
+
+    /// <summary>
+    /// Asks whoever is listening whether one recipe may be made, and gives back the
+    /// last answer. A handler that answers nothing leaves the recipe as it found it.
+    /// </summary>
+    /// <remarks>
+    /// The game asks this while somebody arranges ingredients, once per candidate
+    /// recipe per rearrangement, which is a different order of frequency from any
+    /// other event bound here. Three things keep that affordable, in the order they
+    /// are reached:
+    ///
+    /// Nothing is subscribed until a script asks, so a server whose scripts want none
+    /// of this pays nothing at all. Then the output code each handler named is matched
+    /// here, in C#, before a payload is built or the interpreter entered — so a script
+    /// watching one recipe pays a wildcard match per candidate rather than a call.
+    /// Only what survives both crosses into Lua.
+    ///
+    /// The filter is required rather than offered, which is why it is on
+    /// <see cref="Handler"/> rather than left to a handler's own first line: a script
+    /// cannot ask for every recipe by omitting it, and so cannot put an interpreter
+    /// call on this path without naming what it is for.
+    /// </remarks>
+    private bool RaiseRecipeMatch(string name, IRecipeBase recipe, EventPayload about, bool matched)
+    {
+        if (handlers.GetValueOrDefault(name) is not { Count: > 0 } listening) return matched;
+
+        // Answered where it is asked, for the reason RaiseAnswered gives: the game
+        // wants the answer now, and one marshalled onto the main thread would arrive
+        // after the recipe was decided.
+        if (Environment.CurrentManagedThreadId != mainThread)
+        {
+            if (offThread.Add(name))
+            {
+                api.Logger.Warning(
+                    "[moontweaks] '{0}' was asked from another thread and was left to the server to answer. "
+                    + "A script cannot answer it there, so handlers for it do not run for whatever asked.",
+                    name);
+            }
+
+            return matched;
+        }
+
+        var made = recipe.RecipeOutput?.ResolvedItemStack?.Collectible?.Code;
+        ScriptValue.Map? payload = null;
+        var decided = matched;
+
+        foreach (var handler in listening.ToArray())
+        {
+            // The whole point of the filter: a recipe this handler did not ask about
+            // costs a wildcard match and nothing else.
+            if (handler.Filter is { } wanted && (made is null || !WildcardUtil.Match(wanted, made)))
+            {
+                continue;
+            }
+
+            // Built once, and only for a recipe something actually asked about.
+            payload ??= PayloadWriter.Table(about);
+
+            try
+            {
+                // Only a refusal is acted on. The game asks this before it matches the
+                // ingredients at all and takes a false as the whole answer, so there is
+                // nothing a true could mean here that leaving it alone does not already
+                // mean, and reading one would promise a script something this event
+                // cannot do.
+                if (handler.Call.Call([payload]) is ScriptValue.Bool { Value: false }) decided = false;
+            }
+            catch (Exception failure)
+            {
+                listening.Remove(handler);
+                api.Logger.Error(
+                    "[moontweaks] {0}: handler for '{1}' failed and will not be called again: {2}",
+                    handler.Origin, name, failure.Message);
+            }
+        }
+
+        return decided;
+    }
+
+    /// <summary>
+    /// Adds a handler that hears only about recipes making what it named, and
+    /// remembers to subscribe the first time one arrives.
+    /// </summary>
+    /// <remarks>
+    /// Subscribing is deferred to <see cref="Activate"/> exactly as <see cref="On"/>
+    /// defers it, and for the same reason: a run that is thrown away leaves the game's
+    /// own events as it found them. Each event takes out its own subscription, so a
+    /// script asking for one of the two does not put a handler on the other.
+    /// </remarks>
+    private void OnRecipeMatch(
+        string name, string output, ScriptOrigin origin, ScriptValue.Func handler, Action subscribe)
+    {
+        if (!handlers.TryGetValue(name, out var listening))
+        {
+            handlers[name] = listening = [];
+            pending.Add((name, subscribe));
+        }
+
+        listening.Add(new Handler(origin, handler, new AssetLocation(output)));
+    }
 
     /// <summary>
     /// Adds a handler, and remembers to subscribe to the game's event the first time

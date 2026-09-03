@@ -60,6 +60,8 @@ diag.surface = {
   "events.gameWorldSave",
   "events.mapRegionLoaded",
   "events.mapRegionUnloaded",
+  "events.matchesGridRecipe",
+  "events.matchesRecipe",
   "events.mountGaitChanged",
   "events.playerChangeSlot",
   "events.playerChat",

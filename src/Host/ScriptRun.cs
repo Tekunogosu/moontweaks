@@ -75,7 +75,7 @@ public sealed record ScriptRun(
         host.Bind(DomainBinder.Bind(new TagDomain(server.World)));
         host.Bind(DomainBinder.Bind(new LogDomain(server.Logger)));
         host.Bind(DomainBinder.Bind(new ServerDomain(server, timers)));
-        host.Bind(DomainBinder.Bind(new EventDomain(events)));
+        host.Bind(DomainBinder.Bind(events));
         host.Bind(DomainBinder.Bind(new CommandDomain(commands)));
         host.Bind(DomainBinder.Bind(new ModDomain(server.ModLoader)));
         host.Bind(DomainBinder.Bind(new EntityDomain(creatures, stacks)));
