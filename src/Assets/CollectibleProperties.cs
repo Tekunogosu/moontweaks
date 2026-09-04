@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using MoonTweaks.Api;
 using MoonTweaks.Scripting;
+using Newtonsoft.Json.Linq;
 using Vintagestory.API.Common;
+using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 
 namespace MoonTweaks.Assets;
@@ -34,7 +36,10 @@ public static class CollectibleProperties
         if (spec.Tool is { } tool) asset.Tool = ValueSet.As<EnumTool>(tool);
         if (spec.MaterialDensity is { } density) asset.MaterialDensity = density;
         if (spec.MiningSpeed is { } speeds) asset.MiningSpeed = Speeds(speeds);
-        if (spec.Attributes is not null) asset.Attributes = AssetStacks.Attributes(spec.Attributes);
+        if (spec.Attributes is not null || spec.SetAttributes is not null)
+        {
+            asset.Attributes = Carried(asset.Attributes, spec.Attributes, spec.SetAttributes, origin);
+        }
         if (spec.StorageFlags is { } storage) asset.StorageFlags = Flags(storage);
         if (spec.DamagedBy is { } sources) asset.DamagedBy = Sources(sources);
         if (spec.Combustible is { } fire) Burn(asset, fire, stacks, origin);
@@ -53,6 +58,43 @@ public static class CollectibleProperties
                 stacks.World.Api.CollectibleTagRegistry, asset.Tags, spec.AddTags, spec.SetTags, origin);
         }
     }
+
+    /// <summary>
+    /// The attributes an asset carries once a script has spoken: merged into what it
+    /// held when the script wrote <c>attributes</c>, and exactly what the script wrote
+    /// when it wrote <c>setAttributes</c>. Asked as one question rather than two,
+    /// because both answer the same field and a spec naming both has said two
+    /// incompatible things about it.
+    /// </summary>
+    /// <remarks>
+    /// The merge is JSON's own: an object folds into an object key by key at every
+    /// depth, and anything else — a scalar, a list — replaces what sat under its key.
+    /// Merged onto a copy, so an attribute tree the game shares between assets is not
+    /// changed for the ones a script did not name.
+    /// </remarks>
+    private static JsonObject? Carried(
+        JsonObject? held, ScriptValue? merged, ScriptValue? replaced, ScriptOrigin origin)
+    {
+        if (merged is not null && replaced is not null)
+        {
+            throw new ScriptError(origin,
+                "names 'attributes' alongside 'setAttributes', which disagree about what the rest "
+                + "of what it carries should become; write one or the other");
+        }
+
+        if (replaced is not null) return AssetStacks.Attributes(replaced);
+
+        var into = held?.Token is JObject carried ? (JObject)carried.DeepClone() : new JObject();
+        into.Merge(ScriptJson.Token(merged!), MERGE);
+        return new JsonObject(into);
+    }
+
+    /// <summary>How a script's attributes fold into an asset's: objects by key, everything else replaced.</summary>
+    private static readonly JsonMergeSettings MERGE = new()
+    {
+        MergeArrayHandling = MergeArrayHandling.Replace,
+        MergeNullValueHandling = MergeNullValueHandling.Ignore,
+    };
 
     /// <summary>
     /// How something changes once it stops being fresh, as the game holds it. A list

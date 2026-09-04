@@ -32,6 +32,28 @@ break".
 
 ---
 
+## Attributes that merge — 1.1.0
+
+`attributes` on `items.set` and `blocks.set` folds into what the asset already
+carries instead of replacing it; `setAttributes` is the replacing spelling, and a
+call naming both is refused. `20-assets.lua` exercises all three spellings, but no
+binding reads an asset's attributes back, so whether the merge landed is only
+visible in the game.
+
+**Run:** the startup suite, then the hemp example in
+`examples/scripts/assets/storage.lua` on a server holding Grassroots and Immersive
+Fibercraft.
+
+**Good result:** three passes — `items.set (attributes merge)`,
+`items.set (setAttributes)`, `items.set (refuses attributes with setAttributes)`.
+In the world, hemp fibers spin into hemp twine on the wheel or the drop spindle
+*and* still sit on a shelf: the shelf is the key the script never named, so it is
+what shows the merge rather than a replace.
+
+**If it fails:** fibers that spin but no longer shelve mean the merge replaced the
+tree. `CollectibleProperties.Carried` is the only place the two trees meet; check
+that it clones and merges into the held tree rather than starting from the script's.
+
 ## Land claims — 0.37.0
 
 `moontweaks.claims` reads claims, adds one and removes one. `52-claims.lua` is the

@@ -290,10 +290,23 @@ public class AssetPropertiesSpec
 
     /// <summary>
     /// Arbitrary data the game reads off this item or block, written as a Lua table
-    /// and stored as JSON. Replaces whatever it carried.
+    /// and stored as JSON, merged into whatever it already carries. A key named here
+    /// replaces the value under that key; a key left out keeps the value the game
+    /// gave it. Tables merge the same way at every depth, so naming one key inside
+    /// <c>handbook</c> moves that key and nothing else beside it. A list replaces the
+    /// list under its key whole.
     /// </summary>
     [LuaField("attributes")]
     public ScriptValue? Attributes { get; set; }
+
+    /// <summary>
+    /// Arbitrary data the game reads off this item or block, in place of whatever it
+    /// already carries. Read <c>attributes</c> for the usual case: replacing takes
+    /// away every key the game gave an asset, and this is the only way to take one
+    /// away, since a Lua table cannot hold a nil.
+    /// </summary>
+    [LuaField("setAttributes")]
+    public ScriptValue? SetAttributes { get; set; }
 
     /// <summary>What burning or smelting it does.</summary>
     [LuaField("combustible")]

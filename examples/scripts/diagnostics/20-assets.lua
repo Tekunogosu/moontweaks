@@ -55,6 +55,41 @@ diag.check("items.set (refuses an unknown code)", function()
   return "refused, naming the code"
 end)
 
+-- ## Attributes
+--
+-- Three answers to one field. `attributes` folds into what the asset carries,
+-- `setAttributes` replaces it, and naming both is refused. Nothing here reads the
+-- tree back — no binding does yet — so what these measure is that each spelling is
+-- accepted or refused as documented; whether the merge landed is watched in the game.
+diag.check("items.set (attributes merge)", function()
+  -- A stick carries handbook data the game wrote. Adding a key beside it must leave
+  -- that data in place, which a replace would take away.
+  items.set { code = "game:stick", attributes = { moontweaksDiag = { ran = true } } }
+
+  return "merged moontweaksDiag into game:stick, beside what it already carried"
+end)
+
+diag.check("items.set (setAttributes)", function()
+  -- On something this suite may rewrite whole: a bare ingot has nothing the game
+  -- reads off its attributes, so replacing them costs it nothing.
+  items.set { code = "game:ingot-copper", setAttributes = { moontweaksDiag = true } }
+
+  return "replaced game:ingot-copper attributes with one key"
+end)
+
+diag.check("items.set (refuses attributes with setAttributes)", function()
+  local ok, why = pcall(items.set, {
+    code = "game:stick",
+    attributes = { a = 1 },
+    setAttributes = { b = 2 },
+  })
+
+  assert(not ok, "both spellings of one field were accepted")
+  assert(tostring(why):find("setAttributes"), "refused without naming the field: " .. tostring(why))
+
+  return "refused, naming both fields"
+end)
+
 -- ## Tags of this server's own
 --
 -- Declaring one, putting it on something, and then selecting by it. The last step is
