@@ -113,7 +113,6 @@ rpglevels.config.killXp = {
   { prefix = "game:sheep-",                    xp = 4 },
   { prefix = "game:gazelle-",contains = "-baby-", xp = 2 },
   { prefix = "game:gazelle-",                  xp = 4 },
-  { prefix = "game:fox-pup-",                  xp = 1 },
   { prefix = "game:fox-",    contains = "-baby-", xp = 1 },
   { prefix = "game:fox-",                      xp = 4 },
   { prefix = "game:raccoon-",contains = "-baby-", xp = 1 },
@@ -125,7 +124,6 @@ rpglevels.config.killXp = {
   { prefix = "game:beemob",                    xp = 5 },
   { prefix = "game:chicken-",                  xp = 1 },
   { prefix = "game:fish-",                     xp = 1 },
-  { prefix = "game:salmon",                    xp = 1 },
 }
 
 -- What a milestone hands over, in tiers matched to where a player of that level is in

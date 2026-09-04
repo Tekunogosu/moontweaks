@@ -26,7 +26,7 @@ namespace MoonTweaks.Entities;
 ///
 /// -- Searching. A box around a point, nearest first.
 /// for _, wolf in ipairs(entities.around { x = 500, y = 110, z = 500, range = 30,
-///                                         code = "game:wolf-adult", aliveOnly = true }) do
+///                                         code = "game:wolf-*", aliveOnly = true }) do
 ///   moontweaks.log.info(("%s at %.0f %.0f %.0f"):format(wolf.name, wolf.x, wolf.y, wolf.z))
 /// end
 ///

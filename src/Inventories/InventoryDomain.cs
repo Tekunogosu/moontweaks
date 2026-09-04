@@ -32,7 +32,7 @@ namespace MoonTweaks.Inventories;
 ///   end
 ///
 ///   -- Into their bags rather than into their hand, and it says how much fitted.
-///   local given = inventory.put({ player = e.player }, { code = "game:bread-spelt", quantity = 2 })
+///   local given = inventory.put({ player = e.player }, { code = "game:bread-spelt-perfect", quantity = 2 })
 ///   moontweaks.log.info(("%d loaf/loaves fitted"):format(given))
 /// end)
 ///
@@ -57,7 +57,7 @@ namespace MoonTweaks.Inventories;
 /// -- Charging for something: take says how much it actually got.
 /// local paid = inventory.take({ player = "someone" }, { code = "game:gear-rusty", quantity = 2 })
 /// if paid == 2 then
-///   inventory.put({ player = "someone" }, "game:linen-normal")
+///   inventory.put({ player = "someone" }, "game:cloth-plain")
 /// end
 /// </code>
 /// </example>

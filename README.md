@@ -634,9 +634,11 @@ touches is built from the folder the game hands it, and the two places that need
 platform-neutral form convert deliberately.
 
 The scripts in `scripts/` are POSIX shell, so they run on Linux and macOS as they
-are. On Windows they need WSL or Git Bash, and `package.sh` additionally wants
-`zip`, which Windows does not ship. Building and testing without them is `dotnet
-build` and copying the output; the scripts are convenience rather than requirement.
+are. On Windows they need WSL or Git Bash. Three want a program beyond the shell:
+`package.sh` wants `zip`, which Windows does not ship, `run-client.sh` wants `jq`,
+and `check-examples.sh` wants `lua-language-server`. Building and testing without
+any of them is `dotnet build` and copying the output; the scripts are convenience
+rather than requirement.
 
 Develop on Linux where there is a choice. Its filesystem is case-sensitive, so a
 script folder or an asset code with the wrong casing fails there and passes quietly
@@ -670,7 +672,13 @@ mode 700, since that file carries the session key and signature.
 Overrides: `VS_SERVER` (dedicated server install, default
 `/mnt/media/vintagestory-server`), `MOONTWEAKS_TESTBED` (server data path,
 default `.testbed`), `MOONTWEAKS_CLIENT` (client data path, default
-`/tmp/moontweaks-client`), `MOONTWEAKS_ADDRESS` (default `127.0.0.1:42420`).
+`/tmp/moontweaks-client`), `MOONTWEAKS_PORT` (default `42460`) and
+`MOONTWEAKS_ADDRESS` (default `127.0.0.1:$MOONTWEAKS_PORT`).
+
+The port is off the game's default of `42420` so the testbed never contends with a
+real server on the same machine, and it is passed on the command line rather than
+written into the testbed's config, so a regenerated testbed still lands somewhere
+harmless.
 
 `ClientSyncProbe` logs the grid recipe count the client received, so a test can
 compare it against what the server reported.
@@ -768,7 +776,7 @@ therefore visible to scripts and load-bearing: a script that assigns to that nam
 breaks `math.random` for every script and every handler until the server restarts.
 Nothing outside the engine has any reason to touch it.
 
-## Licence
+## License
 
 MoonTweaks is MIT licensed; see `LICENSE`.
 

@@ -15,7 +15,7 @@ namespace MoonTweaks.Assets;
 /// moontweaks.log.info(("%d item(s) on this server"):format(items.count()))
 ///
 /// -- Only the keys written here change, and a wildcard changes a whole family at once.
-/// items.set { code = "game:knife-flint", durability = 128 }
+/// items.set { code = "game:knife-generic-flint", durability = 128 }
 /// </code>
 /// </example>
 [LuaModule("moontweaks.items")]

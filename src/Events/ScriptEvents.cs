@@ -51,7 +51,7 @@ namespace MoonTweaks.Events;
 ///
 /// -- What people do to blocks. A place event also says what stood there before.
 /// events.didBreakBlock(function(e)
-///   if e.block == "game:crock-burned" then
+///   if e.block == "game:crock-red-fired" then
 ///     moontweaks.log.info(("%s broke a crock at %d %d %d"):format(e.playerName, e.x, e.y, e.z))
 ///   end
 /// end)

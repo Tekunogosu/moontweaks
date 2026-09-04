@@ -15,10 +15,10 @@ local world   = moontweaks.world
 -- A sound is named by its path in the game's assets. One the game has no sound for
 -- plays nothing and says nothing, so a path is worth checking against a working one.
 events.didBreakBlock(function(e)
-  if e.block ~= "game:ore-quartz-none" then return end
+  if e.block ~= "game:ore-quartz" then return end
 
   world.playSound {
-    sound = "game:sounds/effect/receive-glass",
+    sound = "game:sounds/effect/deepbell",
     x = e.x, y = e.y, z = e.z,
     range = 24,
   }

@@ -145,6 +145,6 @@ items.set {
 -- A tag nothing declared is refused by name, on the line that named it, rather than
 -- quietly matching nothing. Uncomment to see it:
 --
--- items.set { code = "game:knife-flint", addTags = "moontweaks:never-declared" }
+-- items.set { code = "game:knife-generic-flint", addTags = "moontweaks:never-declared" }
 
 moontweaks.log.info("tag-matched properties done")

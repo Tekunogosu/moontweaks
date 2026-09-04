@@ -33,7 +33,9 @@ grid.add {
   name = "moontweaks:sticks-from-firewood",
   pattern = { "AF" },
   ingredients = {
-    A = { tags = { "tool-axe" }, isTool = true, toolDurabilityCost = 1 },
+    A = { tags = { "tool-axe" }, 
+      isTool = true, toolDurabilityCost = 1 
+    },
     F = "game:firewood",
   },
   output = { code = "game:stick", quantity = 4 },
