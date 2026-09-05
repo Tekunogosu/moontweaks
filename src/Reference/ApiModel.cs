@@ -1,9 +1,15 @@
 using System.Collections.Generic;
 
-namespace MoonTweaks.DocGen;
+namespace MoonTweaks.Reference;
 
 /// <summary>The whole scriptable surface, as rendered into every documentation format.</summary>
+/// <param name="Name">What declares the surface, as a reader would call it: the mod's name.</param>
+/// <param name="Version">Version of that mod.</param>
+/// <param name="Modules">Every dotted path scripts call functions on.</param>
+/// <param name="Tables">Every table shape scripts write or are handed.</param>
+/// <param name="Enums">Every closed set of values a field accepts.</param>
 public sealed record ApiModel(
+    string Name,
     string Version,
     IReadOnlyList<ModuleDoc> Modules,
     IReadOnlyList<TableDoc> Tables,

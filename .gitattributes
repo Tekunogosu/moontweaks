@@ -1,0 +1,16 @@
+# Line endings are normalised to LF in the repository and checked out as LF on every
+# platform. Two things depend on that rather than merely preferring it.
+#
+# The examples and the generated library are embedded in the assembly, and a server
+# compares what it would write against what is already on disk — outright for an
+# example, by the build marker in the header for the library. A checkout carrying
+# CRLF would embed CRLF, so the same commit built on Windows and on Linux would
+# produce different resources and write Windows line endings into a Linux server's
+# folder.
+#
+# The scripts in scripts/ are run by /bin/sh, which does not accept a CR at the end
+# of a line.
+*               text=auto eol=lf
+
+*.sh            text eol=lf
+*.lua           text eol=lf

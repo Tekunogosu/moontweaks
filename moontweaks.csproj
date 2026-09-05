@@ -17,13 +17,12 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
-  <!-- The library is produced by ./scripts/docs.sh from a prior build, so a plain
-       `dotnet build` may not have one yet; the mod reports its absence at startup. -->
+  <!-- The scripting library is not embedded: a server renders it at startup from
+       the assembly it loaded, the same way it renders one for every plugin, which
+       is why the XML documentation file travels in the zip beside the DLL. -->
   <ItemGroup>
     <EmbeddedResource Include="src/Host/Resources/luarc.json" LogicalName="MoonTweaks.luarc.json" />
     <EmbeddedResource Include="src/Host/Resources/vscode-extensions.json" LogicalName="MoonTweaks.vscode.extensions.json" />
-    <EmbeddedResource Include="docs/library/moontweaks.lua" LogicalName="MoonTweaks.library.moontweaks.lua"
-                      Condition="Exists('$(MSBuildThisFileDirectory)docs/library/moontweaks.lua')" />
     <!-- Shipped for authors to copy from, so every example is one the build checks.
          Examples are grouped into folders by what they are about, and a resource name
          has only dots to spell that with: the folders become dot segments here and

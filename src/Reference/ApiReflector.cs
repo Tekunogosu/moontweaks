@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using MoonTweaks.Api;
 
-namespace MoonTweaks.DocGen;
+namespace MoonTweaks.Reference;
 
 /// <summary>
 /// Reads the scriptable surface out of the mod assembly. It enumerates modules,
@@ -20,7 +20,9 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         .ToDictionary(type => type, type => type.GetCustomAttribute<LuaTableAttribute>()!.Name);
 
     /// <summary>Builds the complete model.</summary>
-    public ApiModel Read(string version)
+    /// <param name="name">What declares the surface, as the model names it.</param>
+    /// <param name="version">Version of that mod.</param>
+    public ApiModel Read(string name, string version)
     {
         var modules = assembly.GetTypes()
             .Where(type => type.GetCustomAttribute<LuaModuleAttribute>() is not null)
@@ -38,7 +40,7 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
             .OrderBy(value => value.Name, StringComparer.Ordinal)
             .ToList();
 
-        return new ApiModel(version, modules, tables, enums);
+        return new ApiModel(name, version, modules, tables, enums);
     }
 
     private ModuleDoc ReadModule(Type type) => new(
@@ -204,6 +206,15 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         return type.IsArray ? $"{suggests.Values}[]" : suggests.Values;
     }
 
+    /// <summary>
+    /// The name a table shape is documented under, or null where the type is not one.
+    /// A shape declared in this assembly is one of its own; one declared elsewhere is
+    /// named by its own annotation, so a plugin's function taking a shape MoonTweaks
+    /// declares is written against the type the MoonTweaks library already defines.
+    /// </summary>
+    private string? TableNameOf(Type type) =>
+        tableNames.TryGetValue(type, out var own) ? own : SpecBinder.DeclaredTable(type)?.Name;
+
     /// <summary>Renders a CLR type as the Lua type scripts actually write.</summary>
     private string LuaNameOf(Type type)
     {
@@ -227,10 +238,10 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         if (type == typeof(string[][])) return "string[] | string[][]";
         // One key read two ways: the tag names, or the groups those names sit in.
         if (type == typeof(TagJunction)) return $"{SuggestionSets.ASSET_TAG}[] | TagGroup[]";
-        if (tableNames.TryGetValue(type, out var table)) return table;
+        if (TableNameOf(type) is { } table) return table;
         if (type.IsArray && type.GetElementType() is { } element)
         {
-            if (tableNames.TryGetValue(element, out var each)) return $"{each}[]";
+            if (TableNameOf(element) is { } each) return $"{each}[]";
             if (element.IsEnum) return $"{element.Name}[]";
         }
         if (type.IsEnum) return type.Name;

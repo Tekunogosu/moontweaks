@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A MoonTweaks plugin: a code mod of its own that hands MoonTweaks bindings for
+       scripts to reach under plugin.xlib. Built against moontweaks.dll and the mod
+       it exposes, neither of which travels in its zip: the game resolves both from
+       the mods it has already loaded, which is what declaring them as dependencies
+       in modinfo.json guarantees. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>moontweaks-xlib</AssemblyName>
+    <RootNamespace>MoonTweaks.Plugins.XLib</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- The summaries a server writes into the editor's library come from this
+         file, which build.sh puts in the zip beside the DLL. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- build.sh extracts the DLL from the XLib zip; a checkout with it elsewhere
+         sets XLIB_DLL. -->
+    <XLibDll Condition="'$(XLIB_DLL)' != ''">$(XLIB_DLL)</XLibDll>
+    <XLibDll Condition="'$(XLibDll)' == ''">$(MSBuildThisFileDirectory)obj/xlib/xlib.dll</XLibDll>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../moontweaks.csproj" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="xlib"><HintPath>$(XLibDll)</HintPath><Private>false</Private></Reference>
+    <Reference Include="VintagestoryAPI"><HintPath>$(VintageStoryDir)/VintagestoryAPI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="VintagestoryLib"><HintPath>$(VintageStoryDir)/VintagestoryLib.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <Target Name="CheckXLib" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(XLibDll)')"
+           Text="xlib.dll was not found at '$(XLibDll)'. Run build.sh, which extracts it from the XLib zip, or set XLIB_DLL to the DLL's path." />
+  </Target>
+
+</Project>

@@ -13,6 +13,10 @@ this runs entirely on the server (can be used in singleplayer without issue). Th
 the client is not available yet. `CLIENTSIDE.md` holds a design for reaching them from a
 client-side companion mod; it is a proposal rather than committed work.
 
+Another mod can add bindings of its own, which scripts reach under `plugin.<name>` and
+an editor completes like the rest. `PLUGINS.md` is the contract, and `plugins/xlib/` a
+complete plugin exposing XLib's skills.
+
 Now, Lua *IS* slower than writing a full C#. It's really designed for smaller customizations. While you could write a full
 mod in Lua with MoonTweaks, it's not recommended. That being said, a lot of work went into making it run as performant
 as possible. If you do experience significant performance issue while utilizing MoonTweaks, please create an issue and 
@@ -385,9 +389,10 @@ Failures name the file, the line, the call, and the argument:
 ### Layers
 
 ```
-Host       ModSystem, commands, script discovery, editor scaffolding, the log module
+Host       ModSystem, commands, script discovery, plugins, editor scaffolding, the log module
+Reference  the scriptable surface read back out of an assembly, and the library written from it
 Scripting  ScriptValue / IScriptHost / ScriptOrigin, and the JSON they convert to
-Api        annotations, the spec shapes, SpecBinder, PayloadWriter, DomainBinder
+Api        annotations, the plugin contract, the spec shapes, SpecBinder, PayloadWriter, DomainBinder
 Assets     reaching items and blocks: codes, tags, stacks, properties
 Recipes    one domain and factory per recipe kind, over the shared owners below
 Players    reaching a player and the behaviours their state lives on
@@ -407,7 +412,9 @@ systems the mods shipping with the game declare. Everything it touches is listed
 `MODSYSTEMS.md`, which is the list to walk after a game update.
 
 `ScriptRun` owns running the scripts. A server's startup and `/moontweaks check`
-both go through it, so what a check reports is what a start would do.
+both go through it, so what a check reports is what a start would do. It binds
+MoonTweaks's own domains first and every plugin's after them, against the paths
+already taken, which is what keeps `moontweaks.` the mod's own.
 
 The interpreter appears in exactly one class, `Scripting/LuaCSharpHost`. Lua values
 are reduced to a neutral `ScriptValue` tree at that boundary, so swapping
@@ -460,14 +467,17 @@ with the same files the mod installs into a server: the editor configuration hel
 this build produced. The repository's own scripts are therefore checked exactly where
 an author's are, by `check-examples.sh` running `lua-language-server` over that
 scaffolded folder. Generating and checking are separate programs because they answer
-separate questions: `package.sh` generates the library as a build step and must not
-fail on a diagnostic in an example, and a diagnostic reported by a build step reads
-as the packaging being broken rather than as a finding about the examples.
+separate questions: a diagnostic reported by a build step reads as the packaging
+being broken rather than as a finding about the examples.
 
 `ApiReflector` enumerates the surface through `DomainBinder.FunctionsOf` and
 `SpecBinder.FieldsOf` — the same helpers the interpreter uses to decide what
 exists — and takes descriptions from the compiler's XML documentation output. It
-cannot document a function that is not bound, or omit one that is.
+cannot document a function that is not bound, or omit one that is. It lives in the
+mod rather than in the generator, because a server runs the same reflection at
+startup to write `library/moontweaks.lua` and one library per plugin from the
+assemblies it actually loaded; the generator reuses it for the site. The zip
+therefore carries the XML documentation beside the DLL.
 
 Every module carries a worked example as well as a description, written beside the
 binding as an XML `example` element. One source reaches three places: the reference
@@ -570,6 +580,7 @@ timing loop's often do not.
 ```
 /moontweaks list       the changes this server's scripts applied at startup
 /moontweaks check      re-run every script and report what it would change
+/moontweaks plugins    the plugins bound on this server and the paths scripts reach them at
 /moontweaks export     rewrite library/codes.lua from the live registries
 ```
 

@@ -1,0 +1,15 @@
+{
+  "type": "code",
+  "modid": "moontweaksxlib",
+  "name": "MoonTweaks XLib",
+  "description": "Reaches XLib's skills from MoonTweaks scripts, under plugin.xlib.",
+  "authors": ["Theysa"],
+  "version": "0.1.0",
+  "side": "Server",
+  "requiredonclient": false,
+  "dependencies": {
+    "game": "1.22.0",
+    "moontweaks": "1.2.0",
+    "xlibfork": "1.0.37"
+  }
+}

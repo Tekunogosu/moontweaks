@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
-namespace MoonTweaks.DocGen;
+namespace MoonTweaks.Reference;
 
 /// <summary>
 /// The compiler's XML documentation output, indexed by member. Descriptions come
@@ -17,6 +18,21 @@ public sealed partial class XmlDocs
     private readonly Dictionary<string, XElement> members;
 
     private XmlDocs(Dictionary<string, XElement> members) => this.members = members;
+
+    /// <summary>Documentation with nothing in it, for an assembly that shipped none.</summary>
+    public static readonly XmlDocs None = new([]);
+
+    /// <summary>
+    /// The XML file beside a loaded assembly, or null when it carries none. A mod
+    /// ships the compiler's output next to its DLL to be described; one that does
+    /// not still binds, and is described without its summaries.
+    /// </summary>
+    public static XmlDocs? Beside(Assembly assembly)
+    {
+        if (assembly.Location.Length == 0) return null;
+        var path = Path.ChangeExtension(assembly.Location, ".xml");
+        return File.Exists(path) ? Load(path) : null;
+    }
 
     /// <summary>Loads the XML file the compiler emitted next to an assembly.</summary>
     public static XmlDocs Load(string path) => new(

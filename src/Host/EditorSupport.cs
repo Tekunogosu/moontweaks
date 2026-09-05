@@ -1,15 +1,17 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using MoonTweaks.Reference;
 using Vintagestory.API.Common;
 
 namespace MoonTweaks.Host;
 
 /// <summary>
-/// Turns the MoonTweaks folder into a workspace an editor understands: the LuaCATS
-/// library describing this build's bindings, the configuration that points a
-/// language server at it, and a worked example of every recipe kind. A server that
-/// has started once needs no further setup.
+/// Turns the MoonTweaks folder into a workspace an editor understands: one LuaCATS
+/// library per set of bindings the server exposes, MoonTweaks's own and every
+/// plugin's, the configuration that points a language server at them, and a worked
+/// example of every recipe kind. A server that has started once needs no further
+/// setup.
 /// </summary>
 public static class EditorSupport
 {
@@ -19,8 +21,13 @@ public static class EditorSupport
     /// <summary>Folder the shipped examples are written to, for copying into scripts.</summary>
     public const string EXAMPLES_FOLDER = "examples";
 
-    private const string LIBRARY_RESOURCE = "MoonTweaks.library.moontweaks.lua";
     private const string EXAMPLE_PREFIX = "MoonTweaks.examples.";
+
+    /// <summary>
+    /// What a plugin's library is named, so one left behind by a plugin since removed
+    /// is told apart from a file an author put in the folder themselves.
+    /// </summary>
+    private static readonly string PLUGIN_LIBRARY_PATTERN = $"{Api.PluginContract.ROOT}.*.lua";
 
     /// <summary>How a scaffolded file is kept current.</summary>
     private enum Upkeep
@@ -36,25 +43,32 @@ public static class EditorSupport
     }
 
     /// <summary>One file the mod writes into its folder.</summary>
-    /// <param name="Resource">Embedded resource holding the contents.</param>
     /// <param name="Location">Where it goes, relative to the MoonTweaks folder.</param>
+    /// <param name="Contents">What it holds.</param>
     /// <param name="Upkeep">What decides whether it is rewritten.</param>
-    private sealed record Scaffold(string Resource, string Location, Upkeep Upkeep);
+    private sealed record Scaffold(string Location, string Contents, Upkeep Upkeep);
 
     /// <summary>
-    /// Everything this build carries. The library is stamped, so a restart reads one
+    /// Everything this server writes. A library is stamped, so a restart reads one
     /// header line rather than the whole file. Examples are small and carry no
     /// marker of their own, so they are compared outright.
     /// </summary>
-    private static IEnumerable<Scaffold> Scaffolds()
+    private static IEnumerable<Scaffold> Scaffolds(IEnumerable<Library> libraries)
     {
-        yield return new(LIBRARY_RESOURCE, $"{LIBRARY_FOLDER}/moontweaks.lua", Upkeep.Stamped);
-        yield return new("MoonTweaks.luarc.json", ".luarc.json", Upkeep.Seeded);
-        yield return new("MoonTweaks.vscode.extensions.json", ".vscode/extensions.json", Upkeep.Seeded);
+        foreach (var library in libraries)
+        {
+            yield return new($"{LIBRARY_FOLDER}/{library.FileName}", library.Contents, Upkeep.Stamped);
+        }
+
+        if (Read("MoonTweaks.luarc.json") is { } luarc) yield return new(".luarc.json", luarc, Upkeep.Seeded);
+        if (Read("MoonTweaks.vscode.extensions.json") is { } extensions)
+        {
+            yield return new(".vscode/extensions.json", extensions, Upkeep.Seeded);
+        }
 
         foreach (var resource in Resources(EXAMPLE_PREFIX))
         {
-            yield return new(resource, LocationOf(resource), Upkeep.Mirrored);
+            if (Read(resource) is { } example) yield return new(LocationOf(resource), example, Upkeep.Mirrored);
         }
     }
 
@@ -77,31 +91,26 @@ public static class EditorSupport
     }
 
     /// <summary>Writes every scaffolded file the folder does not already have current.</summary>
-    public static void Install(string folder, ILogger logger)
+    /// <param name="folder">The MoonTweaks folder.</param>
+    /// <param name="libraries">Every library this server describes its bindings with.</param>
+    /// <param name="logger">Where what was written is reported.</param>
+    public static void Install(string folder, IReadOnlyList<Library> libraries, ILogger logger)
     {
-        if (Read(LIBRARY_RESOURCE) is null)
-        {
-            // A build that skipped the reference generator still runs scripts; it
-            // just cannot describe itself to an editor.
-            logger.Warning("[moontweaks] this build embeds no scripting library, so {0} has no editor support",
-                folder);
-            return;
-        }
-
         var written = new List<string>();
+        var scaffolds = Scaffolds(libraries).ToList();
 
-        foreach (var file in Scaffolds())
+        foreach (var file in scaffolds)
         {
             var target = Path.Combine(folder, file.Location.Replace('/', Path.DirectorySeparatorChar));
-            if (Read(file.Resource) is not { } contents) continue;
-            if (File.Exists(target) && IsCurrent(file.Upkeep, target, contents)) continue;
+            if (File.Exists(target) && IsCurrent(file.Upkeep, target, file.Contents)) continue;
 
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.WriteAllText(target, contents);
+            File.WriteAllText(target, file.Contents);
             written.Add(file.Location);
         }
 
-        var removed = Prune(folder, [.. Scaffolds().Select(file => file.Location)]);
+        var shipped = new HashSet<string>(scaffolds.Select(file => file.Location), System.StringComparer.Ordinal);
+        var removed = Prune(folder, shipped).Concat(PruneLibraries(folder, shipped)).ToList();
 
         if (written.Count == 0 && removed.Count == 0)
         {
@@ -158,6 +167,31 @@ public static class EditorSupport
         {
             if (Directory.EnumerateFileSystemEntries(directory).Any()) continue;
             Directory.Delete(directory);
+        }
+
+        removed.Sort(System.StringComparer.Ordinal);
+        return removed;
+    }
+
+    /// <summary>
+    /// Deletes a plugin library whose plugin this server no longer holds. Only files
+    /// named as a plugin's are candidates: MoonTweaks's own is always shipped, and
+    /// anything else in the folder is the author's.
+    /// </summary>
+    private static IReadOnlyList<string> PruneLibraries(string folder, HashSet<string> shipped)
+    {
+        var library = Path.Combine(folder, LIBRARY_FOLDER);
+        if (!Directory.Exists(library)) return [];
+
+        var removed = new List<string>();
+
+        foreach (var path in Directory.EnumerateFiles(library, PLUGIN_LIBRARY_PATTERN))
+        {
+            var location = $"{LIBRARY_FOLDER}/{Path.GetFileName(path)}";
+            if (shipped.Contains(location)) continue;
+
+            File.Delete(path);
+            removed.Add(location);
         }
 
         removed.Sort(System.StringComparer.Ordinal);

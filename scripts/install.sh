@@ -19,7 +19,7 @@ VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$RO
 
 for dest in "$@"; do
     mkdir -p "$dest"
-    rm -f "$dest"/moontweaks-*.zip
+    rm -f "$dest"/moontweaks-[0-9]*.zip
     cp "$ROOT/bin/Release/moontweaks-$VERSION.zip" "$dest/"
     echo "installed moontweaks-$VERSION into $dest"
 done

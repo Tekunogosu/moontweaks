@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using MoonTweaks.DocGen;
+using MoonTweaks.Reference;
 
 if (args.Length < 4)
 {
@@ -21,7 +22,7 @@ var checkOnly = args.Contains("--check");
 var vendorDir = args.Length > 4 && !args[4].StartsWith("--", StringComparison.Ordinal) ? args[4] : null;
 
 var assembly = Assembly.LoadFrom(Path.GetFullPath(assemblyPath));
-var api = new ApiReflector(assembly, XmlDocs.Load(xmlPath)).Read(version);
+var api = new ApiReflector(assembly, XmlDocs.Load(xmlPath)).Read("MoonTweaks", version);
 
 var undocumented = Undocumented(api).ToList();
 foreach (var gap in undocumented) Console.Error.WriteLine($"undocumented: {gap}");

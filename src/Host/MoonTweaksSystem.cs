@@ -4,6 +4,7 @@ using System.Linq;
 using MoonTweaks.Commands;
 using MoonTweaks.Events;
 using MoonTweaks.Recipes;
+using MoonTweaks.Reference;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
 using Vintagestory.API.Server;
@@ -28,6 +29,16 @@ public class MoonTweaksSystem : ModSystem
 
     /// <summary>What this server's scripts are listening for.</summary>
     private ScriptEvents? events;
+
+    /// <summary>
+    /// Every plugin this server holds, found once at startup. Empty until then, and
+    /// empty for good when one of them was refused, since a run with a refused plugin
+    /// never happens.
+    /// </summary>
+    private IReadOnlyList<Plugin> plugins = [];
+
+    /// <summary>What the last successful run bound each plugin at, for the list command.</summary>
+    private IReadOnlyList<BoundPlugin> boundPlugins = [];
 
     /// <summary>
     /// This server's settings, read once by whichever of the startup phases reaches
@@ -96,7 +107,7 @@ public class MoonTweaksSystem : ModSystem
                             api, ScriptEngine.Create(ScriptEngine.DEFAULT),
                             ScriptLibrary.ScriptsPathFor(), new RecipeRegistry(api),
                             new ScriptEvents(api), new ScriptCommands(api, commandNames),
-                            new ScriptTimers(api), config.UndoHistory);
+                            new ScriptTimers(api), config.UndoHistory, plugins);
 
                         if (run.Failure is { } failure) return TextCommandResult.Error(failure.Message);
                         if (run.Scripts.Count == 0) return TextCommandResult.Success("no scripts to check");
@@ -107,6 +118,13 @@ public class MoonTweaksSystem : ModSystem
                             + (lines.Length == 0 ? "" : "\n" + lines)
                             + "\nnothing was applied; restart the server for changes to take effect");
                     }))
+                .EndSubCommand()
+                .BeginSubCommand("plugins")
+                    .WithDescription("List the plugins whose bindings this server's scripts reach")
+                    .HandleWith(_ => Answered(api.Logger, "plugins", () =>
+                        TextCommandResult.Success(boundPlugins.Count == 0
+                            ? "no plugins are bound on this server"
+                            : string.Join("\n", boundPlugins.Select(Describe)))))
                 .EndSubCommand()
                 .BeginSubCommand("export")
                     .WithDescription("Rewrite the asset codes an editor suggests, from the live registries")
@@ -149,11 +167,25 @@ public class MoonTweaksSystem : ModSystem
 
         var config = Settings(folder, server.Logger);
 
+        // Bound before anything is written, so the editor support describes exactly
+        // the plugins the run holds and a refused one never describes itself. A
+        // refused plugin is an operator's problem rather than an author's, and nothing
+        // runs until it is resolved: a script written against that plugin has no way
+        // to tell a refusal from a typo.
+        var registry = new RecipeRegistry(server);
+        events = new ScriptEvents(server);
+        var commands = new ScriptCommands(server);
+        var timers = new ScriptTimers(server);
+        var prepared = Discovered(server)
+            ? Prepared(server, config, scriptsFolder, registry, events, commands, timers)
+            : null;
+
         // What an author writes scripts with rather than what runs them, so a folder
         // that will not take it costs a server its editor support and nothing else.
         Attempt(server.Logger, "writing the editor support", () =>
         {
-            EditorSupport.Install(folder, server.Logger);
+            var bound = prepared?.Plugins.Select(plugin => plugin.Plugin) ?? [];
+            EditorSupport.Install(folder, Libraries(server.Logger, bound), server.Logger);
 
             // The registries are populated by now, so the codes an author may write are
             // exactly the ones an editor can offer.
@@ -171,12 +203,13 @@ public class MoonTweaksSystem : ModSystem
             }
         });
 
-        var registry = new RecipeRegistry(server);
-        events = new ScriptEvents(server);
-        var commands = new ScriptCommands(server);
-        var timers = new ScriptTimers(server);
+        if (prepared is null)
+        {
+            server.Logger.Error("[moontweaks] no scripts ran");
+            return;
+        }
 
-        if (Executed(server, config, scriptsFolder, registry, events, commands, timers) is not { } run) return;
+        var run = prepared.Run();
 
         if (run.Scripts.Count == 0)
         {
@@ -197,6 +230,7 @@ public class MoonTweaksSystem : ModSystem
 
         var affected = run.Log.Apply(server, server.Logger);
         applied = run.Log;
+        boundPlugins = run.Plugins;
         // Kept rather than disposed: a script may have left a handler behind, and it
         // is only callable while the interpreter that made it is alive.
         host = run.Host;
@@ -237,6 +271,12 @@ public class MoonTweaksSystem : ModSystem
                 run.Log.Refused.Count);
         }
 
+        if (run.Plugins.Count > 0)
+        {
+            server.Logger.Notification("[moontweaks] {0} plugin(s) bound: {1}",
+                run.Plugins.Count, string.Join("; ", run.Plugins.Select(Describe)));
+        }
+
         if (events.Count > 0)
         {
             server.Logger.Notification("[moontweaks] {0} event handler(s) listening", events.Count);
@@ -249,14 +289,71 @@ public class MoonTweaksSystem : ModSystem
     }
 
     /// <summary>
-    /// Runs every script, or reports why none of them could be and answers nothing.
+    /// Finds this server's plugins, keeping them for every run. Answers whether all
+    /// of them could be taken; a refusal is reported here and acted on by the caller.
+    /// </summary>
+    private bool Discovered(ICoreServerAPI server)
+    {
+        try
+        {
+            plugins = Plugins.Discover(server.ModLoader);
+            return true;
+        }
+        catch (PluginError refused)
+        {
+            plugins = [];
+            server.Logger.Error("[moontweaks] {0}", refused.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// One library per set of bindings: MoonTweaks's own, then each plugin's. All
+    /// rendered the same way from the assemblies the server actually loaded, so
+    /// what an editor completes is what the interpreter binds.
+    /// </summary>
+    /// <param name="logger">Where a plugin shipping no documentation is reported.</param>
+    /// <param name="bound">The plugins actually bound, which are the ones described.</param>
+    private IReadOnlyList<Library> Libraries(ILogger logger, IEnumerable<Plugin> bound)
+    {
+        var libraries = new List<Library>
+        {
+            Library.Of("moontweaks.lua", "MoonTweaks", Mod.Info?.Version ?? "", typeof(MoonTweaksSystem).Assembly),
+        };
+
+        foreach (var plugin in bound)
+        {
+            var library = Library.Of(
+                plugin.LibraryFile, plugin.Mod.Info?.Name ?? plugin.Name, plugin.Mod.Info?.Version ?? "",
+                plugin.Assembly);
+
+            if (!library.Documented)
+            {
+                logger.Warning(
+                    "[moontweaks] {0} ships no XML documentation beside its assembly, so {1} carries no descriptions",
+                    plugin.Describe(), library.FileName);
+            }
+
+            libraries.Add(library);
+        }
+
+        return libraries;
+    }
+
+    /// <summary>One plugin as the log and the list command name it.</summary>
+    private static string Describe(BoundPlugin bound) =>
+        $"{bound.Plugin.Describe()} at {string.Join(", ", bound.Paths)}";
+
+    /// <summary>
+    /// Binds every module and reads the folder, or reports why the scripts could not
+    /// be run at all and answers nothing.
     /// </summary>
     /// <remarks>
     /// A script that fails is the run's own answer and is reported by the caller.
-    /// This is for what happens either side of the scripts: reading the folder, and
-    /// building the interpreter to run them on.
+    /// This is for what happens before the scripts: reading the folder, building the
+    /// interpreter, and taking the plugins.
     /// </remarks>
-    private static ScriptRun? Executed(
+    private ScriptRun.Prepared? Prepared(
         ICoreServerAPI server,
         MoonTweaksConfig config,
         string scriptsFolder,
@@ -267,9 +364,14 @@ public class MoonTweaksSystem : ModSystem
     {
         try
         {
-            return ScriptRun.Execute(
+            return ScriptRun.Prepare(
                 server, ScriptEngine.Create(ScriptEngine.DEFAULT), scriptsFolder,
-                registry, events, commands, timers, config.UndoHistory);
+                registry, events, commands, timers, config.UndoHistory, plugins);
+        }
+        catch (PluginError refused)
+        {
+            server.Logger.Error("[moontweaks] {0}", refused.Message);
+            return null;
         }
         catch (Exception unreadable)
         {

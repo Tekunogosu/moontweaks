@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using MoonTweaks.Reference;
 
 namespace MoonTweaks.DocGen;
 
