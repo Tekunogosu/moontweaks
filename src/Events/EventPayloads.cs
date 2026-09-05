@@ -6,6 +6,7 @@ using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
+using Vintagestory.GameContent;
 
 namespace MoonTweaks.Events;
 
@@ -390,6 +391,77 @@ public sealed class EntityDeathEventPayload(Entity entity, DamageSource? cause)
     /// </summary>
     [LuaField("byEntity")]
     public double? ByEntity => killer?.EntityId;
+}
+
+/// <summary>Something about to be hurt, and by what.</summary>
+/// <param name="entity">The entity about to take the damage.</param>
+/// <param name="cause">What is hurting it.</param>
+/// <param name="amount">How much, as the game is about to apply it.</param>
+[LuaTable("EntityDamagedEvent", Given = true)]
+public sealed class EntityDamagedEventPayload(Entity entity, DamageSource cause, double amount)
+    : EntityEventPayload(entity)
+{
+    // Whoever is answerable, read the way the death event reads it: GetCauseEntity
+    // answers for a projectile and a blow alike.
+    private readonly Entity? attacker = cause.GetCauseEntity();
+
+    /// <summary>How much it is about to lose, after every armour and effect the game applied.</summary>
+    [LuaField("amount")]
+    public double Amount { get; } = amount;
+
+    /// <summary>What kind of hurt it is.</summary>
+    [LuaField("kind")]
+    public EnumHurtKind Kind { get; } = ValueSet.As<EnumHurtKind>(cause.Type);
+
+    /// <summary>Its health before the damage lands, or nil where it has none to have.</summary>
+    [LuaField("health")]
+    public double? Health { get; } = entity.GetBehavior<EntityBehaviorHealth>()?.Health;
+
+    /// <summary>Its most health, or nil where it has none to have.</summary>
+    [LuaField("maxHealth")]
+    public double? MaxHealth { get; } = entity.GetBehavior<EntityBehaviorHealth>()?.MaxHealth;
+
+    /// <summary>
+    /// Identifier of the player responsible, or nil where no player is. Whoever is
+    /// responsible rather than what struck, so an arrow names the archer.
+    /// </summary>
+    [LuaField("byPlayer")]
+    public string? ByPlayer => (attacker as EntityPlayer)?.PlayerUID;
+
+    /// <summary>Identifier of the entity responsible, or nil where nothing is.</summary>
+    [LuaField("byEntity")]
+    public double? ByEntity => attacker?.EntityId;
+}
+
+/// <summary>Something about to be healed.</summary>
+/// <param name="entity">The entity about to be healed.</param>
+/// <param name="cause">How the heal arrived.</param>
+/// <param name="amount">How much, as the game is about to apply it.</param>
+[LuaTable("EntityHealedEvent", Given = true)]
+public sealed class EntityHealedEventPayload(Entity entity, DamageSource cause, double amount)
+    : EntityEventPayload(entity)
+{
+    /// <summary>
+    /// How much it is about to gain. Health does not go past its most, so what it
+    /// actually gains is the smaller of this and the room it has left.
+    /// </summary>
+    [LuaField("amount")]
+    public double Amount { get; } = amount;
+
+    /// <summary>Its health before the heal lands, or nil where it has none to have.</summary>
+    [LuaField("health")]
+    public double? Health { get; } = entity.GetBehavior<EntityBehaviorHealth>()?.Health;
+
+    /// <summary>Its most health, or nil where it has none to have.</summary>
+    [LuaField("maxHealth")]
+    public double? MaxHealth { get; } = entity.GetBehavior<EntityBehaviorHealth>()?.MaxHealth;
+
+    /// <summary>
+    /// Whether this is a revival, which sets health to the amount rather than adding
+    /// it. A player respawning arrives this way.
+    /// </summary>
+    [LuaField("revive")]
+    public bool Revive { get; } = cause.Source == EnumDamageSource.Revive;
 }
 
 /// <summary>Something that left the world, and why.</summary>

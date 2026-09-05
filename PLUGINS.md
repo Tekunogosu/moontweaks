@@ -3,7 +3,9 @@
 A plugin is a code mod of its own that adds bindings to every script MoonTweaks runs.
 Scripts reach them under `plugin.<name>`, an editor completes them from a library the
 server writes beside MoonTweaks's own, and MoonTweaks itself carries nothing about
-any particular plugin. `plugins/xlib/` is a complete one, exposing XLib's skills.
+any particular plugin. `plugins/xlib/` is the smallest one that works, binding a few
+of XLib's skill functions to show the shape; `xlib-mtweaks`, a mod of its own, is the
+full XLib plugin built the same way.
 
 ## The contract
 

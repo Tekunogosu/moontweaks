@@ -2,13 +2,16 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using MoonTweaks.Api;
 using MoonTweaks.Scripting;
 using Vintagestory.API.Common;
+using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using Vintagestory.GameContent;
 
 namespace MoonTweaks.Events;
 
@@ -145,6 +148,29 @@ public sealed class ScriptEvents(ICoreServerAPI api)
     /// or null where nobody decided anything.
     /// </summary>
     private delegate EnumAccessResponse? Answered(EventPayload about);
+
+    /// <summary>
+    /// An amount handed to every handler in turn, each told what the one before it
+    /// left, and carried back changed or not.
+    /// </summary>
+    /// <param name="describe">The shape for one amount, built afresh per handler.</param>
+    /// <param name="amount">What the game was about to apply.</param>
+    private delegate double Amended(System.Func<double, EventPayload> describe, double amount);
+
+    /// <summary>
+    /// Every health behaviour already hooked, so an entity that both spawned and was
+    /// reported loaded is listened to once. Weak, so a despawned entity is let go.
+    /// </summary>
+    private readonly ConditionalWeakTable<EntityBehaviorHealth, object> hooked = [];
+
+    /// <summary>What amends damage, once a script asked; null while none has.</summary>
+    private Amended? damaged;
+
+    /// <summary>What amends healing, once a script asked; null while none has.</summary>
+    private Amended? healed;
+
+    /// <summary>Whether the spawn and load listeners that hook each entity are in place.</summary>
+    private bool hooking;
 
     /// <summary>
     /// Hands something a player said to whoever is listening and gives back what
@@ -366,6 +392,52 @@ public sealed class ScriptEvents(ICoreServerAPI api)
         OnAnyThread("entityDeath", origin, handler, occurred =>
             api.Event.OnEntityDeath += (entity, cause) =>
                 occurred(new EntityDeathEventPayload(entity, cause)));
+
+    /// <summary>
+    /// Called before anything alive takes damage, with the amount the game is about to
+    /// apply, and answered by what the handler returns: a number to apply that much
+    /// instead, or nothing to leave it alone. Zero prevents the hurt entirely.
+    /// </summary>
+    /// <remarks>
+    /// The game raises this per entity rather than for the world, so each entity is
+    /// listened to as it spawns or comes back with its chunk. Everything that hurts
+    /// through the game's own damage path arrives here, which is every weapon, fall,
+    /// fire and creature; a mod writing health directly does not.
+    ///
+    /// Handlers are asked in turn and each is told what the one before it left, so a
+    /// script halving damage and a later one adding two both have their say and the
+    /// last word stands. Raised on the thread the server ticks on, where the answer
+    /// is needed, so the same guard applies as to the other answering events: asked
+    /// from anywhere else, the amount is left as it was found.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens, and may answer.</param>
+    [LuaFunction("entityDamaged")]
+    public void OnEntityDamaged(
+        ScriptOrigin origin,
+        [LuaPayload(typeof(EntityDamagedEventPayload), Returns = "number|nil")] ScriptValue.Func handler) =>
+        OnAmended("entityDamaged", origin, handler, amend => HookHealth(damaged = amend));
+
+    /// <summary>
+    /// Called before anything alive is healed, with the amount the game is about to
+    /// apply, and answered by what the handler returns: a number to apply that much
+    /// instead, or nothing to leave it alone.
+    /// </summary>
+    /// <remarks>
+    /// Listened to per entity exactly as <c>entityDamaged</c> is, and covering the same
+    /// path: a poultice, a bandage, a respawn, and anything a mod heals the way the
+    /// game does. Natural regeneration writes health directly and never arrives here.
+    /// The game does not say who applied a heal, so a script crediting a healer reads
+    /// who is nearby, sneaking and looking at the entity, which the player module
+    /// answers.
+    /// </remarks>
+    /// <param name="origin">Script line adding the handler.</param>
+    /// <param name="handler">Called each time it happens, and may answer.</param>
+    [LuaFunction("entityHealed")]
+    public void OnEntityHealed(
+        ScriptOrigin origin,
+        [LuaPayload(typeof(EntityHealedEventPayload), Returns = "number|nil")] ScriptValue.Func handler) =>
+        OnAmended("entityHealed", origin, handler, amend => HookHealth(healed = amend));
 
     /// <summary>
     /// Called when something leaves the world, however it went. Read <c>reason</c>
@@ -967,6 +1039,116 @@ public sealed class ScriptEvents(ICoreServerAPI api)
         }
 
         listening.Add(new Handler(origin, handler));
+    }
+
+    /// <summary>
+    /// Adds a handler for an event whose answer is an amount, subscribing the first
+    /// time one arrives. The same bookkeeping <see cref="On"/> does, differing only in
+    /// that a number a handler returns is carried back rather than dropped.
+    /// </summary>
+    private void OnAmended(
+        string name, ScriptOrigin origin, ScriptValue.Func handler, Action<Amended> subscribe)
+    {
+        if (!handlers.TryGetValue(name, out var listening))
+        {
+            handlers[name] = listening = [];
+            pending.Add((name, () => subscribe((describe, amount) => RaiseAmended(name, describe, amount))));
+        }
+
+        listening.Add(new Handler(origin, handler));
+    }
+
+    /// <summary>
+    /// Puts the listeners in place that hook every entity's health as it appears,
+    /// once for both events: the game raises damage and healing through one delegate
+    /// per entity, and which of the two a call is only shows once it arrives.
+    /// </summary>
+    private void HookHealth(Amended _)
+    {
+        if (hooking) return;
+        hooking = true;
+
+        api.Event.OnEntitySpawn += Hook;
+        api.Event.OnEntityLoaded += Hook;
+    }
+
+    /// <summary>Hooks one entity's health, unless it has none or is hooked already.</summary>
+    private void Hook(Entity entity)
+    {
+        if (entity.GetBehavior<EntityBehaviorHealth>() is not { } health) return;
+        if (hooked.TryGetValue(health, out _)) return;
+
+        hooked.Add(health, health);
+        health.onDamaged += (amount, cause) => Amend(entity, cause, amount);
+    }
+
+    /// <summary>
+    /// What the game should apply, after every handler for the kind of call this is
+    /// has had its say. Healing is damage of a kind to the game, so the type on the
+    /// source is what tells the two apart.
+    /// </summary>
+    private float Amend(Entity entity, DamageSource cause, float amount)
+    {
+        var healing = cause.Type == EnumDamageType.Heal;
+        var amend = healing ? healed : damaged;
+        if (amend is null) return amount;
+
+        System.Func<double, EventPayload> describe = healing
+            ? value => new EntityHealedEventPayload(entity, cause, value)
+            : value => new EntityDamagedEventPayload(entity, cause, value);
+
+        return (float)amend(describe, amount);
+    }
+
+    /// <summary>
+    /// Calls every handler for an amount, each told what the one before it left, and
+    /// carries back what should be applied. A handler answering a number below zero
+    /// is read as zero, since a negative heal is not a hurt and the game would treat
+    /// it as one.
+    /// </summary>
+    /// <remarks>
+    /// A fresh table per handler, for the reason chat rebuilds its own: what a handler
+    /// is told has to be what the handler before it decided. Refuses to run anywhere
+    /// but the thread the server ticks on, for the reason <see cref="RaiseAnswered"/>
+    /// gives: the answer is needed where it was asked.
+    /// </remarks>
+    private double RaiseAmended(string name, System.Func<double, EventPayload> describe, double amount)
+    {
+        if (handlers.GetValueOrDefault(name) is not { Count: > 0 } listening) return amount;
+
+        if (Environment.CurrentManagedThreadId != mainThread)
+        {
+            if (offThread.Add(name))
+            {
+                api.Logger.Warning(
+                    "[moontweaks] '{0}' was asked from another thread and was left to the server to answer. "
+                    + "A script cannot answer it there, so handlers for it do not run for whatever asked.",
+                    name);
+            }
+            return amount;
+        }
+
+        var decided = amount;
+
+        foreach (var handler in listening.ToArray())
+        {
+            try
+            {
+                if (handler.Call.Call([PayloadWriter.Table(describe(decided))]) is ScriptValue.Num answer)
+                {
+                    decided = Math.Max(0, answer.Value);
+                }
+            }
+            catch (Exception failure)
+            {
+                listening.Remove(handler);
+                api.Logger.Error(
+                    "[moontweaks] {0}: handler for '{1}' failed and will not be called again: {2}",
+                    handler.Origin, name, failure.Message);
+            }
+        }
+
+        return decided;
     }
 
     /// <summary>

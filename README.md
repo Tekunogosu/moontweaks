@@ -14,8 +14,8 @@ the client is not available yet. `CLIENTSIDE.md` holds a design for reaching the
 client-side companion mod; it is a proposal rather than committed work.
 
 Another mod can add bindings of its own, which scripts reach under `plugin.<name>` and
-an editor completes like the rest. `PLUGINS.md` is the contract, and `plugins/xlib/` a
-complete plugin exposing XLib's skills.
+an editor completes like the rest. `PLUGINS.md` is the contract, `plugins/xlib/` the
+smallest plugin that works, and `xlib-mtweaks` a full one exposing XLib as a mod of its own.
 
 Now, Lua *IS* slower than writing a full C#. It's really designed for smaller customizations. While you could write a full
 mod in Lua with MoonTweaks, it's not recommended. That being said, a lot of work went into making it run as performant

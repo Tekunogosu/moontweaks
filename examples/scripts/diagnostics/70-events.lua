@@ -83,6 +83,15 @@ diag.watch("entityLoaded", events.entityLoaded, entity)
 diag.watch("entityDeath", events.entityDeath, function(e)
   return ("%s died of %s"):format(e.code, tostring(e.cause))
 end)
+-- Anything alive being hurt or patched up. The player checks hurt the hen, so
+-- the first fills in then; the second needs somebody to use a poultice.
+diag.watch("entityDamaged", events.entityDamaged, function(e)
+  return ("%s about to take %.1f of %s from %s"):format(
+    e.code, e.amount, tostring(e.kind), tostring(e.byPlayer or e.byEntity or "nothing"))
+end)
+diag.watch("entityHealed", events.entityHealed, function(e)
+  return ("%s about to gain %.1f"):format(e.code, e.amount)
+end)
 diag.watch("entityDespawn", events.entityDespawn, function(e)
   return ("%s left because %s"):format(e.code, tostring(e.reason))
 end)

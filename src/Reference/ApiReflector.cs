@@ -243,6 +243,7 @@ public sealed class ApiReflector(Assembly assembly, XmlDocs docs)
         {
             if (TableNameOf(element) is { } each) return $"{each}[]";
             if (element.IsEnum) return $"{element.Name}[]";
+            if (element == typeof(int) || element == typeof(double)) return $"{LuaNameOf(element)}[]";
         }
         if (type.IsEnum) return type.Name;
 

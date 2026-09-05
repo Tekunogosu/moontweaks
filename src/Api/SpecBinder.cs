@@ -193,6 +193,20 @@ public static class SpecBinder
                 : new TagJunction { Names = (string[])Convert(typeof(string[]), value, origin, path)! };
         }
 
+        // A list of numbers, such as the values an ability has per tier.
+        if (underlying.IsArray
+            && underlying.GetElementType() is { } number
+            && (number == typeof(int) || number == typeof(double)))
+        {
+            var entries = Items(value, origin, path, "a list");
+            var bound = Array.CreateInstance(number, entries.Count);
+            for (var index = 0; index < entries.Count; index++)
+            {
+                bound.SetValue(Convert(number, entries[index], origin, $"{path}[{index + 1}]"), index);
+            }
+            return bound;
+        }
+
         // A list of table shapes, for the kinds that number their ingredients rather
         // than key them by a pattern character.
         if (underlying.IsArray
